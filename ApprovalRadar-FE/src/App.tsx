@@ -181,7 +181,7 @@ export default function App() {
       </div>
 
       {/* Search Bar & Active Filters */}
-      <div className="mb-6 flex flex-col gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="flex items-center bg-surface border border-border-standard rounded-lg px-3 py-2 w-full max-w-md focus-within:ring-1 focus-within:ring-brand focus-within:border-brand transition-all shadow-sm">
           <MagnifyingGlass className="w-5 h-5 text-text-muted mr-2" />
           <input 
