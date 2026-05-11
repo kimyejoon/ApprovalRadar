@@ -8,7 +8,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from scraper import run_scraper_job
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # 프론트엔드 개발자가 Swagger에서 확인할 수 있는 응답 데이터 형태(Schema)를 정의합니다.
 class BusinessModel(BaseModel):
@@ -36,6 +36,11 @@ class BusinessResponse(BaseModel):
     status: str
     data: List[BusinessModel]
     meta: Optional[PaginationMeta] = None
+
+class DeltaResponse(BaseModel):
+    status: str
+    server_time: str
+    data: List[BusinessModel]
 
 def parse_comma_separated_list(regions: Optional[str] = Query(None, description="콤마(,)로 구분된 지역 목록 (예: 서울,강원,경기)")) -> Optional[List[str]]:
     if not regions:
@@ -165,5 +170,67 @@ def get_approvals(
         return {"status": "success", "data": result, "meta": meta}
     except Exception as e:
         # DB Error handling, returns a user-friendly message as required
+        print(f"Database error: {e}")
+        raise HTTPException(status_code=500, detail="데이터 제공처의 응답이 지연되고 있거나 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
+
+@app.get("/api/v1/approvals/delta", response_model=DeltaResponse)
+def get_approvals_delta(
+    last_updated_at: str = Query(..., description="마지막으로 데이터를 가져온 시간 (ISO 8601)"),
+    search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
+    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)"),
+    regions: Optional[List[str]] = Depends(parse_comma_separated_list)
+):
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            
+            query_conditions = ["updated_at > ?"]
+            params = [last_updated_at]
+            
+            if search:
+                query_conditions.append("(business_name LIKE ? OR license_no LIKE ?)")
+                search_term = f"%{search}%"
+                params.extend([search_term, search_term])
+                
+            if start_date:
+                query_conditions.append("last_event_date >= ?")
+                params.append(start_date)
+                
+            if end_date:
+                query_conditions.append("last_event_date <= ?")
+                params.append(end_date)
+                
+            if regions:
+                region_conditions = []
+                for r in regions:
+                    region_conditions.append("address LIKE ?")
+                    params.append(f"%{r}%")
+                if region_conditions:
+                    query_conditions.append(f"({' OR '.join(region_conditions)})")
+            
+            where_clause = " WHERE " + " AND ".join(query_conditions)
+            
+            data_query = f"SELECT * FROM businesses{where_clause} ORDER BY updated_at ASC"
+            
+            cursor.execute(data_query, params)
+            rows = cursor.fetchall()
+            
+            result = []
+            for row in rows:
+                record = dict(row)
+                try:
+                    record["representative_history"] = json.loads(record.get("representative_history", "[]"))
+                    record["licensing_history"] = json.loads(record.get("licensing_history", "[]"))
+                except Exception:
+                    record["representative_history"] = []
+                    record["licensing_history"] = []
+                result.append(record)
+                
+            timezone_kst = timezone(timedelta(hours=9))
+            server_time = datetime.now(timezone_kst).isoformat()
+                
+        return {"status": "success", "server_time": server_time, "data": result}
+    except Exception as e:
         print(f"Database error: {e}")
         raise HTTPException(status_code=500, detail="데이터 제공처의 응답이 지연되고 있거나 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")

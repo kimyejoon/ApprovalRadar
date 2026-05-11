@@ -62,15 +62,16 @@ def fetch_and_update_businesses(date_str: str):
                 cursor.execute("SELECT * FROM businesses WHERE license_no = ?", (lcns_no,))
                 db_record = cursor.fetchone()
                 
-                now = datetime.datetime.now().isoformat()
+                timezone_kst = datetime.timezone(datetime.timedelta(hours=9))
+                now = datetime.datetime.now(timezone_kst).isoformat()
                 
                 if not db_record:
                     # 신규 등록
                     cursor.execute('''
                         INSERT INTO businesses 
-                        (license_no, business_name, address, representative_name, business_status, license_date, phone_number, last_event_date, is_new)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-                    ''', (lcns_no, bssh_nm, addr, rep_name, business_status, license_date, phone_number, event_date))
+                        (license_no, business_name, address, representative_name, business_status, license_date, phone_number, last_event_date, is_new, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                    ''', (lcns_no, bssh_nm, addr, rep_name, business_status, license_date, phone_number, event_date, now, now))
                 else:
                     db_dict = dict(db_record)
                     prev_rep = db_dict["representative_name"]
@@ -194,7 +195,8 @@ def fetch_and_update_change_history(date_str: str):
                     if is_updated:
                         # 대표자 정보가 API 원문에 포함되어 왔고, 사유가 대표자변경이라면 마스터 테이블도 갱신
                         current_rep = af_cn if "대표자" in reason else db_dict["representative_name"]
-                        now = datetime.datetime.now().isoformat()
+                        timezone_kst = datetime.timezone(datetime.timedelta(hours=9))
+                        now = datetime.datetime.now(timezone_kst).isoformat()
                         
                         cursor.execute('''
                             UPDATE businesses 
@@ -225,10 +227,15 @@ def run_scraper_job():
         last_date_str = cursor.fetchone()[0]
         
     if last_date_str:
-        dt = datetime.datetime.fromisoformat(last_date_str)
-        target_date = dt.strftime("%Y%m%d")
+        # DB에서 가져온 문자열이 KST timezone offset을 포함할 수 있음
+        try:
+            dt = datetime.datetime.fromisoformat(last_date_str)
+            target_date = dt.strftime("%Y%m%d")
+        except ValueError:
+            target_date = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime("%Y%m%d")
     else:
-        target_date = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime("%Y%m%d")
+        timezone_kst = datetime.timezone(datetime.timedelta(hours=9))
+        target_date = (datetime.datetime.now(timezone_kst) - datetime.timedelta(days=3)).strftime("%Y%m%d")
         
     print(f"Scraping Job Triggered. Target Date >= {target_date}")
     fetch_and_update_businesses(target_date)
