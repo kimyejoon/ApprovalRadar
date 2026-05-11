@@ -33,7 +33,7 @@ export function TableHead({ className, ...props }: React.ThHTMLAttributes<HTMLTa
   return (
     <th
       className={cn(
-        "h-10 px-4 text-left align-middle font-medium text-text-muted [&:has([role=checkbox])]:pr-0",
+        "h-10 px-4 text-left align-middle font-medium text-text-muted has-[[role=checkbox]]:pr-0",
         className
       )}
       {...props}
@@ -45,7 +45,7 @@ export function TableCell({ className, ...props }: React.TdHTMLAttributes<HTMLTa
   return (
     <td
       className={cn(
-        "p-4 align-middle text-text-secondary [&:has([role=checkbox])]:pr-0",
+        "p-4 align-middle text-text-secondary has-[[role=checkbox]]:pr-0",
         className
       )}
       {...props}
