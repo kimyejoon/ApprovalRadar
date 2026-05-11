@@ -33,7 +33,7 @@ export function KoreaMapSelector({ selectedLocations, onSelect }: KoreaMapSelect
               const el = region as HTMLElement;
               el.style.cursor = 'pointer';
               el.style.transition = 'all 0.2s ease-in-out';
-              el.style.stroke = '#ffffff';
+              el.style.stroke = '#3ecf8e'; // Initial brand border
               el.style.strokeWidth = '2px';
               
               // Add title for tooltip if not exists
@@ -65,13 +65,13 @@ export function KoreaMapSelector({ selectedLocations, onSelect }: KoreaMapSelect
 
     const applyStyle = (el: HTMLElement, hovered: boolean) => {
       if (isSelected(el.id)) {
-        // Supabase accent style (Green outline with faint fill)
-        el.style.fill = hovered ? 'rgba(62, 207, 142, 0.2)' : 'rgba(62, 207, 142, 0.1)';
-        el.style.stroke = '#3ecf8e'; // Brand color
+        // Selected style: Green fill, Green stroke
+        el.style.fill = hovered ? '#2eb376' : '#3ecf8e'; // Slightly darker green on hover
+        el.style.stroke = '#3ecf8e';
       } else {
-        // Default style
+        // Default style: Grey fill, Accent (Green) stroke
         el.style.fill = hovered ? '#cbd5e1' : '#f1f5f9';
-        el.style.stroke = '#ffffff';
+        el.style.stroke = '#3ecf8e';
       }
     };
 

@@ -447,15 +447,33 @@ export default function App() {
         onClose={() => setIsLocationFilterOpen(false)}
         title="소재지 필터"
       >
-        <div className="p-2 sm:p-4">
+        <div className="p-2 sm:p-4 flex flex-col items-center">
           <p className="text-sm text-text-muted mb-4 text-center">지도를 클릭하여 여러 지역을 선택할 수 있습니다.</p>
+          
+          {/* Selected Location Tags in Modal */}
+          {tempLocationFilters.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-2 mb-4 w-full max-w-[500px]">
+              {tempLocationFilters.map(loc => (
+                <span key={loc} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm transition-all">
+                  {loc}
+                  <button 
+                    onClick={() => setTempLocationFilters(prev => prev.filter(l => l !== loc))}
+                    className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
+                  >
+                    <X weight="bold" className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
           <KoreaMapSelector 
             selectedLocations={tempLocationFilters} 
             onSelect={(locations) => {
               setTempLocationFilters(locations);
             }} 
           />
-          <div className="flex justify-end gap-2 mt-6">
+          <div className="flex justify-end gap-2 mt-6 w-full max-w-[500px]">
             <Button variant="secondary" onClick={() => setIsLocationFilterOpen(false)}>취소</Button>
             <Button variant="primary" onClick={() => {
               setLocationFilters(tempLocationFilters);
