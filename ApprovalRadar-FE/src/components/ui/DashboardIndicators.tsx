@@ -36,7 +36,7 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
   }, []);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
       {/* Indicator Card */}
       <Card className="flex flex-col justify-center border-border-standard shadow-sm bg-surface-primary">
         <CardHeader className="pb-2">
@@ -90,7 +90,7 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
       </Card>
 
       {/* Bar Chart: 주간 트렌드 */}
-      <Card className="border-border-standard shadow-sm bg-surface-primary">
+      <Card className="border-border-standard shadow-sm bg-surface-primary lg:col-span-2">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-text-muted">최근 7일 변동 추이</CardTitle>
         </CardHeader>
