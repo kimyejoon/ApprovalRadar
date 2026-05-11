@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Radar, Sun, Moon } from '@phosphor-icons/react';
+import { Broadcast, Sun, Moon } from '@phosphor-icons/react';
 import { Button } from '../ui/Button';
 
 interface DashboardLayoutProps {
@@ -22,7 +22,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Sidebar */}
       <aside className="w-60 border-r border-border-standard flex flex-col">
         <div className="h-16 flex items-center px-6 border-b border-border-standard">
-          <Radar className="w-6 h-6 text-brand mr-3" />
+          <Broadcast className="w-6 h-6 text-brand mr-3" />
           <span className="font-sans font-medium text-lg tracking-tight">인허가Radar</span>
         </div>
         <nav className="flex-1 px-4 py-6 space-y-2">
