@@ -55,21 +55,21 @@ export function DatePickerWithPresets({ date, setDate }: DatePickerWithPresetsPr
           <Button
             variant="ghost"
             className="justify-start font-normal"
-            onClick={() => setDate({ from: startOfWeek(new Date(), { weekStartsOn: 1 }), to: startOfToday() })}
+            onClick={() => setDate({ from: startOfWeek(startOfToday(), { weekStartsOn: 1 }), to: startOfToday() })}
           >
             이번 주
           </Button>
           <Button
             variant="ghost"
             className="justify-start font-normal"
-            onClick={() => setDate({ from: startOfMonth(new Date()), to: startOfToday() })}
+            onClick={() => setDate({ from: startOfMonth(startOfToday()), to: startOfToday() })}
           >
             이번 달
           </Button>
           <Button
             variant="ghost"
             className="justify-start font-normal"
-            onClick={() => setDate({ from: subDays(new Date(), 7), to: startOfToday() })}
+            onClick={() => setDate({ from: subDays(startOfToday(), 7), to: startOfToday() })}
           >
             최근 7일
           </Button>
