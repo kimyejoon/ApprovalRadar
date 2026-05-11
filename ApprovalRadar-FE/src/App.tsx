@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { DownloadSimple, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { useState, useEffect, useMemo } from 'react';
+import { DownloadSimple, CaretLeft, CaretRight, CaretUp, CaretDown, ArrowsDownUp } from '@phosphor-icons/react';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Button } from './components/ui/Button';
 import { Modal } from './components/ui/Modal';
@@ -63,16 +63,68 @@ const INITIAL_DATA = [
   }
 ];
 
+type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone';
+
+interface SortableHeadProps {
+  label: string;
+  sortKey: SortKey;
+  sortConfig: { key: SortKey; direction: 'asc' | 'desc' } | null;
+  onSort: (key: SortKey) => void;
+}
+
+function SortableHead({ label, sortKey, sortConfig, onSort }: SortableHeadProps) {
+  const isActive = sortConfig?.key === sortKey;
+  return (
+    <TableHead>
+      <button 
+        onClick={() => onSort(sortKey)}
+        className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
+      >
+        {label}
+        <span className="text-text-muted flex items-center justify-center w-4 h-4">
+          {isActive ? (
+            sortConfig.direction === 'asc' ? <CaretUp weight="bold" /> : <CaretDown weight="bold" />
+          ) : (
+            <ArrowsDownUp />
+          )}
+        </span>
+      </button>
+    </TableHead>
+  );
+}
+
 export default function App() {
   const [data, setData] = useState(INITIAL_DATA);
   const [selectedItem, setSelectedItem] = useState<typeof INITIAL_DATA[0] | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
+
+  const handleSort = (key: SortKey) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedData = useMemo(() => {
+    const sortableItems = [...data];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        const { key, direction } = sortConfig;
+        if (a[key] < b[key]) return direction === 'asc' ? -1 : 1;
+        if (a[key] > b[key]) return direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [data, sortConfig]);
 
   // Pagination logic
-  const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(sortedData.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = data.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedData = sortedData.slice(startIndex, startIndex + itemsPerPage);
 
   // Simulate live data arriving (리스트 밀림 방식)
   useEffect(() => {
@@ -114,13 +166,13 @@ export default function App() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>업소명</TableHead>
+            <SortableHead label="업소명" sortKey="name" sortConfig={sortConfig} onSort={handleSort} />
             <TableHead>소재지</TableHead>
             <TableHead>인허가번호</TableHead>
-            <TableHead>대표자명</TableHead>
+            <SortableHead label="대표자명" sortKey="owner" sortConfig={sortConfig} onSort={handleSort} />
             <TableHead>영업상태</TableHead>
-            <TableHead>인허가시각</TableHead>
-            <TableHead>전화번호</TableHead>
+            <SortableHead label="인허가시각" sortKey="approvalDate" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHead label="전화번호" sortKey="phone" sortConfig={sortConfig} onSort={handleSort} />
           </TableRow>
         </TableHeader>
         <TableBody>
