@@ -27,7 +27,6 @@ export function KoreaMapSelector({ selectedLocation, onSelect }: KoreaMapSelecto
             const regions = svg.querySelectorAll('path[id], g[id]');
             regions.forEach((region) => {
               if (region.id === '전국_시도_경계') {
-                (region as HTMLElement).style.pointerEvents = 'none';
                 return;
               }
               
