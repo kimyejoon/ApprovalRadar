@@ -1,0 +1,1957 @@
+연번,공공데이터 서비스명,"서비스
+유형",요청인자,,출력항목,
+,,,항목,설명,항목,설명
+1,HACCP 교육훈련기관 지정 현황,OPEN API,keyid,인증키,PRMS_DT,허가일자
+1,HACCP 교육훈련기관 지정 현황,OPEN API,serviceId,서비스명,PRSDNT_NM,대표자
+1,HACCP 교육훈련기관 지정 현황,OPEN API,dataType,요청파일 타입,BSSH_ADDR,주소
+1,HACCP 교육훈련기관 지정 현황,OPEN API,startidx,요청시작위치,BSSH_NM,교육훈련기관명
+1,HACCP 교육훈련기관 지정 현황,OPEN API,endIdx,요청종료위치,EDC_INSTT_APPN_NO,지정번호
+2,HACCP 적용업소 지정 현황,OPEN API,keyid,인증키,HACCP_APPN_NO,HACCP 지정번호
+2,HACCP 적용업소 지정 현황,OPEN API,serviceId,서비스명,HACCP_APPN_DT,HACCP 지정일자
+2,HACCP 적용업소 지정 현황,OPEN API,dataType,요청파일 타입,SITE_ADDR,주소
+2,HACCP 적용업소 지정 현황,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자명
+2,HACCP 적용업소 지정 현황,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+2,HACCP 적용업소 지정 현황,OPEN API,LCNS_NO,인허가번호,INDUTY_CD_NM,업종
+2,HACCP 적용업소 지정 현황,OPEN API,HACCP_APPN_NO,HACCP 지정번호,CRTFC_RETN_DT,인증반납일자 
+2,HACCP 적용업소 지정 현황,OPEN API,CHNG_DT,변경일자,CRTFC_ENDDT,인증종료일자 
+2,HACCP 적용업소 지정 현황,OPEN API,,,ASGN_CANCL_DT,지정취소일자 
+2,HACCP 적용업소 지정 현황,OPEN API,,,CLSBIZ_DT,폐업일자
+2,HACCP 적용업소 지정 현황,OPEN API,,,CLSBIZ_DVS_CD_NM,영업상태
+2,HACCP 적용업소 지정 현황,OPEN API,,,PRDLST_NM,품목명
+2,HACCP 적용업소 지정 현황,OPEN API,,,LCNS_NO,인허가번호
+3,LMO 수입 승인 현황,OPEN API,keyid,인증키,NATN_CD_NM,수입국
+3,LMO 수입 승인 현황,OPEN API,serviceId,서비스명,PRPOS,용도
+3,LMO 수입 승인 현황,OPEN API,dataType,요청파일 타입,BNE_NM,학명
+3,LMO 수입 승인 현황,OPEN API,startidx,요청시작위치,SYSTM_NM,계통명
+3,LMO 수입 승인 현황,OPEN API,endIdx,요청종료위치,COMMON_NM,보통명
+3,LMO 수입 승인 현황,OPEN API,,,ADDR,주소
+3,LMO 수입 승인 현황,OPEN API,,,BSSH_NM,업소명
+3,LMO 수입 승인 현황,OPEN API,,,CONFM_DT,승인일자
+3,LMO 수입 승인 현황,OPEN API,,,LMO_CONFM_NO,유전자 변형 생물체 승인번호
+4,개별기준규격,OPEN API,keyid,인증키,SPEC_VAL,기준규격
+4,개별기준규격,OPEN API,serviceId,서비스명,PIAM_KOR_NM,단서조항명
+4,개별기준규격,OPEN API,dataType,요청파일 타입,ATTRB_SEQ,단서조항일련번호
+4,개별기준규격,OPEN API,startidx,요청시작위치,FNPRT_ITM_NM,세부항목명
+4,개별기준규격,OPEN API,endIdx,요청종료위치,TESTITM_NM,시험항목명
+4,개별기준규격,OPEN API,LAST_UPDT_DTM,최종수정일(YYYYMMDD),LAST_UPDT_DTM,최종수정일시
+4,개별기준규격,OPEN API,PRDLST_CD,품목유형코드,TESTITM_CD,시험항목코드
+4,개별기준규격,OPEN API,,,UPDT_PRVNS,수정사유
+4,개별기준규격,OPEN API,,,UNIT_NM,단위명
+4,개별기준규격,OPEN API,,,UNIT_CD,단위코드
+4,개별기준규격,OPEN API,,,NTR_PRSEC_ITM_YN,자품검사시험항목여부
+4,개별기준규격,OPEN API,,,RVLV_ELSE_TESTITM_YN,공전외시험항목여부
+4,개별기준규격,OPEN API,,,MONTRNG_TESTITM_YN,감시시험항목여부
+4,개별기준규격,OPEN API,,,EMPHS_PRSEC_TESTITM_YN,중점검사시험항목여부
+4,개별기준규격,OPEN API,,,INJRY_YN,위해여부
+4,개별기준규격,OPEN API,,,FNPRT_ITM_INCLS_YN,세부항목포함여부
+4,개별기준규격,OPEN API,,,MCRRGNSM_3M,미생물3M
+4,개별기준규격,OPEN API,,,PRDLST_CD_NM,품목명
+4,개별기준규격,OPEN API,,,MCRRGNSM_2M,미생물2M
+4,개별기준규격,OPEN API,,,MCRRGNSM_2C,미생물2C
+4,개별기준규격,OPEN API,,,MCRRGNSM_2N,미생물2N
+4,개별기준규격,OPEN API,,,A082_CI_FNPRT_CD_NM,선택형부적합명
+4,개별기준규격,OPEN API,,,CHOIC_IMPROPT,선택형부적합코드
+4,개별기준규격,OPEN API,,,A082_CF_FNPRT_CD_NM,선택형적합명
+4,개별기준규격,OPEN API,,,CHOIC_FIT,선택형적합코드
+4,개별기준규격,OPEN API,,,A080_FNPRT_CD_NM,최소값구분명
+4,개별기준규격,OPEN API,,,MIMM_VAL_DVS_CD,최소값구분코드
+4,개별기준규격,OPEN API,,,MIMM_VAL,최소값
+4,개별기준규격,OPEN API,,,PRDLST_CD,품목분류코드
+4,개별기준규격,OPEN API,,,A081_FNPRT_CD_NM,최대값구분명
+4,개별기준규격,OPEN API,,,MXMM_VAL_DVS_CD,최대값구분코드
+4,개별기준규격,OPEN API,,,MXMM_VAL,최대값
+4,개별기준규격,OPEN API,,,A079_FNPRT_CD_NM,판정형식명
+4,개별기준규격,OPEN API,,,JDGMNT_FOM_CD,판정형식코드
+4,개별기준규격,OPEN API,,,VALD_MANLI,유효자리
+4,개별기준규격,OPEN API,,,SORC,출처
+4,개별기준규격,OPEN API,,,VALD_END_DT,유효종료일
+4,개별기준규격,OPEN API,,,VALD_BEGN_DT,유효개시일
+4,개별기준규격,OPEN API,,,SPEC_VAL_SUMUP,기준규격요약
+4,개별기준규격,OPEN API,,,INDV_SPEC_SEQ,개별기준규격일련번호
+5,건강기능식품 개별인정형 정보,OPEN API,keyid,인증키,IFTKN_ATNT_MATR_CN,섭취시 주의 사항 내용
+5,건강기능식품 개별인정형 정보,OPEN API,serviceId,서비스명,RAWMTRL_NM,원재료 명
+5,건강기능식품 개별인정형 정보,OPEN API,dataType,요청파일 타입,WT_UNIT,중량 단위
+5,건강기능식품 개별인정형 정보,OPEN API,startidx,요청시작위치,DAY_INTK_LOWLIMIT,1일 섭취량 하한선
+5,건강기능식품 개별인정형 정보,OPEN API,endIdx,요청종료위치,DAY_INTK_HIGHLIMIT,1일 섭취량 상한선
+5,건강기능식품 개별인정형 정보,OPEN API,,,PRIMARY_FNCLTY,주된 기능성
+5,건강기능식품 개별인정형 정보,OPEN API,,,HF_FNCLTY_MTRAL_RCOGN_NO,원료인정번호
+6,건강기능식품 기능성 원료인정현황,OPEN API,keyid,인증키,IFTKN_ATNT_MATR_CN,섭취시 주의사항
+6,건강기능식품 기능성 원료인정현황,OPEN API,serviceId,서비스명,DAY_INTK_CN,1일 섭취량
+6,건강기능식품 기능성 원료인정현황,OPEN API,dataType,요청파일 타입,FNCLTY_CN,기능성 내용
+6,건강기능식품 기능성 원료인정현황,OPEN API,startidx,요청시작위치,APLC_RAWMTRL_NM,신청원료명
+6,건강기능식품 기능성 원료인정현황,OPEN API,endIdx,요청종료위치,ADDR,주소
+6,건강기능식품 기능성 원료인정현황,OPEN API,PRMS_DT,인정일자,INDUTY_NM,업종
+6,건강기능식품 기능성 원료인정현황,OPEN API,APLC_RAWMTRL_NM,신청원료명,BSSH_NM,업체명
+6,건강기능식품 기능성 원료인정현황,OPEN API,HF_FNCLTY_MTRAL_RCOGN_NO,인정번호,PRMS_DT,인정일자
+6,건강기능식품 기능성 원료인정현황,OPEN API,,,HF_FNCLTY_MTRAL_RCOGN_NO,인정번호
+7,건강기능식품 생산실적 보고 품목 현황,OPEN API,keyid,인증키,PRDCTN_QY,생산량(KG)
+7,건강기능식품 생산실적 보고 품목 현황,OPEN API,serviceId,서비스명,FYER_PRDCTN_ABRT_QY,연간생산능력(KG)
+7,건강기능식품 생산실적 보고 품목 현황,OPEN API,dataType,요청파일 타입,PRDLST_REPORT_NO,품목제조보고번호
+7,건강기능식품 생산실적 보고 품목 현황,OPEN API,startidx,요청시작위치,EVL_YR,보고년도
+7,건강기능식품 생산실적 보고 품목 현황,OPEN API,endIdx,요청종료위치,LCNS_NO,인허가번호
+7,건강기능식품 생산실적 보고 품목 현황,OPEN API,EVL_YR,생산실적보고년도(YYYY)(필수),H_ITEM_NM,품목유형
+7,건강기능식품 생산실적 보고 품목 현황,OPEN API,LCNS_NO,인허가번호,GUBUN,품목구분
+7,건강기능식품 생산실적 보고 품목 현황,OPEN API,PRDLST_CD_NM,품목유형명,PRDLST_NM,품목명
+7,건강기능식품 생산실적 보고 품목 현황,OPEN API,,,BSSH_NM,업소명
+8,건강기능식품 영양DB,OPEN API,keyid,인증키,SCLAS_NM,소분류 명
+8,건강기능식품 영양DB,OPEN API,serviceId,서비스명,SCLAS_CD,소분류 코드
+8,건강기능식품 영양DB,OPEN API,dataType,요청파일 타입,MLSFC_NM,중분류 명
+8,건강기능식품 영양DB,OPEN API,startidx,요청시작위치,MLSFC_CD,중분류 코드
+8,건강기능식품 영양DB,OPEN API,endIdx,요청종료위치,LCLAS_NM,대분류 명
+8,건강기능식품 영양DB,OPEN API,HELT_ITM_GRP_NM,명칭,LCLAS_CD,대분류 코드
+8,건강기능식품 영양DB,OPEN API,,,HELT_ITM_GRP_NM,건강 항목 그룹 명
+8,건강기능식품 영양DB,OPEN API,,,HELT_ITM_GRP_CD,건강 항목 그룹 코드
+9,건강기능식품 이상사례 신고 현황 정보,OPEN API,keyid,인증키,,
+9,건강기능식품 이상사례 신고 현황 정보,OPEN API,serviceId,서비스명,,
+9,건강기능식품 이상사례 신고 현황 정보,OPEN API,dataType,요청파일 타입,,
+9,건강기능식품 이상사례 신고 현황 정보,OPEN API,startidx,요청시작위치,,
+9,건강기능식품 이상사례 신고 현황 정보,OPEN API,endIdx,요청종료위치,,
+10,건강기능식품 전문.벤처제조업인허가 현황,OPEN API,keyid,인증키,LOCP_ADDR,주소
+10,건강기능식품 전문.벤처제조업인허가 현황,OPEN API,serviceId,서비스명,TELNO,전화번호
+10,건강기능식품 전문.벤처제조업인허가 현황,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+10,건강기능식품 전문.벤처제조업인허가 현황,OPEN API,startidx,요청시작위치,INDUTY_NM,업종
+10,건강기능식품 전문.벤처제조업인허가 현황,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자
+10,건강기능식품 전문.벤처제조업인허가 현황,OPEN API,CHNG_DT,변경일자,BSSH_NM,업소명
+10,건강기능식품 전문.벤처제조업인허가 현황,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가 번호
+11,건강기능식품 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+11,건강기능식품 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+11,건강기능식품 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+11,건강기능식품 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+11,건강기능식품 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+11,건강기능식품 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+11,건강기능식품 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+11,건강기능식품 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+11,건강기능식품 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+12,건강기능식품 표시기준,OPEN API,keyid,인증키,,
+12,건강기능식품 표시기준,OPEN API,serviceId,서비스명,,
+12,건강기능식품 표시기준,OPEN API,dataType,요청파일 타입,,
+12,건강기능식품 표시기준,OPEN API,startidx,요청시작위치,,
+12,건강기능식품 표시기준,OPEN API,endIdx,요청종료위치,,
+13,건강기능식품 품목분류정보,OPEN API,keyid,인증키,CRET_DTM,최초등록일
+13,건강기능식품 품목분류정보,OPEN API,serviceId,서비스명,SKLL_IX_IRDNT_RAWMTRL,성분명
+13,건강기능식품 품목분류정보,OPEN API,dataType,요청파일 타입,INTK_MEMO,REMARK
+13,건강기능식품 품목분류정보,OPEN API,startidx,요청시작위치,INTK_UNIT,단위
+13,건강기능식품 품목분류정보,OPEN API,endIdx,요청종료위치,DAY_INTK_HIGHLIMIT,일일섭취량 상한
+13,건강기능식품 품목분류정보,OPEN API,,,DAY_INTK_LOWLIMIT,일일섭취량 하한
+13,건강기능식품 품목분류정보,OPEN API,,,PRIMARY_FNCLTY,주된기능성
+13,건강기능식품 품목분류정보,OPEN API,,,IFTKN_ATNT_MATR_CN,섭취시주의사항
+13,건강기능식품 품목분류정보,OPEN API,,,LAST_UPDT_DTM,최종수정일
+13,건강기능식품 품목분류정보,OPEN API,,,PRDCT_NM,품목명
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,keyid,인증키,PRIMARY_FNCLTY,주된기능성
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,serviceId,서비스명,NTK_MTHD,섭취방법
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,dataType,요청파일 타입,DISPOS,제품형태
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,startidx,요청시작위치,POG_DAYCNT,소비기한_일수
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,endIdx,요청종료위치,PRMS_DT,허가_일자
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,CHNG_DT,변경일자(YYYYMMDD),PRDLST_NM,품목_명
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,BSSH_NM,업소명,PRDLST_REPORT_NO,품목제조번호
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,PRDLST_NM,품목명,FRMLC_MTRQLT,포장재질
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,PRDLST_REPORT_NO,품목제조번호,FRMLC_MTHD,포장방법
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,CAP_RAWMTRL_NM,캡슐 원재료
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,ETC_RAWMTRL_NM,기타 원재료
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,INDIV_RAWMTRL_NM,기능성 원재료
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,LAST_UPDT_DTM,최종수정일자
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,INDUTY_CD_NM,업종
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,BSSH_NM,업소_명
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,RAWMTRL_NM,품목유형(기능지표성분)
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,FRMLC_MTRQLT,포장재질
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,PRDT_SHAP_CD_NM,제품_형태_코드_명
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,CHILD_CRTFC_YN,어린이기호식품품질인증여부
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,PRODUCTION,생산종료여부
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,HIENG_LNTRT_DVS_NM,고열량저영양여부
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,STDR_STND,기준규격
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,PRDLST_CDNM,유형
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,CSTDY_MTHD,보관방법
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,IFTKN_ATNT_MATR_CN,섭취시주의사항
+14,건강기능식품 품목제조 신고사항 현황,OPEN API,,,LCNS_NO,인허가번호
+15,건강기능식품 품목제조신고(원재료),OPEN API,keyid,인증키,PRIMARY_FNCLTY,주된기능성
+15,건강기능식품 품목제조신고(원재료),OPEN API,serviceId,서비스명,NTK_MTHD,섭취방법
+15,건강기능식품 품목제조신고(원재료),OPEN API,dataType,요청파일 타입,DISPOS,성상
+15,건강기능식품 품목제조신고(원재료),OPEN API,startidx,요청시작위치,POG_DAYCNT,소비기한
+15,건강기능식품 품목제조신고(원재료),OPEN API,endIdx,요청종료위치,PRMS_DT,보고일자
+15,건강기능식품 품목제조신고(원재료),OPEN API,CHNG_DT,변경일자(YYYYMMDD),PRDLST_NM,품목명
+15,건강기능식품 품목제조신고(원재료),OPEN API,PRDLST_REPORT_NO,품목제조번호,PRDLST_REPORT_NO,품목제조번호
+15,건강기능식품 품목제조신고(원재료),OPEN API,PRMS_DT,보고일자(YYYYMMDD),BSSH_NM,업소명
+15,건강기능식품 품목제조신고(원재료),OPEN API,PRDLST_NM,품목명,PRDT_SHAP_CD_NM,제품형태
+15,건강기능식품 품목제조신고(원재료),OPEN API,BSSH_NM,업소명,LAST_UPDT_DTM,최종수정일시
+15,건강기능식품 품목제조신고(원재료),OPEN API,LCNS_NO,인허가번호,CRET_DTM,최초생성일시
+15,건강기능식품 품목제조신고(원재료),OPEN API,,,RAWMTRL_NM,원재료
+15,건강기능식품 품목제조신고(원재료),OPEN API,,,STDR_STND,기준규격
+15,건강기능식품 품목제조신고(원재료),OPEN API,,,SHAP,형태
+15,건강기능식품 품목제조신고(원재료),OPEN API,,,CSTDY_MTHD,보관방법
+15,건강기능식품 품목제조신고(원재료),OPEN API,,,IFTKN_ATNT_MATR_CN,섭취시주의사항
+15,건강기능식품 품목제조신고(원재료),OPEN API,,,LCNS_NO,인허가번호
+16,건강기능식품GMP 지정 현황,OPEN API,keyid,인증키,PRSDNT_NM,대표자명
+16,건강기능식품GMP 지정 현황,OPEN API,serviceId,서비스명,INDUTY_CD_NM,업종명
+16,건강기능식품GMP 지정 현황,OPEN API,dataType,요청파일 타입,APPN_CANCL_DT,GMP취소일자
+16,건강기능식품GMP 지정 현황,OPEN API,startidx,요청시작위치,LCNS_NO,업고고유번호
+16,건강기능식품GMP 지정 현황,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+16,건강기능식품GMP 지정 현황,OPEN API,,,APPN_DT,지정일자
+16,건강기능식품GMP 지정 현황,OPEN API,,,GMP_APPN_NO,GMP지정번호
+17,건강기능식품공전,OPEN API,keyid,인증키,VALD_END_DT,유효종료일자
+17,건강기능식품공전,OPEN API,serviceId,서비스명,VALD_BEGN_DT,유효개시일자
+17,건강기능식품공전,OPEN API,dataType,요청파일 타입,SPEC_VAL_SUMUP,기준규격값 요약
+17,건강기능식품공전,OPEN API,startidx,요청시작위치,SPEC_VAL,기준규격값
+17,건강기능식품공전,OPEN API,endIdx,요청종료위치,FNPRT_ITM_NM,세부항목명
+17,건강기능식품공전,OPEN API,LAST_UPDT_DTM,최종수정일(YYYYMMDD),T_KOR_NM,시험항목 한글명
+17,건강기능식품공전,OPEN API,PRDLST_CD,품목유형코드,TESTITM_CD,시험항목코드
+17,건강기능식품공전,OPEN API,,,PC_KOR_NM,품목한글명
+17,건강기능식품공전,OPEN API,,,UNIT_NM,단위명
+17,건강기능식품공전,OPEN API,,,INJRY_YN,위해여부
+17,건강기능식품공전,OPEN API,,,MIMM_VAL,최소값
+17,건강기능식품공전,OPEN API,,,MXMM_VAL,최대값
+17,건강기능식품공전,OPEN API,,,SORC,출처
+17,건강기능식품공전,OPEN API,,,PRDLST_CD,품목코드
+18,건강기능식품업소 인허가 변경 정보,OPEN API,keyid,인증키,CHNG_PRVNS,변경사유
+18,건강기능식품업소 인허가 변경 정보,OPEN API,serviceId,서비스명,CHNG_AF_CN,변경후내용
+18,건강기능식품업소 인허가 변경 정보,OPEN API,dataType,요청파일 타입,CHNG_BF_CN,변경전내용
+18,건강기능식품업소 인허가 변경 정보,OPEN API,startidx,요청시작위치,CHNG_DT,변경일자
+18,건강기능식품업소 인허가 변경 정보,OPEN API,endIdx,요청종료위치,SITE_ADDR,주소
+18,건강기능식품업소 인허가 변경 정보,OPEN API,LCNS_NO,인허가번호,TELNO,전화번호
+18,건강기능식품업소 인허가 변경 정보,OPEN API,BSSH_NM,업소명,LCNS_NO,인허가번호
+18,건강기능식품업소 인허가 변경 정보,OPEN API,,,INDUTY_CD_NM,업종명
+18,건강기능식품업소 인허가 변경 정보,OPEN API,,,BSSH_NM,업소명
+19,"건강기능식품제조업, 건강기능식품판매업 지도단속계획 및 실적현황",OPEN API,keyid,인증키,PLAN_TITL,계획명
+19,"건강기능식품제조업, 건강기능식품판매업 지도단속계획 및 실적현황",OPEN API,serviceId,서비스명,GIDCHCK_RSLTCD,점검결과
+19,"건강기능식품제조업, 건강기능식품판매업 지도단속계획 및 실적현황",OPEN API,dataType,요청파일 타입,BLDINSCTR_NAME,피점검자성명
+19,"건강기능식품제조업, 건강기능식품판매업 지도단속계획 및 실적현황",OPEN API,startidx,요청시작위치,GIDCHCK_DT,지도점검일자
+19,"건강기능식품제조업, 건강기능식품판매업 지도단속계획 및 실적현황",OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+19,"건강기능식품제조업, 건강기능식품판매업 지도단속계획 및 실적현황",OPEN API,SEARCHSTDT,지도점검일자시작범위(YYYYMMDD),EXC_INSTTCD,점검기관
+19,"건강기능식품제조업, 건강기능식품판매업 지도단속계획 및 실적현황",OPEN API,SEARCHENDDT,지도점검일자종료범위(YYYYMMDD),CHCK_ENDDT,계획종료일자
+19,"건강기능식품제조업, 건강기능식품판매업 지도단속계획 및 실적현황",OPEN API,,,CHCK_BGNDT,계획시작일자
+19,"건강기능식품제조업, 건강기능식품판매업 지도단속계획 및 실적현황",OPEN API,,,PLAN_CLCD,계획분류
+20,건강기능식품판매업,OPEN API,keyid,인증키,TELNO,전화번호
+20,건강기능식품판매업,OPEN API,serviceId,서비스명,PRMS_DT,허가일자
+20,건강기능식품판매업,OPEN API,dataType,요청파일 타입,INDUTY_NM,업종
+20,건강기능식품판매업,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자명
+20,건강기능식품판매업,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+20,건강기능식품판매업,OPEN API,CHNG_DT,변경일자,INSTT_NM,기관명
+20,건강기능식품판매업,OPEN API,LCNS_NO,인허가번호,LOCP_ADDR,주소
+20,건강기능식품판매업,OPEN API,,,LCNS_NO,인허가 번호
+21,검사부적합 현황(농산물),OPEN API,keyid,인증키,FRMLCUNIT,포장단위
+21,검사부적합 현황(농산물),OPEN API,serviceId,서비스명,BRCDNO,바코드번호
+21,검사부적합 현황(농산물),OPEN API,dataType,요청파일 타입,REGSTR_TELNO,전화번호
+21,검사부적합 현황(농산물),OPEN API,startidx,요청시작위치,INSTT_NM,검사기관
+21,검사부적합 현황(농산물),OPEN API,endIdx,요청종료위치,ADDR,영업자주소
+21,검사부적합 현황(농산물),OPEN API,PRDTNM,제품명,DISTBTMLMT,유통/소비기한
+21,검사부적합 현황(농산물),OPEN API,,,MNFDT,제조일자
+21,검사부적합 현황(농산물),OPEN API,,,BSSHNM,업소명
+21,검사부적합 현황(농산물),OPEN API,,,REPORTR_TELNO,보고자전화번호
+21,검사부적합 현황(농산물),OPEN API,,,LCNS_NO,업체인허가번호
+21,검사부적합 현황(농산물),OPEN API,,,RTRVLDSUSE_SEQ,회수폐기일련번호
+21,검사부적합 현황(농산물),OPEN API,,,CRET_DTM,등록일
+21,검사부적합 현황(농산물),OPEN API,,,TESTANALS_RSLT,검사결과
+21,검사부적합 현황(농산물),OPEN API,,,STDR_STND,기준규격
+21,검사부적합 현황(농산물),OPEN API,,,TEST_ITMNM,부적합항목
+21,검사부적합 현황(농산물),OPEN API,,,PRDTNM,제품명
+22,검사부적합(국내),OPEN API,keyid,인증키,FRMLCUNIT,포장단위
+22,검사부적합(국내),OPEN API,serviceId,서비스명,BRCDNO,바코드번호
+22,검사부적합(국내),OPEN API,dataType,요청파일 타입,REGSTR_TELNO,전화번호
+22,검사부적합(국내),OPEN API,startidx,요청시작위치,INSTT_NM,검사기관
+22,검사부적합(국내),OPEN API,endIdx,요청종료위치,ADDR,영업자주소
+22,검사부적합(국내),OPEN API,PRDTNM,제품명,DISTBTMLMT,유통/소비기한
+22,검사부적합(국내),OPEN API,PRDLST_REPORT_NO,품목제조보고번호,MNFDT,제조일자
+22,검사부적합(국내),OPEN API,,,BSSHNM,업소명
+22,검사부적합(국내),OPEN API,,,PRDLST_CD_NM,식품유형
+22,검사부적합(국내),OPEN API,,,REPORTR_TELNO,보고자전화번호
+22,검사부적합(국내),OPEN API,,,LCNS_NO,업체인허가번호
+22,검사부적합(국내),OPEN API,,,PRDLST_REPORT_NO,품목제조보고번호
+22,검사부적합(국내),OPEN API,,,RTRVLDSUSE_SEQ,회수폐기일련번호
+22,검사부적합(국내),OPEN API,,,CRET_DTM,등록일
+22,검사부적합(국내),OPEN API,,,TESTANALS_RSLT,검사결과
+22,검사부적합(국내),OPEN API,,,STDR_STND,기준규격
+22,검사부적합(국내),OPEN API,,,TEST_ITMNM,부적합항목
+22,검사부적합(국내),OPEN API,,,PRDTNM,제품명
+23,공유주방운영업 인허가 대장,OPEN API,keyid,인증키,INSTT_NM,기관명
+23,공유주방운영업 인허가 대장,OPEN API,serviceId,서비스명,TELNO,전화번호
+23,공유주방운영업 인허가 대장,OPEN API,dataType,요청파일 타입,LOCP_ADDR,주소
+23,공유주방운영업 인허가 대장,OPEN API,startidx,요청시작위치,PRMS_DT,허가일자
+23,공유주방운영업 인허가 대장,OPEN API,endIdx,요청종료위치,INDUTY_NM,업종
+23,공유주방운영업 인허가 대장,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+23,공유주방운영업 인허가 대장,OPEN API,BSSH_NM,업소명,BSSH_NM,업소명
+23,공유주방운영업 인허가 대장,OPEN API,CHNG_DT, 변경일자(YYYYMMDD),LCNS_NO,인허가번호
+24,공통기준규격,OPEN API,keyid,인증키,ATTRB_SEQ,단서조항일련번호
+24,공통기준규격,OPEN API,serviceId,서비스명,FNPRT_ITM_NM,세부항목명
+24,공통기준규격,OPEN API,dataType,요청파일 타입,TESTITM_NM,시험항목명
+24,공통기준규격,OPEN API,startidx,요청시작위치,TESTITM_CD,시험항목코드
+24,공통기준규격,OPEN API,endIdx,요청종료위치,PRDLST_CD_NM,품목명
+24,공통기준규격,OPEN API,LAST_UPDT_DTM,최종수정일(YYYYMMDD),LAST_UPDT_DTM,최종수정일시
+24,공통기준규격,OPEN API,PRDLST_CD,품목유형코드,UPDT_PRVNS,수정사유
+24,공통기준규격,OPEN API,,,UNIT_NM,단위명
+24,공통기준규격,OPEN API,,,PRDLST_CD,품목분류코드
+24,공통기준규격,OPEN API,,,UNIT_CD,단위코드
+24,공통기준규격,OPEN API,,,NTR_PRSEC_ITM_YN,자품검사시험항목여부
+24,공통기준규격,OPEN API,,,RVLV_ELSE_TESTITM_YN,공전외시험항목여부
+24,공통기준규격,OPEN API,,,MONTRNG_TESTITM_YN,감시시험항목여부
+24,공통기준규격,OPEN API,,,EMPHS_PRSEC_TESTITM_YN,중점검사시험항목여부
+24,공통기준규격,OPEN API,,,INJRY_YN,위해여부
+24,공통기준규격,OPEN API,,,FNPRT_ITM_INCLS_YN,세부항목포함여부
+24,공통기준규격,OPEN API,,,MCRRGNSM_3M,미생물3M
+24,공통기준규격,OPEN API,,,MCRRGNSM_2M,미생물2M
+24,공통기준규격,OPEN API,,,MCRRGNSM_2C,미생물2C
+24,공통기준규격,OPEN API,,,SPEC_NM,공통기준종류명
+24,공통기준규격,OPEN API,,,MCRRGNSM_2N,미생물2N
+24,공통기준규격,OPEN API,,,A082_CI_FNPRT_CD_NM,선택형부적합명
+24,공통기준규격,OPEN API,,,CHOIC_IMPROPT,선택형부적합코드
+24,공통기준규격,OPEN API,,,A082_CF_FNPRT_CD_NM,선택형적합명
+24,공통기준규격,OPEN API,,,CHOIC_FIT,선택형적합코드
+24,공통기준규격,OPEN API,,,A080_FNPRT_CD_NM,최소값구분명
+24,공통기준규격,OPEN API,,,MIMM_VAL_DVS_CD,최소값구분코드
+24,공통기준규격,OPEN API,,,MIMM_VAL,최소값
+24,공통기준규격,OPEN API,,,A081_FNPRT_CD_NM,최대값구분명
+24,공통기준규격,OPEN API,,,MXMM_VAL_DVS_CD,최대값구분코드
+24,공통기준규격,OPEN API,,,CMMN_SPEC_CD,공통기준종류코드
+24,공통기준규격,OPEN API,,,MXMM_VAL,최대값
+24,공통기준규격,OPEN API,,,A079_FNPRT_CD_NM,판정형식명
+24,공통기준규격,OPEN API,,,JDGMNT_FOM_CD,판정형식코드
+24,공통기준규격,OPEN API,,,VALD_MANLI,유효자리
+24,공통기준규격,OPEN API,,,SORC,출처
+24,공통기준규격,OPEN API,,,VALD_END_DT,유효종료일
+24,공통기준규격,OPEN API,,,VALD_BEGN_DT,유효개시일
+24,공통기준규격,OPEN API,,,SPEC_VAL_SUMUP,기준규격요약
+24,공통기준규격,OPEN API,,,SPEC_VAL,기준규격
+24,공통기준규격,OPEN API,,,PIAM_KOR_NM,단서조항명
+24,공통기준규격,OPEN API,,,CMMN_SPEC_SEQ,공통기준종류코드일련번호
+25,공통기준제외,OPEN API,keyid,인증키,LAST_UPDT_DTM,최종수정일시
+25,공통기준제외,OPEN API,serviceId,서비스명,TESTITM_CD,시험항목코드
+25,공통기준제외,OPEN API,dataType,요청파일 타입,KOR_NM,한글명
+25,공통기준제외,OPEN API,startidx,요청시작위치,PRDLST_CD,품목코드
+25,공통기준제외,OPEN API,endIdx,요청종료위치,SPEC_NM,기준규격명
+25,공통기준제외,OPEN API,LAST_UPDT_DTM,최종수정일(YYYYMMDD),CMMN_SPEC_CD,공통기준규격코드
+26,공통기준종류,OPEN API,keyid,인증키,LAST_UPDT_DTM,최종수정일시
+26,공통기준종류,OPEN API,serviceId,서비스명,USE_YN,사용여부
+26,공통기준종류,OPEN API,dataType,요청파일 타입,DFN,정의
+26,공통기준종류,OPEN API,startidx,요청시작위치,LV,레벨
+26,공통기준종류,OPEN API,endIdx,요청종료위치,HRNK_CMMN_SPEC_CD,상위공통기준규격코드
+26,공통기준종류,OPEN API,LAST_UPDT_DTM,최종수정일(YYYYMMDD),SPEC_NM,기준규격명
+26,공통기준종류,OPEN API,,,CMMN_SPEC_CD,공통기준규격코드
+27,과징금부과기준,OPEN API,keyid,인증키,VALD_END_DT,유효종료일자
+27,과징금부과기준,OPEN API,serviceId,서비스명,VALD_BGN_DT,유효시작일자
+27,과징금부과기준,OPEN API,dataType,요청파일 타입,LV_NO,레벨
+27,과징금부과기준,OPEN API,startidx,요청시작위치,VILT_TYPE_NM,위반유형
+27,과징금부과기준,OPEN API,endIdx,요청종료위치,BASIS_LAWORD,근거법령
+27,과징금부과기준,OPEN API,VALD_BGN_DT,유효시작일자(YYYYMMDD),LAWORD_CD_NM,식품법령
+28,과태료부과기준,OPEN API,keyid,인증키,DSPS_STDR_CD_NM,처분기준명
+28,과태료부과기준,OPEN API,serviceId,서비스명,VALD_END_DT,유효종료일자
+28,과태료부과기준,OPEN API,dataType,요청파일 타입,VALD_BGN_DT,유효시작일자
+28,과태료부과기준,OPEN API,startidx,요청시작위치,VILT_TYPE_NM,위반유형
+28,과태료부과기준,OPEN API,endIdx,요청종료위치,BASIS_LAWORD,근거법령
+28,과태료부과기준,OPEN API,VALD_BGN_DT,유효시작일자,LV_NO,레벨
+28,과태료부과기준,OPEN API,,,DSPS_STDR_CD_NM,처분기준명
+28,과태료부과기준,OPEN API,,,DSPS_STDR_CD,처분기준코드
+29,국외검사기관 인정 현황,OPEN API,keyid,인증키,PRSEC_ITM_CD_NM,검사항목
+29,국외검사기관 인정 현황,OPEN API,serviceId,서비스명,APPN_BGN_DT,지정일자
+29,국외검사기관 인정 현황,OPEN API,dataType,요청파일 타입,PRSDNT_NM,대표자
+29,국외검사기관 인정 현황,OPEN API,startidx,요청시작위치,BSSH_NM,기관명
+29,국외검사기관 인정 현황,OPEN API,endIdx,요청종료위치,BSSH_ADDR,주소
+29,국외검사기관 인정 현황,OPEN API,,,TELNO,전화번호
+29,국외검사기관 인정 현황,OPEN API,,,PRSEC_INSTT_RCOGN_NO,인정번호
+30,기구 및 용기.포장의 한시적 기준 및 규격 인정 현황,OPEN API,keyid,인증키,MC_NATN_CD_NM,제조회사 국가
+30,기구 및 용기.포장의 한시적 기준 및 규격 인정 현황,OPEN API,serviceId,서비스명,PRDT_NM,제품명
+30,기구 및 용기.포장의 한시적 기준 및 규격 인정 현황,OPEN API,dataType,요청파일 타입,MC_NM,제조회사
+30,기구 및 용기.포장의 한시적 기준 및 규격 인정 현황,OPEN API,startidx,요청시작위치,TELNO,전화번호
+30,기구 및 용기.포장의 한시적 기준 및 규격 인정 현황,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+30,기구 및 용기.포장의 한시적 기준 및 규격 인정 현황,OPEN API,,,BSSH_NM,업소명
+30,기구 및 용기.포장의 한시적 기준 및 규격 인정 현황,OPEN API,,,RCOGN_DT,인정일자
+30,기구 및 용기.포장의 한시적 기준 및 규격 인정 현황,OPEN API,,,LIMIT_STDR_STND_RCOGN_NO,인정번호
+31,기구.용기포장제조업,OPEN API,keyid,인증키,TELNO,전화번호
+31,기구.용기포장제조업,OPEN API,serviceId,서비스명,PRMS_DT,허가일자
+31,기구.용기포장제조업,OPEN API,dataType,요청파일 타입,INDUTY_NM,업종
+31,기구.용기포장제조업,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자명
+31,기구.용기포장제조업,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+31,기구.용기포장제조업,OPEN API,CHNG_DT,변경일자,INSTT_NM,기관명
+31,기구.용기포장제조업,OPEN API,LCNS_NO,인허가번호,LOCP_ADDR,주소
+32,기구.용기포장제조업,OPEN API,,,LCNS_NO,인허가 번호
+32,기구등의 살균.소독제에 관한 표시기준,OPEN API,keyid,인증키,,
+32,기구등의 살균.소독제에 관한 표시기준,OPEN API,serviceId,서비스명,,
+32,기구등의 살균.소독제에 관한 표시기준,OPEN API,dataType,요청파일 타입,,
+32,기구등의 살균.소독제에 관한 표시기준,OPEN API,startidx,요청시작위치,,
+32,기구등의 살균.소독제에 관한 표시기준,OPEN API,endIdx,요청종료위치,,
+33,기구등의 살균소독제 기준규격,OPEN API,keyid,인증키,SORC,출처
+33,기구등의 살균소독제 기준규격,OPEN API,serviceId,서비스명,VALD_END_DT,유효종료일자
+33,기구등의 살균소독제 기준규격,OPEN API,dataType,요청파일 타입,VALD_BEGN_DT,유효개시일자
+33,기구등의 살균소독제 기준규격,OPEN API,startidx,요청시작위치,SPEC_VAL_SUMUP,기준규격값 요약
+33,기구등의 살균소독제 기준규격,OPEN API,endIdx,요청종료위치,SPEC_VAL,기준규격값
+33,기구등의 살균소독제 기준규격,OPEN API,LAST_UPDT_DTM,최종수정일(YYYYMMDD),PIAM_KOR_NM,품목항목속성 한글명
+33,기구등의 살균소독제 기준규격,OPEN API,PRDLST_CD,품목유형코드,FNPRT_ITM_NM,세부항목명
+33,기구등의 살균소독제 기준규격,OPEN API,,,T_KOR_NM,시험항목 한글명
+33,기구등의 살균소독제 기준규격,OPEN API,,,LAST_UPDT_DTM,수정일자
+33,기구등의 살균소독제 기준규격,OPEN API,,,UPDT_PRVNS,수정사유
+33,기구등의 살균소독제 기준규격,OPEN API,,,UNIT_NM,단위명
+33,기구등의 살균소독제 기준규격,OPEN API,,,INJRY_YN,위해여부
+33,기구등의 살균소독제 기준규격,OPEN API,,,MIMM_VAL,최소값
+33,기구등의 살균소독제 기준규격,OPEN API,,,MXMM_VAL,최대값
+33,기구등의 살균소독제 기준규격,OPEN API,,,PC_KOR_NM,품목한글명
+34,기구등의 살균소독제 한시적 기준 및 규격 인정 현황,OPEN API,keyid,인증키,MC_NATN_CD_NM,제조회사 국가
+34,기구등의 살균소독제 한시적 기준 및 규격 인정 현황,OPEN API,serviceId,서비스명,PRDT_NM,제품명
+34,기구등의 살균소독제 한시적 기준 및 규격 인정 현황,OPEN API,dataType,요청파일 타입,MC_NM,제조회사
+34,기구등의 살균소독제 한시적 기준 및 규격 인정 현황,OPEN API,startidx,요청시작위치,TELNO,전화번호
+34,기구등의 살균소독제 한시적 기준 및 규격 인정 현황,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+34,기구등의 살균소독제 한시적 기준 및 규격 인정 현황,OPEN API,,,BSSH_NM,업소명
+34,기구등의 살균소독제 한시적 기준 및 규격 인정 현황,OPEN API,,,RCOGN_DT,인정일자
+34,기구등의 살균소독제 한시적 기준 및 규격 인정 현황,OPEN API,,,LIMIT_STDR_STND_RCOGN_NO,인정번호
+35,나트륨 줄이기 실천음식점 지정업체 대장,OPEN API,keyid,인증키,INSTT_NM,관할기관
+35,나트륨 줄이기 실천음식점 지정업체 대장,OPEN API,serviceId,서비스명,ETC_INFO,기타정보
+35,나트륨 줄이기 실천음식점 지정업체 대장,OPEN API,dataType,요청파일 타입,APPT_YMD,지정일자
+35,나트륨 줄이기 실천음식점 지정업체 대장,OPEN API,startidx,요청시작위치,SITE_ADDR,영업소재지
+35,나트륨 줄이기 실천음식점 지정업체 대장,OPEN API,endIdx,요청종료위치,INDUTY_CD_NM,업종
+35,나트륨 줄이기 실천음식점 지정업체 대장,OPEN API,LCNS_NO,인허가번호,BSSH_NM,업체명
+35,나트륨 줄이기 실천음식점 지정업체 대장,OPEN API,BSSH_NM,업체명,LCNS_NO,인허가번호
+35,나트륨 줄이기 실천음식점 지정업체 대장,OPEN API,JOIN_YMD,참여일자(YYYYMMDD),,
+36,농산물 안전성검사기관 정보,OPEN API,keyid,인증키,TELNO,전화번호
+36,농산물 안전성검사기관 정보,OPEN API,serviceId,서비스명,HRMF_MTTR_ITM,유해물질항목
+36,농산물 안전성검사기관 정보,OPEN API,dataType,요청파일 타입,PRSEC_WORK_SCOPE,검사업무범위
+36,농산물 안전성검사기관 정보,OPEN API,startidx,요청시작위치,PRSEC_INSTT_LOCPLC,검사기관소재지
+36,농산물 안전성검사기관 정보,OPEN API,endIdx,요청종료위치,APPN_INSTT_NM,지정기관
+36,농산물 안전성검사기관 정보,OPEN API,,,APPN_DT,지정일자
+36,농산물 안전성검사기관 정보,OPEN API,,,APPN_NO,지정번호
+37,농산물이력추적 생산정보,OPEN API,keyid,인증키,VALD_PRICE_END_DT,유효기간종료일자
+37,농산물이력추적 생산정보,OPEN API,serviceId,서비스명,VALD_PRICE_BGN_DT,유효기간시작일자
+37,농산물이력추적 생산정보,OPEN API,dataType,요청파일 타입,ORGN_NM,단체명
+37,농산물이력추적 생산정보,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자명
+37,농산물이력추적 생산정보,OPEN API,endIdx,요청종료위치,RPRSNT_PRDLST_NM,대표품목
+38,농산물이력추적 유통정보,OPEN API,keyid,인증키,REG_INSTT_NM,등록기관
+38,농산물이력추적 유통정보,OPEN API,serviceId,서비스명,HIST_TRACE_REG_NO,이력추적등록번호
+38,농산물이력추적 유통정보,OPEN API,dataType,요청파일 타입,TELNO,전화번호
+38,농산물이력추적 유통정보,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자명
+38,농산물이력추적 유통정보,OPEN API,endIdx,요청종료위치,GRP_NM,거래처명
+38,농산물이력추적 유통정보,OPEN API,,,HIST_TRACE_REG_NO,이력추적등록번호
+39,농약 등록정보,OPEN API,keyid,인증키,SICKNS_HLSCT_NM_WEEDS_NM,병해충/잡초명
+39,농약 등록정보,OPEN API,serviceId,서비스명,PRPOS_DVS_CD_NM,용도
+39,농약 등록정보,OPEN API,dataType,요청파일 타입,AGCHM_DVS_NM,농약구분
+39,농약 등록정보,OPEN API,startidx,요청시작위치,MDC_SHAP_NM,제제형태
+39,농약 등록정보,OPEN API,endIdx,요청종료위치,PRDLST_REG_NO,등록번호
+39,농약 등록정보,OPEN API,CHNG_DT,변경일자,ECLGY_TOXCTY,생태독성
+39,농약 등록정보,OPEN API,,,PERSN_LVSTCK_TOXCTY,사람/가축독성
+39,농약 등록정보,OPEN API,,,REG_YN_NM,등록여부
+39,농약 등록정보,OPEN API,,,PRDLST_REG_STND,등록규격
+39,농약 등록정보,OPEN API,,,AGCHM_PRDLST_NO,품목번호
+39,농약 등록정보,OPEN API,,,TEST_DRGS_NM,시험약제명
+39,농약 등록정보,OPEN API,,,BRND_NM,상표명
+39,농약 등록정보,OPEN API,,,PRDLST_REG_DT,등록일자
+39,농약 등록정보,OPEN API,,,PRDLST_REG_VALD_DT,등록유효일자
+39,농약 등록정보,OPEN API,,,MNF_INCM_DVS_NM,제조/수입구분
+39,농약 등록정보,OPEN API,,,ADDR,주소
+39,농약 등록정보,OPEN API,,,PRSDNT_NM,대표자
+39,농약 등록정보,OPEN API,,,PRDLST_ENG_NM,농약영문명
+39,농약 등록정보,OPEN API,,,CPR_NM,법인명
+39,농약 등록정보,OPEN API,,,BUSS_REG_EVNT_NM,업등록종목
+39,농약 등록정보,OPEN API,,,BUSS_REG_NO,업등록번호
+39,농약 등록정보,OPEN API,,,USE_TMNO,사용횟수
+39,농약 등록정보,OPEN API,,,USE_UNIT,단위
+39,농약 등록정보,OPEN API,,,USE_QTY,사용수량
+39,농약 등록정보,OPEN API,,,DILU_DRNG,희석배수
+39,농약 등록정보,OPEN API,,,USE_PPRTM,사용적기
+39,농약 등록정보,OPEN API,,,AGCHM_USE_MTHD,농약사용방법
+39,농약 등록정보,OPEN API,,,CROPS_NM,작물명
+39,농약 등록정보,OPEN API,,,PRDLST_KOR_NM,농약명
+40,농약잔류허용기준,OPEN API,keyid,인증키,DSUSE_YN,폐기 여부
+40,농약잔류허용기준,OPEN API,serviceId,서비스명,MRL_VAL,MRL 값
+40,농약잔류허용기준,OPEN API,dataType,요청파일 타입,STEP,단계
+40,농약잔류허용기준,OPEN API,startidx,요청시작위치,OPERTN_CITYPOINT,시행 시점
+40,농약잔류허용기준,OPEN API,endIdx,요청종료위치,FOOD_KOR_NM,식품명
+40,농약잔류허용기준,OPEN API,시행시점(YYYYMMDD),LAUNCH_POINT,AGCHM_KOR_NM,농약명
+41,농축산물유통관리 허위표시공표정보,OPEN API,keyid,인증키,PUBLC_END_DT,공표종료일
+41,농축산물유통관리 허위표시공표정보,OPEN API,serviceId,서비스명,PUBLC_BGN_DT,공표시작일
+41,농축산물유통관리 허위표시공표정보,OPEN API,dataType,요청파일 타입,VILT_DTLS,위반내역
+41,농축산물유통관리 허위표시공표정보,OPEN API,startidx,요청시작위치,ENTRPS_BASS_ADDR,주소
+41,농축산물유통관리 허위표시공표정보,OPEN API,endIdx,요청종료위치,ENTRPS_NM,업체명
+41,농축산물유통관리 허위표시공표정보,OPEN API,CHNG_DT,변경일자(YYYYMMDD),BSN_KND_NM,업종
+42,농축산물유통관리 허위표시품목정보,OPEN API,keyid,인증키,PRDLST_NM,품목명
+42,농축산물유통관리 허위표시품목정보,OPEN API,serviceId,서비스명,DSPS_CN,처분내용
+42,농축산물유통관리 허위표시품목정보,OPEN API,dataType,요청파일 타입,VILT_CN,위반내용
+42,농축산물유통관리 허위표시품목정보,OPEN API,startidx,요청시작위치,PUBLC_END_DT,공표종료일자
+42,농축산물유통관리 허위표시품목정보,OPEN API,endIdx,요청종료위치,PUBLC_BGN_DT,공표시작일자
+42,농축산물유통관리 허위표시품목정보,OPEN API,CHNG_DT,변경일자(YYYYMMDD),VILT_DTLS,위반내역
+42,농축산물유통관리 허위표시품목정보,OPEN API,,,ENTRPS_BASS_ADDR,주소
+42,농축산물유통관리 허위표시품목정보,OPEN API,,,ENTRPS_NM,업소명
+42,농축산물유통관리 허위표시품목정보,OPEN API,,,BSN_KND_NM,업종
+43,도축업 인허가 대장,OPEN API,keyid,인증키,INSTT_NM,기관명
+43,도축업 인허가 대장,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+43,도축업 인허가 대장,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+43,도축업 인허가 대장,OPEN API,startidx,요청시작위치,INDUTY_NM,업종
+43,도축업 인허가 대장,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+43,도축업 인허가 대장,OPEN API,BSSH_NM,업소명,BSSH_NM,업소명
+43,도축업 인허가 대장,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가번호
+43,도축업 인허가 대장,OPEN API,CHNG_DT,변경일자,,
+44,동물용의약품 현황,OPEN API,keyid,인증키,SHAP_NM,형태
+44,동물용의약품 현황,OPEN API,serviceId,서비스명,CAS_NM,CAS 명
+44,동물용의약품 현황,OPEN API,dataType,요청파일 타입,IUPAC_NM,IUPAC 명
+44,동물용의약품 현황,OPEN API,startidx,요청시작위치,SYSTM_NM,계통명
+44,동물용의약품 현황,OPEN API,endIdx,요청종료위치,MCWGH,분자량
+44,동물용의약품 현황,OPEN API,,,MCFRL,분자식
+44,동물용의약품 현황,OPEN API,,,APPLC_OBJ_ANIMAL,적용 대상 동물
+44,동물용의약품 현황,OPEN API,,,ANIMAL_ONLY_MDCIN_NM_ENG,의약품 영문명
+44,동물용의약품 현황,OPEN API,,,STBLY,안정성
+44,동물용의약품 현황,OPEN API,,,SOLUB,용해도
+44,동물용의약품 현황,OPEN API,,,PKA,PKA
+44,동물용의약품 현황,OPEN API,,,DENS_UNIT,밀도단위
+44,동물용의약품 현황,OPEN API,,,LOGPOW,LOGPOW
+44,동물용의약품 현황,OPEN API,,,STEPR,증기압
+44,동물용의약품 현황,OPEN API,,,BOILPNT,끓는점
+44,동물용의약품 현황,OPEN API,,,POIOF,녹는점
+44,동물용의약품 현황,OPEN API,,,ANIMAL_ONLY_MDCIN_NM_KOR,의약품 한글명
+45,동물의약품별 잔류허용 기준,OPEN API,keyid,인증키,ETC_YN,기타 여부
+45,동물의약품별 잔류허용 기준,OPEN API,serviceId,서비스명,FOOD_ENG_NM,식품 영문명
+45,동물의약품별 잔류허용 기준,OPEN API,dataType,요청파일 타입,FOOD_KOR_NM,식품 한글명
+45,동물의약품별 잔류허용 기준,OPEN API,startidx,요청시작위치,MRL,MRL
+45,동물의약품별 잔류허용 기준,OPEN API,endIdx,요청종료위치,STEP,단계
+45,동물의약품별 잔류허용 기준,OPEN API,,,OPERTN_CITYPOINT,시행 시점
+45,동물의약품별 잔류허용 기준,OPEN API,,,ANIMAL_ONLY_MDCIN_NM_KOR,동물 전용 의약품 한글명
+45,동물의약품별 잔류허용 기준,OPEN API,,,CDX_KOREA_DVS_CD,구분
+45,동물의약품별 잔류허용 기준,OPEN API,,,DSUSE_YN,폐기 여부
+45,동물의약품별 잔류허용 기준,OPEN API,,,TMPR_STDR_APPLC_YN,임시기준적용여부
+46,물환경 수질정보,OPEN API,keyid,인증키,WATSA_TM,채수시간
+46,물환경 수질정보,OPEN API,serviceId,서비스명,WATSA_DT,채수일자
+46,물환경 수질정보,OPEN API,dataType,요청파일 타입,PRSEC_DT,검사일자
+46,물환경 수질정보,OPEN API,startidx,요청시작위치,ABL_YN,폐지여부
+46,물환경 수질정보,OPEN API,endIdx,요청종료위치,TOC,TOC
+46,물환경 수질정보,OPEN API,CHNG_DT,변경일자,EC,EC
+46,물환경 수질정보,OPEN API,,,DOC,DOC
+46,물환경 수질정보,OPEN API,,,TP,TP
+46,물환경 수질정보,OPEN API,,,TN,TN
+46,물환경 수질정보,OPEN API,,,EEC_QTY,대장균군수량
+46,물환경 수질정보,OPEN API,,,SS,SS
+46,물환경 수질정보,OPEN API,,,COD,COD
+46,물환경 수질정보,OPEN API,,,BOD,BOD
+46,물환경 수질정보,OPEN API,,,PH,PH
+46,물환경 수질정보,OPEN API,,,FLUX,유량
+46,물환경 수질정보,OPEN API,,,TEMOD,수온
+46,물환경 수질정보,OPEN API,,,MESURE_DP,측정깊이
+46,물환경 수질정보,OPEN API,,,EXAM_ARA_NM,조사지역명
+47,바코드연계제품정보,OPEN API,keyid,인증키,SITE_ADDR,주소
+47,바코드연계제품정보,OPEN API,serviceId,서비스명,INDUTY_NM,업종
+47,바코드연계제품정보,OPEN API,dataType,요청파일 타입,BSSH_NM,제조사명
+47,바코드연계제품정보,OPEN API,startidx,요청시작위치,PRDLST_DCNM,식품 유형
+47,바코드연계제품정보,OPEN API,endIdx,요청종료위치,POG_DAYCNT,소비기한
+47,바코드연계제품정보,OPEN API,CHNG_DT,변경일자,PRDLST_NM,제품명
+47,바코드연계제품정보,OPEN API,PRDLST_REPORT_NO,품목제조보고번호,END_DT,생산중단일
+47,바코드연계제품정보,OPEN API,BAR_CD,바코드번호,PRMS_DT,보고(신고일)
+47,바코드연계제품정보,OPEN API,,,BAR_CD,유통바코드
+47,바코드연계제품정보,OPEN API,,,CLSBIZ_DT,폐업일자
+47,바코드연계제품정보,OPEN API,,,PRDLST_REPORT_NO,품목보고(신고)번호
+48,방사선조사식품 품목 인정 현황,OPEN API,keyid,인증키,VALD_END_DT,유효종료일자
+48,방사선조사식품 품목 인정 현황,OPEN API,serviceId,서비스명,VALD_BEGN_DT,유효개시일자
+48,방사선조사식품 품목 인정 현황,OPEN API,dataType,요청파일 타입,SPEC_VAL_SUMUP,기준규격값 요약
+48,방사선조사식품 품목 인정 현황,OPEN API,startidx,요청시작위치,SPEC_VAL,기준규격값
+48,방사선조사식품 품목 인정 현황,OPEN API,endIdx,요청종료위치,PIAM_KOR_NM,품목항목속성 한글명
+48,방사선조사식품 품목 인정 현황,OPEN API,,,T_KOR_NM,시험항목 한글명
+48,방사선조사식품 품목 인정 현황,OPEN API,,,PC_KOR_NM,품목한글명
+48,방사선조사식품 품목 인정 현황,OPEN API,,,UNIT_NM,단위명
+48,방사선조사식품 품목 인정 현황,OPEN API,,,MIMM_VAL,최소값
+48,방사선조사식품 품목 인정 현황,OPEN API,,,MXMM_VAL,최대값
+48,방사선조사식품 품목 인정 현황,OPEN API,,,SORC,출처
+48,방사선조사식품 품목 인정 현황,OPEN API,,,SPEC_NM,기준규격명
+49,법령코드,OPEN API,keyid,인증키,VALD_END_DT,유효종료일자
+49,법령코드,OPEN API,serviceId,서비스명,VALD_BGN_DT,유효시작일자
+49,법령코드,OPEN API,dataType,요청파일 타입,USE_YN,사용여부
+49,법령코드,OPEN API,startidx,요청시작위치,LV_NO,레벨
+49,법령코드,OPEN API,endIdx,요청종료위치,ALL_LAWORD_CD_NM,전체법령명
+49,법령코드,OPEN API,VALD_BGN_DT,유효시작일자(YYYYMMDD),LAWORD_CD_NM,법령명
+49,법령코드,OPEN API,VALD_END_DT,유효종료일자(YYYYMMDD),WORK_REALM_CD_NM,업무분야
+49,법령코드,OPEN API,,,HRNK_LAWORD_CD,상위법령코드
+49,법령코드,OPEN API,,,LAST_UPDT_DTM,최종수정일시
+49,법령코드,OPEN API,,,FOOD_LAWORD_CD,법령코드
+50,상수도 수질정보,OPEN API,keyid,인증키,DCMLPOINT,소수점
+50,상수도 수질정보,OPEN API,serviceId,서비스명,UNIT_NM,단위명
+50,상수도 수질정보,OPEN API,dataType,요청파일 타입,MESURE_VAL,측정값
+50,상수도 수질정보,OPEN API,startidx,요청시작위치,PRSEC_ITM_NM,검사항목명
+50,상수도 수질정보,OPEN API,endIdx,요청종료위치,PICK_DT,채취일자
+50,상수도 수질정보,OPEN API,CHNG_DT,변경일자,PRSEC_MM,검사월
+50,상수도 수질정보,OPEN API,,,PRSEC_YR,검사년도
+50,상수도 수질정보,OPEN API,,,FCLTY_LOC,시설위치
+50,상수도 수질정보,OPEN API,,,EXCS_YN,초과여부
+50,상수도 수질정보,OPEN API,,,FCLTY_NM,시설명
+51,생산중단제품정보,OPEN API,keyid,인증키,ARTCL_END_WHY,생산중단사유
+51,생산중단제품정보,OPEN API,serviceId,서비스명,FOOD_HF_LS_CL_CD_NM,구분
+51,생산중단제품정보,OPEN API,dataType,요청파일 타입,BSSH_NM,업소명
+51,생산중단제품정보,OPEN API,startidx,요청시작위치,LCNS_NO,인허가번호
+51,생산중단제품정보,OPEN API,endIdx,요청종료위치,PRDLST_DCNM,품목유형명
+51,생산중단제품정보,OPEN API,PRDLST_REPORT_NO,품목제조보고번호,END_DT,생산중단일자
+51,생산중단제품정보,OPEN API,PRDLST_NM,제품명,PRDLST_NM,제품명
+51,생산중단제품정보,OPEN API,END_DT,생산중단일자,PRMS_DT,품목보고일자
+51,생산중단제품정보,OPEN API,FOOD_HF_LS_CL_CD,"구분(001:식품(식품첨가물),002:건강기능식품,003:축산물,011:위생용품)",PRDLST_REPORT_NO,품목제조보고번호
+51,생산중단제품정보,OPEN API,PRMS_DT,품목보고일자,,
+51,생산중단제품정보,OPEN API,LCNS_NO,인허가번호,,
+52,쇠고기(국내)이력추적 가공관리,OPEN API,keyid,인증키,PRCSS_PLC_NM,가공장소명
+52,쇠고기(국내)이력추적 가공관리,OPEN API,serviceId,서비스명,PRCSS_DT,가공일자
+52,쇠고기(국내)이력추적 가공관리,OPEN API,dataType,요청파일 타입,PRCSS_PLC_CD,가공장소코드
+52,쇠고기(국내)이력추적 가공관리,OPEN API,startidx,요청시작위치,ENTTY_IDNTFC_NO,개체식별번호
+52,쇠고기(국내)이력추적 가공관리,OPEN API,endIdx,요청종료위치,FMH_NM,농가명
+52,쇠고기(국내)이력추적 가공관리,OPEN API,CHNG_DT,변경일자,GND_NM,성별
+53,쇠고기(국내)이력추적 생산정보,OPEN API,keyid,인증키,COW_KND_NM,소종류명
+53,쇠고기(국내)이력추적 생산정보,OPEN API,serviceId,서비스명,ENTTY_STATS_NM,개체상태명
+53,쇠고기(국내)이력추적 생산정보,OPEN API,dataType,요청파일 타입,BRTH_DT,출생일자
+53,쇠고기(국내)이력추적 생산정보,OPEN API,startidx,요청시작위치,VACIN_LAST_INOCL_OPNO,백신최종접종차수
+53,쇠고기(국내)이력추적 생산정보,OPEN API,endIdx,요청종료위치,VACIN_LAST_INOCL_DT,백신최종접종일자
+53,쇠고기(국내)이력추적 생산정보,OPEN API,BRTH_DT,출생일자,ENTTY_IDNTFC_NO,개체식별번호
+54,쇠고기(국내)이력추적 정보,OPEN API,keyid,인증키,PRCSS_PLC_NM,가공장소명
+54,쇠고기(국내)이력추적 정보,OPEN API,serviceId,서비스명,PRCSS_DT,가공일자
+54,쇠고기(국내)이력추적 정보,OPEN API,dataType,요청파일 타입,SNTT_PRSEC_PASS_ENNC,위생검사합격유무
+54,쇠고기(국내)이력추적 정보,OPEN API,startidx,요청시작위치,ADDR,도축장소주소
+54,쇠고기(국내)이력추적 정보,OPEN API,endIdx,요청종료위치,SLAU_YMD,도축년월일
+54,쇠고기(국내)이력추적 정보,OPEN API,,,SNTT_PRSEC_NM,위생검사
+54,쇠고기(국내)이력추적 정보,OPEN API,,,SLAU_PLC_NM,도축장소
+54,쇠고기(국내)이력추적 정보,OPEN API,,,VACIN_LAST_INOCL_OPNO,백신최종접종차수
+54,쇠고기(국내)이력추적 정보,OPEN API,,,VACIN_LAST_INOCL_DT,백신최종접종일자
+54,쇠고기(국내)이력추적 정보,OPEN API,,,FMH_NM,농가명
+54,쇠고기(국내)이력추적 정보,OPEN API,,,GND_NM,성별
+54,쇠고기(국내)이력추적 정보,OPEN API,,,COW_KND_NM,소종류명
+54,쇠고기(국내)이력추적 정보,OPEN API,,,ENTTY_STATS_NM,개체상태명
+54,쇠고기(국내)이력추적 정보,OPEN API,,,BRTH_DT,출생일자
+54,쇠고기(국내)이력추적 정보,OPEN API,,,ENTTY_IDNTFC_NO,개체식별번호
+55,수거검사 계획 및 실적 관련 현황,OPEN API,keyid,인증키,JDGMNT_CD_NM,판정결과
+55,수거검사 계획 및 실적 관련 현황,OPEN API,serviceId,서비스명,TKAWYDTM,수거일자
+55,수거검사 계획 및 실적 관련 현황,OPEN API,dataType,요청파일 타입,PRDTNM,제품명
+55,수거검사 계획 및 실적 관련 현황,OPEN API,startidx,요청시작위치,SITE_ADDR,소재지
+55,수거검사 계획 및 실적 관련 현황,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+55,수거검사 계획 및 실적 관련 현황,OPEN API,SEARCHSTDT,수거시작일자(YYYYMMDD),PRCSCITYPOINT_INDUTYCD_NM,업종
+55,수거검사 계획 및 실적 관련 현황,OPEN API,SEARCHENDDT,수거종료일자(YYYYMMDD),PLAN_TITL,수거계획명
+55,수거검사 계획 및 실적 관련 현황,OPEN API,TKAWYSPCI_TYPECD,검체구분(0수산물1가공식품2식품첨가물3건강기능식품4농산물5축산물6기구용기7위생용품8식품접객업9기타),TKAWYPRNO,수거증번호
+55,수거검사 계획 및 실적 관련 현황,OPEN API,LAST_UPDT_DTM,최종수정일자(YYYYMMDD),LAST_UPDT_DTM,최종수정일시
+55,수거검사 계획 및 실적 관련 현황,OPEN API,BSSH_NM,업소명,PRDLST_REPORT_NO,품목제조보고번호
+55,수거검사 계획 및 실적 관련 현황,OPEN API,,,TKAWYSPCI_TYPECD_NM,검체구분
+55,수거검사 계획 및 실적 관련 현황,OPEN API,,,EXC_INSTT_NM,수행기관명
+56,수산물 수입업체 현황 정보,OPEN API,keyid,인증키,ENTRPS_KOR_NM,업체한글명
+56,수산물 수입업체 현황 정보,OPEN API,serviceId,서비스명,BSN_PRMS_NO_1,영업허가번호
+56,수산물 수입업체 현황 정보,OPEN API,dataType,요청파일 타입,INDUTY_CD_NM,업종코드명
+56,수산물 수입업체 현황 정보,OPEN API,startidx,요청시작위치,PRSDNT_KOR_NM,대표자명
+56,수산물 수입업체 현황 정보,OPEN API,endIdx,요청종료위치,RM,비고
+56,수산물 수입업체 현황 정보,OPEN API,CHNG_DT,변경일자,ADDR,주소
+57,수산물 표시단속정보,OPEN API,keyid,인증키,ORGNP_DVS_NM,원산지구분
+57,수산물 표시단속정보,OPEN API,serviceId,서비스명,INSTT_NM,단속기관명
+57,수산물 표시단속정보,OPEN API,dataType,요청파일 타입,DISCL_DTM,단속일자
+57,수산물 표시단속정보,OPEN API,startidx,요청시작위치,VILT_ENTRPS_RELS_DT,위반업체해제일자
+57,수산물 표시단속정보,OPEN API,endIdx,요청종료위치,VILT_ENTRPS_RELS_YN,위반업체해제여부
+57,수산물 표시단속정보,OPEN API,DISCL_DTM,단속일자(YYYYMMDD),CTPRVN_NM,주소
+57,수산물 표시단속정보,OPEN API,,,BIZCND_DVS_NM,업태
+57,수산물 표시단속정보,OPEN API,,,MPRC_DVS_NM,수산물구분
+57,수산물 표시단속정보,OPEN API,,,VILT_MATR_DVS_NM,위반사항구분
+57,수산물 표시단속정보,OPEN API,,,ENTRPS_NM,업체명
+58,수산물 해외등록시설정보,OPEN API,keyid,인증키,POSTPNE_BGN_DT,유예시작일자
+58,수산물 해외등록시설정보,OPEN API,serviceId,서비스명,STATS_DVS,상태구분
+58,수산물 해외등록시설정보,OPEN API,dataType,요청파일 타입,APPLC_DT,적용일자
+58,수산물 해외등록시설정보,OPEN API,startidx,요청시작위치,ADDR_PRDT,주소제품
+58,수산물 해외등록시설정보,OPEN API,endIdx,요청종료위치,ENTRPS_ADDR,업체주소
+58,수산물 해외등록시설정보,OPEN API,,,NLTY_NM,국적명
+58,수산물 해외등록시설정보,OPEN API,,,KND_CD_NM,종류코드명
+58,수산물 해외등록시설정보,OPEN API,,,ENTRPS_NM,업체명
+58,수산물 해외등록시설정보,OPEN API,,,RM,비고
+58,수산물 해외등록시설정보,OPEN API,,,CANCL_DT,취소일자
+58,수산물 해외등록시설정보,OPEN API,,,POSTPNE_RELS_DT,유예해제일자
+58,수산물 해외등록시설정보,OPEN API,,,POSTPNE_END_DT,유예종료일자
+58,수산물 해외등록시설정보,OPEN API,,,REG_NO,등록번호
+59,수산물이력정보-기본정보,OPEN API,keyid,인증키,ADDR,주소
+59,수산물이력정보-기본정보,OPEN API,serviceId,서비스명,TELNO,전화번호
+59,수산물이력정보-기본정보,OPEN API,dataType,요청파일 타입,ENTRPS_NM,업소명
+59,수산물이력정보-기본정보,OPEN API,startidx,요청시작위치,PRDLST_GROUP_DVS_NM,품목
+59,수산물이력정보-기본정보,OPEN API,endIdx,요청종료위치,GOODS_NM,상품명
+59,수산물이력정보-기본정보,OPEN API,,,HIST_TRACE_REG_NO,이력추적등록번호
+60,수산물이력정보-생산정보,OPEN API,keyid,인증키,PRDLST_GROUP_DVS_NM,품목
+60,수산물이력정보-생산정보,OPEN API,serviceId,서비스명,GOODS_NM,상품명
+60,수산물이력정보-생산정보,OPEN API,dataType,요청파일 타입,LOTNO_WRHOUSNG,로트번호입고
+60,수산물이력정보-생산정보,OPEN API,startidx,요청시작위치,PHHGH_UNIT_CD_NM,입고단위
+60,수산물이력정보-생산정보,OPEN API,endIdx,요청종료위치,WRHOUSNG_QTY,입고수량
+60,수산물이력정보-생산정보,OPEN API,CHNG_DT,변경일자,WRHOUSNG_DT,입고일자
+60,수산물이력정보-생산정보,OPEN API,,,SETT_QTY,입식수량
+60,수산물이력정보-생산정보,OPEN API,,,HIST_TRACE_REG_NO,이력추적등록번호
+61,수산물이력정보-출하정보,OPEN API,keyid,인증키,RELES_DVS_NM,출고구분
+61,수산물이력정보-출하정보,OPEN API,serviceId,서비스명,PRDLST_GROUP_DVS_NM,품목
+61,수산물이력정보-출하정보,OPEN API,dataType,요청파일 타입,LOTNO_WRHOUSNG,로트번호입고
+61,수산물이력정보-출하정보,OPEN API,startidx,요청시작위치,LOTNO_RELES,로트번호출고
+61,수산물이력정보-출하정보,OPEN API,endIdx,요청종료위치,RELES_UNIT_NM,출고단위
+61,수산물이력정보-출하정보,OPEN API,CHNG_DT,변경일자,RELES_QTY,출고수량
+61,수산물이력정보-출하정보,OPEN API,,,RELES_DT,출고일자
+61,수산물이력정보-출하정보,OPEN API,,,PRDCTN_QTY,생산수량
+61,수산물이력정보-출하정보,OPEN API,,,PRDCTN_DT,생산일자
+61,수산물이력정보-출하정보,OPEN API,,,HIST_TRACE_REG_NO,이력추적등록번호
+62,수입쇠고기 냉동전환 정보,OPEN API,keyid,인증키,FRESH_DISTB_TMLMT_BGN_DT,냉장유통/소비기한 시작일자
+62,수입쇠고기 냉동전환 정보,OPEN API,serviceId,서비스명,FREEZING_CNVRS_WT,전환중량(KG)
+62,수입쇠고기 냉동전환 정보,OPEN API,dataType,요청파일 타입,FREEZING_CNVRS_QTY,전환수량(BOX)
+62,수입쇠고기 냉동전환 정보,OPEN API,startidx,요청시작위치,PRDLST_NM,품명(한글)
+62,수입쇠고기 냉동전환 정보,OPEN API,endIdx,요청종료위치,APLC_DTM,신고일
+62,수입쇠고기 냉동전환 정보,OPEN API,MEATWATCH_NO,이력번호,BSSH_NM,수입업체명
+62,수입쇠고기 냉동전환 정보,OPEN API,HIST_NO,수입신고확인증번호,ORGNP_NM,원산지
+62,수입쇠고기 냉동전환 정보,OPEN API,ACCEPT_NO,축산물수입신고필증번호,HIST_NO,수입신고확인증번호
+62,수입쇠고기 냉동전환 정보,OPEN API,,,ACCEPT_NO,축산물수입신고필증번호
+62,수입쇠고기 냉동전환 정보,OPEN API,,,FREEZING_DISTB_TMLMT_DT,냉동전환 후 유통/소비기한
+62,수입쇠고기 냉동전환 정보,OPEN API,,,FREEZING_CNVRS_PREARNGE_DT,냉동전환 완료일
+62,수입쇠고기 냉동전환 정보,OPEN API,,,FREEZING_CNVRS_OPRTN_DT,냉동전환 실시일
+62,수입쇠고기 냉동전환 정보,OPEN API,,,FRESH_DISTB_TMLMT_DT,냉장유통/소비기한 만료일자
+62,수입쇠고기 냉동전환 정보,OPEN API,,,MEATWATCH_NO,이력번호
+63,수입쇠고기 유통이력정보,OPEN API,keyid,인증키,EXCOURY_PRCSS_BGN_DT,수출국가공시작일자
+63,수입쇠고기 유통이력정보,OPEN API,serviceId,서비스명,EXCOURY_PRCSS_PLC_NM,수출국가공장소명
+63,수입쇠고기 유통이력정보,OPEN API,dataType,요청파일 타입,EXCOURY_SLAU_END_DT,수출국도축종료일자
+63,수입쇠고기 유통이력정보,OPEN API,startidx,요청시작위치,EXCOURY_SLAU_BGN_DT,수출국도축시작일자
+63,수입쇠고기 유통이력정보,OPEN API,endIdx,요청종료위치,EXCOURY_SLAU_PLC_NM,수출국도축장소명
+63,수입쇠고기 유통이력정보,OPEN API,CHNG_DT,변경일자,ORGNP_NATN_NM,원산지국가명
+63,수입쇠고기 유통이력정보,OPEN API,INCM_ST_DT,수입일자시작범위(YYYYMMDD),INCM_BEEF_PRDLST_NM,수입쇠고기품목명
+63,수입쇠고기 유통이력정보,OPEN API,INCM_END_DT,수입일자종료범위(YYYYMMDD),BL_NO,선하증권번호
+63,수입쇠고기 유통이력정보,OPEN API,,,REGN_NM,부위명
+63,수입쇠고기 유통이력정보,OPEN API,,,INCM_DT,수입일자
+63,수입쇠고기 유통이력정보,OPEN API,,,INCM_ENTRPS_NM,수입업체명
+63,수입쇠고기 유통이력정보,OPEN API,,,XPORT_ENTRPS_NM,수출업체명
+63,수입쇠고기 유통이력정보,OPEN API,,,EXCOURY_PRCSS_END_DT,수출국가공종료일자
+64,수입식품등영업신고대장,OPEN API,keyid,인증키,TELNO,전화번호
+64,수입식품등영업신고대장,OPEN API,serviceId,서비스명,INSTT_NM,기관명
+64,수입식품등영업신고대장,OPEN API,dataType,요청파일 타입,LOCP_ADDR,주소
+64,수입식품등영업신고대장,OPEN API,startidx,요청시작위치,PRMS_DT,허가일자
+64,수입식품등영업신고대장,OPEN API,endIdx,요청종료위치,INDUTY_NM,업종
+64,수입식품등영업신고대장,OPEN API,CHNG_DT,변경일자,PRSDNT_NM,대표자명
+64,수입식품등영업신고대장,OPEN API,LCNS_NO,인허가번호,BSSH_NM,업소명
+64,수입식품등영업신고대장,OPEN API,,,LCNS_NO,인허가번호
+65,수입식품업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+65,수입식품업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+65,수입식품업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+65,수입식품업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+65,수입식품업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+65,수입식품업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+65,수입식품업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+65,수입식품업 폐업정보,OPEN API,,,BSSH_NM,업소명
+65,수입식품업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+66,수입축산물 냉동전환 정보,OPEN API,keyid,인증키,FREEZING_CNVRS_WT,전환중량(KG)
+66,수입축산물 냉동전환 정보,OPEN API,serviceId,서비스명,FREEZING_CNVRS_QTY,전환수량(BOX)
+66,수입축산물 냉동전환 정보,OPEN API,dataType,요청파일 타입,PRDLST_NM,품명(한글)
+66,수입축산물 냉동전환 정보,OPEN API,startidx,요청시작위치,APLC_DTM,신고일
+66,수입축산물 냉동전환 정보,OPEN API,endIdx,요청종료위치,BSSH_NM,수입업체명
+66,수입축산물 냉동전환 정보,OPEN API,MEATWATCH_NO,이력번호,ORGNP_NM,원산지
+66,수입축산물 냉동전환 정보,OPEN API,ACCEPT_NO,축산물수입신고필증번호,HIST_NO,수입신고확인증번호
+66,수입축산물 냉동전환 정보,OPEN API,HIST_NO,수입신고확인증번호,ACCEPT_NO,축산물수입신고필증번호
+66,수입축산물 냉동전환 정보,OPEN API,,,FREEZING_DISTB_TMLMT_DT,냉동전환 후 유통/소비기한
+66,수입축산물 냉동전환 정보,OPEN API,,,FREEZING_CNVRS_PREARNGE_DT,냉동전환 완료일
+66,수입축산물 냉동전환 정보,OPEN API,,,FREEZING_CNVRS_OPRTN_DT,냉동전환 실시일
+66,수입축산물 냉동전환 정보,OPEN API,,,FRESH_DISTB_TMLMT_DT,냉장유통/소비기한 만료일자
+66,수입축산물 냉동전환 정보,OPEN API,,,FRESH_DISTB_TMLMT_BGN_DT,냉장유통/소비기한 시작일자
+66,수입축산물 냉동전환 정보,OPEN API,,,MEATWATCH_NO,이력번호
+67,시약정보,OPEN API,keyid,인증키,VALD_TERM,유효기간
+67,시약정보,OPEN API,serviceId,서비스명,PUREDO,순도
+67,시약정보,OPEN API,dataType,요청파일 타입,STATS_NO,상태
+67,시약정보,OPEN API,startidx,요청시작위치,CTPRVNACCTO_INTD_NO,시도별 지방청
+67,시약정보,OPEN API,endIdx,요청종료위치,CMPNY_NO,회사 명
+67,시약정보,OPEN API,VALD_TERM,유효기간(YYYYMM),CITYMEDI_NM_CD,시약 명
+68,시험항목코드,OPEN API,keyid,인증키,L_KOR_NM,대분류한글명
+68,시험항목코드,OPEN API,serviceId,서비스명,L_ATTRB_CD,시험항목대분류코드
+68,시험항목코드,OPEN API,dataType,요청파일 타입,TESTITM_LCLAS_CD,시험항목대분류시퀀스
+68,시험항목코드,OPEN API,startidx,요청시작위치,TESTITM_NM,시험항목명
+68,시험항목코드,OPEN API,endIdx,요청종료위치,NCKNM,이명
+68,시험항목코드,OPEN API,LAST_UPDT_DTM,최종수정일(YYYYMMDD),ABRV,약어
+68,시험항목코드,OPEN API,,,ENG_NM,영문명
+68,시험항목코드,OPEN API,,,KOR_NM,한글명
+68,시험항목코드,OPEN API,,,LAST_UPDT_DTM,최종수정일시
+68,시험항목코드,OPEN API,,,USE_YN,사용여부
+68,시험항목코드,OPEN API,,,REMN_MTTR_DFN,잔류물질정의
+68,시험항목코드,OPEN API,,,M_KOR_NM,중분류한글명
+68,시험항목코드,OPEN API,,,M_ATTRB_CD,시험항목중분류코드
+68,시험항목코드,OPEN API,,,TESTITM_MLSFC_CD,시험항목중분류시퀀스
+68,시험항목코드,OPEN API,,,TESTITM_CD,시험항목코드
+69,식용란선별포장업 인허가 대장,OPEN API,keyid,인증키,INSTT_NM,기관명
+69,식용란선별포장업 인허가 대장,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+69,식용란선별포장업 인허가 대장,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+69,식용란선별포장업 인허가 대장,OPEN API,startidx,요청시작위치,INDUTY_NM,업종
+69,식용란선별포장업 인허가 대장,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+69,식용란선별포장업 인허가 대장,OPEN API,CHNG_DT, 변경일자(YYYYMMDD),BSSH_NM,업소명
+69,식용란선별포장업 인허가 대장,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가번호
+69,식용란선별포장업 인허가 대장,OPEN API,BSSH_NM,업소명,,
+70,식육즉석판매가공업 인허가 대장,OPEN API,keyid,인증키,INSTT_NM,기관명
+70,식육즉석판매가공업 인허가 대장,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+70,식육즉석판매가공업 인허가 대장,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+70,식육즉석판매가공업 인허가 대장,OPEN API,startidx,요청시작위치,INDUTY_NM,업종
+70,식육즉석판매가공업 인허가 대장,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+70,식육즉석판매가공업 인허가 대장,OPEN API,CHNG_DT, 변경일자(YYYYMMDD),BSSH_NM,업소명
+70,식육즉석판매가공업 인허가 대장,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가번호
+70,식육즉석판매가공업 인허가 대장,OPEN API,BSSH_NM,업소명,,
+71,식육즉석판매가공업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+71,식육즉석판매가공업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+71,식육즉석판매가공업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+71,식육즉석판매가공업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+71,식육즉석판매가공업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+71,식육즉석판매가공업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+71,식육즉석판매가공업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+71,식육즉석판매가공업 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+71,식육즉석판매가공업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+72,식중독 원인물질별 현황,OPEN API,keyid,인증키,PATNT_CNT,환자수
+72,식중독 원인물질별 현황,OPEN API,serviceId,서비스명,OCCRNC_CNT,발생건수
+72,식중독 원인물질별 현황,OPEN API,dataType,요청파일 타입,OCCRNC_VIRS,발생물질
+72,식중독 원인물질별 현황,OPEN API,startidx,요청시작위치,OCCRNC_MM,발생월
+72,식중독 원인물질별 현황,OPEN API,endIdx,요청종료위치,OCCRNC_YEAR,발생년
+72,식중독 원인물질별 현황,OPEN API,OCCRNC_YEAR,발생년(YYYY),PATNT_CNT,환자수
+72,식중독 원인물질별 현황,OPEN API,OCCRNC_MM,발생월(MM),OCCRNC_CNT,발생건수
+72,식중독 원인물질별 현황,OPEN API,OCCRNC_VIRS,발생물질,OCCRNC_PLC,발생장소
+73,식중독 원인시설별 현황,OPEN API,keyid,인증키,OCCRNC_MM,발생월
+73,식중독 원인시설별 현황,OPEN API,serviceId,서비스명,OCCRNC_YEAR,발생년
+73,식중독 원인시설별 현황,OPEN API,dataType,요청파일 타입,,
+73,식중독 원인시설별 현황,OPEN API,startidx,요청시작위치,,
+73,식중독 원인시설별 현황,OPEN API,endIdx,요청종료위치,,
+73,식중독 원인시설별 현황,OPEN API,OCCRNC_YEAR,발생년(YYYY),,
+73,식중독 원인시설별 현황,OPEN API,OCCRNC_MM,발생월(MM),,
+73,식중독 원인시설별 현황,OPEN API,OCCRNC_PLC,발생장소,,
+74,식중독 지역별 현황,OPEN API,keyid,인증키,PATNT_CNT,환자수
+74,식중독 지역별 현황,OPEN API,serviceId,서비스명,OCCRNC_CNT,발생건수
+74,식중독 지역별 현황,OPEN API,dataType,요청파일 타입,OCCRNC_AREA,발생지역
+74,식중독 지역별 현황,OPEN API,startidx,요청시작위치,OCCRNC_MM,발생월
+74,식중독 지역별 현황,OPEN API,endIdx,요청종료위치,OCCRNC_YEAR,발생년
+74,식중독 지역별 현황,OPEN API,OCCRNC_YEAR,발생년(YYYY),,
+74,식중독 지역별 현황,OPEN API,OCCRNC_MM,발생월(MM),,
+74,식중독 지역별 현황,OPEN API,OCCRNC_AREA,발생지역,,
+75,식품(첨가물)품목제조보고,OPEN API,keyid,인증키,CHILD_CRTFC_YN,어린이기호식품품질인증여부
+75,식품(첨가물)품목제조보고,OPEN API,serviceId,서비스명,HIENG_LNTRT_DVS_NM,고열량저영양식품여부
+75,식품(첨가물)품목제조보고,OPEN API,dataType,요청파일 타입,PRODUCTION,생산종료여부
+75,식품(첨가물)품목제조보고,OPEN API,startidx,요청시작위치,PRDLST_DCNM,품목유형명
+75,식품(첨가물)품목제조보고,OPEN API,endIdx,요청종료위치,PRDLST_NM,제품명
+75,식품(첨가물)품목제조보고,OPEN API,CHNG_DT,변경일자(YYYYMMDD),PRMS_DT,허가일자
+75,식품(첨가물)품목제조보고,OPEN API,PRDLST_REPORT_NO,품목제조번호,PRDLST_REPORT_NO,품목제조번호
+75,식품(첨가물)품목제조보고,OPEN API,BSSH_NM,업소명,BSSH_NM,업소명
+75,식품(첨가물)품목제조보고,OPEN API,PRDLST_NM,제품명,FRMLC_MTRQLT,포장재질
+75,식품(첨가물)품목제조보고,OPEN API,LCNS_NO,인허가번호,DISPOS,제품형태
+75,식품(첨가물)품목제조보고,OPEN API,PRMS_DT,보고일자,PRPOS,용도
+75,식품(첨가물)품목제조보고,OPEN API,PRDLST_DCNM,품목유형명,USAGE,용법
+75,식품(첨가물)품목제조보고,OPEN API,,,QLITY_MNTNC_TMLMT_DAYCNT,품질유지기한일수
+75,식품(첨가물)품목제조보고,OPEN API,,,INDUTY_CD_NM,업종
+75,식품(첨가물)품목제조보고,OPEN API,,,LAST_UPDT_DTM,최종수정일자
+75,식품(첨가물)품목제조보고,OPEN API,,,POG_DAYCNT,소비기한
+75,식품(첨가물)품목제조보고,OPEN API,,,LCNS_NO,인허가번호
+76,식품(첨가물)품목제조보고(원재료),OPEN API,keyid,인증키,CHNG_DT,변경일자(YYYYMMDD)
+76,식품(첨가물)품목제조보고(원재료),OPEN API,serviceId,서비스명,RAWMTRL_NM,원재료명
+76,식품(첨가물)품목제조보고(원재료),OPEN API,dataType,요청파일 타입,PRDLST_DCNM,품목유형명
+76,식품(첨가물)품목제조보고(원재료),OPEN API,startidx,요청시작위치,PRDLST_NM,품목명
+76,식품(첨가물)품목제조보고(원재료),OPEN API,endIdx,요청종료위치,PRMS_DT,보고일자
+76,식품(첨가물)품목제조보고(원재료),OPEN API,CHNG_DT,변경일자(YYYYMMDD),PRDLST_REPORT_NO,품목제조번호
+76,식품(첨가물)품목제조보고(원재료),OPEN API,PRDLST_REPORT_NO,품목제조번호,BSSH_NM,업소명
+76,식품(첨가물)품목제조보고(원재료),OPEN API,PRDLST_NM,품목명,LCNS_NO,인허가번호
+76,식품(첨가물)품목제조보고(원재료),OPEN API,BSSH_NM,업소명,,
+76,식품(첨가물)품목제조보고(원재료),OPEN API,LCNS_NO,인허가번호,,
+76,식품(첨가물)품목제조보고(원재료),OPEN API,RAWMTRL_NM,원재료명,,
+76,식품(첨가물)품목제조보고(원재료),OPEN API,PRMS_DT,보고일자,,
+76,식품(첨가물)품목제조보고(원재료),OPEN API,PRDLST_DCNM,품목유형명,,
+77,식품.식품첨가물 생산실적 보고 현황,OPEN API,keyid,인증키,PRDCTN_QY,생산량(KG/옹기류:개)
+77,식품.식품첨가물 생산실적 보고 현황,OPEN API,serviceId,서비스명,FYER_PRDCTN_ABRT_QY,연간생산능력(KG/옹기류:개)
+77,식품.식품첨가물 생산실적 보고 현황,OPEN API,dataType,요청파일 타입,PRDLST_NM,품목명
+77,식품.식품첨가물 생산실적 보고 현황,OPEN API,startidx,요청시작위치,H_ITEM_NM,품목유형
+77,식품.식품첨가물 생산실적 보고 현황,OPEN API,endIdx,요청종료위치,PRDLST_REPORT_NO,품목제조보고번호
+77,식품.식품첨가물 생산실적 보고 현황,OPEN API,EVL_YR,생산실적보고년도(YYYY)(필수),EVL_YR,보고년도
+77,식품.식품첨가물 생산실적 보고 현황,OPEN API,LCNS_NO,인허가번호,SITE_ADDR,주소
+77,식품.식품첨가물 생산실적 보고 현황,OPEN API,BSSH_NM,업소명,BSSH_NM,업소명
+77,식품.식품첨가물 생산실적 보고 현황,OPEN API,PRDLST_NM,제품명,LCNS_NO,인허가번호
+77,식품.식품첨가물 생산실적 보고 현황,OPEN API,PRDLST_CD_NM,품목유형,,
+78,식품검사기관별 시험항목정보조회,OPEN API,keyid,인증키,RM,비고
+78,식품검사기관별 시험항목정보조회,OPEN API,serviceId,서비스명,TESTITM_NM,시험항목명
+78,식품검사기관별 시험항목정보조회,OPEN API,dataType,요청파일 타입,TESTITM_MLSFC_NM,중분류
+78,식품검사기관별 시험항목정보조회,OPEN API,startidx,요청시작위치,TESTITM_LCLAS_NM,대분류
+78,식품검사기관별 시험항목정보조회,OPEN API,endIdx,요청종료위치,MSK_TELNO,전화번호
+78,식품검사기관별 시험항목정보조회,OPEN API,CMPTNC_INSTT_NM,관할기관,ADDR,소재지
+78,식품검사기관별 시험항목정보조회,OPEN API,INSTT_NM,검사기관,INSTT_NM,검사기관
+78,식품검사기관별 시험항목정보조회,OPEN API,TESTITM_NM,시험항목명,CMPTNC_INSTT_NM,관할기관
+78,식품검사기관별 시험항목정보조회,OPEN API,CHNG_DT,변경일자(YYYYMMDD),CHNG_DT,변경일자(YYYYMMDD)
+78,식품검사기관별 시험항목정보조회,OPEN API,,,REALM_NM,분야
+79,식품공전,OPEN API,keyid,인증키,JDGMNT_FNPRT_CD_NM,판정형식
+79,식품공전,OPEN API,serviceId,서비스명,SPEC_VAL_SUMUP,규격값요약
+79,식품공전,OPEN API,dataType,요청파일 타입,VALD_END_DT,유효종료일자
+79,식품공전,OPEN API,startidx,요청시작위치,VALD_BEGN_DT,유효개시일자
+79,식품공전,OPEN API,endIdx,요청종료위치,SPEC_VAL,기준규격값
+79,식품공전,OPEN API,LAST_UPDT_DTM,최종수정일(YYYYMMDD),PIAM_KOR_NM,품목항목속성
+79,식품공전,OPEN API,PRDLST_NM,품목명,FNPRT_ITM_NM,세부항목
+79,식품공전,OPEN API,,,T_KOR_NM,시험항목
+79,식품공전,OPEN API,,,UNIT_NM,단위명
+79,식품공전,OPEN API,,,INJRY_YN,위해여부
+79,식품공전,OPEN API,,,CHOIC_IMPROPT_FNPRT_CD_NM,부적합
+79,식품공전,OPEN API,,,CHOIC_FIT_FNPRT_CD_NM,세부적합
+79,식품공전,OPEN API,,,MIMM_VAL_FNPRT_CD_NM,이상/초과
+79,식품공전,OPEN API,,,MIMM_VAL,최소값
+79,식품공전,OPEN API,,,MXMM_VAL_FNPRT_CD_NM,이하/미만
+79,식품공전,OPEN API,,,MXMM_VAL,최대값
+79,식품공전,OPEN API,,,PRDLST_NM,품목명
+80,식품냉동.냉장업 인허가 대장,OPEN API,keyid,인증키,INSTT_NM,기관명
+80,식품냉동.냉장업 인허가 대장,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+80,식품냉동.냉장업 인허가 대장,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+80,식품냉동.냉장업 인허가 대장,OPEN API,startidx,요청시작위치,INDUTY_NM,업종
+80,식품냉동.냉장업 인허가 대장,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+80,식품냉동.냉장업 인허가 대장,OPEN API,CHNG_DT, 변경일자(YYYYMMDD),BSSH_NM,업소명
+80,식품냉동.냉장업 인허가 대장,OPEN API,BSSH_NM,업소명,LCNS_NO,인허가번호
+80,식품냉동.냉장업 인허가 대장,OPEN API,LNCS_NO,인허가번호,,
+81,식품등 표시기준,OPEN API,keyid,인증키,,
+81,식품등 표시기준,OPEN API,serviceId,서비스명,,
+81,식품등 표시기준,OPEN API,dataType,요청파일 타입,,
+81,식품등 표시기준,OPEN API,startidx,요청시작위치,,
+81,식품등 표시기준,OPEN API,endIdx,요청종료위치,,
+82,식품등수입판매업정보,OPEN API,keyid,인증키,TELNO,전화번호
+82,식품등수입판매업정보,OPEN API,serviceId,서비스명,PRMS_DT,허가일자
+82,식품등수입판매업정보,OPEN API,dataType,요청파일 타입,INDUTY_NM,업종
+82,식품등수입판매업정보,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자명
+82,식품등수입판매업정보,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+82,식품등수입판매업정보,OPEN API,CHNG_DT,변경일자,INSTT_NM,기관명
+82,식품등수입판매업정보,OPEN API,LCNS_NO,인허가번호,LOCP_ADDR,주소
+82,식품등수입판매업정보,OPEN API,BSSH_NM,업소명,LCNS_NO,인허가 번호
+83,식품모범음식점,OPEN API,keyid,인증키,APPN_DT,지정일자
+83,식품모범음식점,OPEN API,serviceId,서비스명,PNCPL_FOOD_NM,주된 음식명
+83,식품모범음식점,OPEN API,dataType,요청파일 타입,APLC_DT,신청일자
+83,식품모범음식점,OPEN API,startidx,요청시작위치,YEAR,인허가연도
+83,식품모범음식점,OPEN API,endIdx,요청종료위치,SIGNGU_NM,시군구
+83,식품모범음식점,OPEN API,CHNG_DT,변경일자,BSSH_NM,업소명
+83,식품모범음식점,OPEN API,,,OPERT_DT,작업일
+83,식품모범음식점,OPEN API,,,LCNS_NO,인허가번호
+84,식품별 농약잔류허용기준,OPEN API,keyid,인증키,OPERTN_CITYPOINT,시행시점
+84,식품별 농약잔류허용기준,OPEN API,serviceId,서비스명,SCLAS_NM,소분류
+84,식품별 농약잔류허용기준,OPEN API,dataType,요청파일 타입,MLSFC_NM,중분류
+84,식품별 농약잔류허용기준,OPEN API,startidx,요청시작위치,LCLAS_NM,대분류
+84,식품별 농약잔류허용기준,OPEN API,endIdx,요청종료위치,TMPR_STDR_APPLC_YN,잠정기준적용여부
+84,식품별 농약잔류허용기준,OPEN API,,,DEDE_NTK_QTY,일일섭취량
+84,식품별 농약잔류허용기준,OPEN API,,,AGCHM_KOR_NM,농약명
+84,식품별 농약잔류허용기준,OPEN API,,,FOOD_ENG_NM,식품영문명
+84,식품별 농약잔류허용기준,OPEN API,,,DSUSE_YN,폐기 여부
+84,식품별 농약잔류허용기준,OPEN API,,,ETC_YN,기타여부
+84,식품별 농약잔류허용기준,OPEN API,,,MRL_VAL,MRL 값
+84,식품별 농약잔류허용기준,OPEN API,,,STEP,단계
+84,식품별 농약잔류허용기준,OPEN API,,,FOOD_KOR_NM,식품한글명
+85,식품별 유해오염물질 검출량,OPEN API,keyid,인증키,COL_E_RESULT,총 아플라톡신
+85,식품별 유해오염물질 검출량,OPEN API,serviceId,서비스명,COL_D_RESULT,3-MCPD
+85,식품별 유해오염물질 검출량,OPEN API,dataType,요청파일 타입,COL_C_RESULT,벤조피렌
+85,식품별 유해오염물질 검출량,OPEN API,startidx,요청시작위치,COL_B_RESULT,PCBs
+85,식품별 유해오염물질 검출량,OPEN API,endIdx,요청종료위치,COL_A_RESULT,다이옥신
+85,식품별 유해오염물질 검출량,OPEN API,PRDLST_CD,식품유형,ANALS_YEAR,분석연도
+85,식품별 유해오염물질 검출량,OPEN API,PRDLST_NM,식품명,PRDLST_NM,식품명
+85,식품별 유해오염물질 검출량,OPEN API,ANALS_YEAR,분석연도,CRET_DTM,생성일자
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_S_RESULT,주석
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_R_RESULT,메틸수은
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_Q_RESULT,수은
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_P_RESULT,무기비소
+85,식품별 유해오염물질 검출량,OPEN API,,,PRDLST_CD,식품유형
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_O_RESULT,비소
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_N_RESULT,카드뮴
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_M_RESULT,납
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_L_RESULT,아플라톡신M1
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_K_RESULT,파튤린
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_J_RESULT,데옥시니발레놀
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_I_RESULT,제랄레논
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_H_RESULT,푸모니신
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_G_RESULT,오크라톡신
+85,식품별 유해오염물질 검출량,OPEN API,,,COL_F_RESULT,아플라톡신B1
+85,식품별 유해오염물질 검출량,OPEN API,,,SNT_GBN,구분
+86,식품보존업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+86,식품보존업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+86,식품보존업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+86,식품보존업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+86,식품보존업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+86,식품보존업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+86,식품보존업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+86,식품보존업 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+86,식품보존업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+87,식품소분업 인허가 대장,OPEN API,keyid,인증키,INSTT_NM,기관명
+87,식품소분업 인허가 대장,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+87,식품소분업 인허가 대장,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+87,식품소분업 인허가 대장,OPEN API,startidx,요청시작위치,INDUTY_NM,업종
+87,식품소분업 인허가 대장,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+87,식품소분업 인허가 대장,OPEN API,CHNG_DT, 변경일자(YYYYMMDD),BSSH_NM,업소명
+87,식품소분업 인허가 대장,OPEN API,BSSH_NM,업소명,LCNS_NO,인허가번호
+87,식품소분업 인허가 대장,OPEN API,LCNS_NO,인허가번호,,
+88,식품소분업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+88,식품소분업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+88,식품소분업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+88,식품소분업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+88,식품소분업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+88,식품소분업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+88,식품소분업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+88,식품소분업 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+88,식품소분업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+89,식품업소 인허가 변경 정보,OPEN API,keyid,인증키,CHNG_PRVNS,변경사유
+89,식품업소 인허가 변경 정보,OPEN API,serviceId,서비스명,CHNG_AF_CN,변경후내용
+89,식품업소 인허가 변경 정보,OPEN API,dataType,요청파일 타입,CHNG_BF_CN,변경전내용
+89,식품업소 인허가 변경 정보,OPEN API,startidx,요청시작위치,CHNG_DT,변경일자
+89,식품업소 인허가 변경 정보,OPEN API,endIdx,요청종료위치,SITE_ADDR,주소
+89,식품업소 인허가 변경 정보,OPEN API,LCNS_NO,인허가번호,TELNO,전화번호
+89,식품업소 인허가 변경 정보,OPEN API,BSSH_NM,업소명,LCNS_NO,인허가번호
+89,식품업소 인허가 변경 정보,OPEN API,,,INDUTY_CD_NM,업종
+89,식품업소 인허가 변경 정보,OPEN API,,,BSSH_NM,업소명
+90,식품영양성분DB정보,OPEN API,keyid,인증키,,
+90,식품영양성분DB정보,OPEN API,serviceId,서비스명,,
+90,식품영양성분DB정보,OPEN API,dataType,요청파일 타입,,
+90,식품영양성분DB정보,OPEN API,startidx,요청시작위치,,
+90,식품영양성분DB정보,OPEN API,endIdx,요청종료위치,,
+91,식품용 기구 및 용기.포장 공전,OPEN API,keyid,인증키,VALD_END_DT,유효종료일자
+91,식품용 기구 및 용기.포장 공전,OPEN API,serviceId,서비스명,VALD_BEGN_DT,유효개시일자
+91,식품용 기구 및 용기.포장 공전,OPEN API,dataType,요청파일 타입,SPEC_VAL_SUMUP,기준규격값 요약
+91,식품용 기구 및 용기.포장 공전,OPEN API,startidx,요청시작위치,SPEC_VAL,기준규격값
+91,식품용 기구 및 용기.포장 공전,OPEN API,endIdx,요청종료위치,FNPRT_ITM_NM,세부항목명
+91,식품용 기구 및 용기.포장 공전,OPEN API,,,T_KOR_NM,시험항목 한글명
+91,식품용 기구 및 용기.포장 공전,OPEN API,,,TESTITM_CD,시험항목코드
+91,식품용 기구 및 용기.포장 공전,OPEN API,,,PC_KOR_NM,품목한글명
+91,식품용 기구 및 용기.포장 공전,OPEN API,,,UNIT_NM,단위명
+91,식품용 기구 및 용기.포장 공전,OPEN API,,,INJRY_YN,위해여부
+91,식품용 기구 및 용기.포장 공전,OPEN API,,,MIMM_VAL,최소값
+91,식품용 기구 및 용기.포장 공전,OPEN API,,,MXMM_VAL,최대값
+91,식품용 기구 및 용기.포장 공전,OPEN API,,,SORC,출처
+91,식품용 기구 및 용기.포장 공전,OPEN API,,,PRDLST_CD,품목코드
+92,식품운반업 인허가 대장,OPEN API,keyid,인증키,INSTT_NM,기관명
+92,식품운반업 인허가 대장,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+92,식품운반업 인허가 대장,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+92,식품운반업 인허가 대장,OPEN API,startidx,요청시작위치,INDUTY_NM,업종
+92,식품운반업 인허가 대장,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+92,식품운반업 인허가 대장,OPEN API,CHNG_DT, 변경일자(YYYYMMDD),BSSH_NM,업소명
+92,식품운반업 인허가 대장,OPEN API,BSSH_NM,업소명,LCNS_NO,인허가번호
+92,식품운반업 인허가 대장,OPEN API,LCNS_NO,인허가번호,,
+93,식품운반업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+93,식품운반업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+93,식품운반업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+93,식품운반업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+93,식품운반업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+93,식품운반업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+93,식품운반업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+93,식품운반업 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+93,식품운반업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+94,식품원료의 한시적 기준 및 규격 인정 현황,OPEN API,keyid,인증키,USED,사용량
+94,식품원료의 한시적 기준 및 규격 인정 현황,OPEN API,serviceId,서비스명,PRPOS,용도
+94,식품원료의 한시적 기준 및 규격 인정 현황,OPEN API,dataType,요청파일 타입,RAWMTRL_NM,원재료명
+94,식품원료의 한시적 기준 및 규격 인정 현황,OPEN API,startidx,요청시작위치,PRDT_NM,제품명
+94,식품원료의 한시적 기준 및 규격 인정 현황,OPEN API,endIdx,요청종료위치,RCOGN_DT,인정일자
+94,식품원료의 한시적 기준 및 규격 인정 현황,OPEN API,,,PRSDNT_NM,대표자
+94,식품원료의 한시적 기준 및 규격 인정 현황,OPEN API,,,BSSH_ADDR,주소
+94,식품원료의 한시적 기준 및 규격 인정 현황,OPEN API,,,BSSH_NM,업소명
+94,식품원료의 한시적 기준 및 규격 인정 현황,OPEN API,,,USING_UNIT,사용량단위
+94,식품원료의 한시적 기준 및 규격 인정 현황,OPEN API,,,LIMIT_STDR_STND_RCOGN_NO,한시적 기준 규격 인정 번호
+95,"식품원재료(식물,동물,미생물,수산물) 정보",OPEN API,keyid,인증키,USE_CND_NM,사용조건
+95,"식품원재료(식물,동물,미생물,수산물) 정보",OPEN API,serviceId,서비스명,RAWMTRL_STATS_CD_NM,상태명
+95,"식품원재료(식물,동물,미생물,수산물) 정보",OPEN API,dataType,요청파일 타입,REGN_CD_NM,부위명
+95,"식품원재료(식물,동물,미생물,수산물) 정보",OPEN API,startidx,요청시작위치,SCNM,학명
+95,"식품원재료(식물,동물,미생물,수산물) 정보",OPEN API,endIdx,요청종료위치,ENG_NM,영문명
+95,"식품원재료(식물,동물,미생물,수산물) 정보",OPEN API,,,RAWMTRL_NCKNM,이명
+95,"식품원재료(식물,동물,미생물,수산물) 정보",OPEN API,,,RPRSNT_RAWMTRL_NM,원재료명
+95,"식품원재료(식물,동물,미생물,수산물) 정보",OPEN API,,,MLSFC_NM,중분류
+95,"식품원재료(식물,동물,미생물,수산물) 정보",OPEN API,,,USE_CND_STDR_CN,사용조건기준내용
+95,"식품원재료(식물,동물,미생물,수산물) 정보",OPEN API,,,LCLAS_NM,대분류
+96,식품원재료코드,OPEN API,keyid,인증키,REGN_CD_NM,부위코드명
+96,식품원재료코드,OPEN API,serviceId,서비스명,REGN_CD,부위코드
+96,식품원재료코드,OPEN API,dataType,요청파일 타입,SCNM,학명
+96,식품원재료코드,OPEN API,startidx,요청시작위치,ENG_NM,영문명
+96,식품원재료코드,OPEN API,endIdx,요청종료위치,RAWMTRL_NCKNM,원재료이명
+96,식품원재료코드,OPEN API,RPRSNT_RAWMTRL_NM,원재료명,RPRSNT_RAWMTRL_NM,원재료명
+96,식품원재료코드,OPEN API,,,RAWMTRL_MLSFC_NM,중분류
+96,식품원재료코드,OPEN API,,,RAWMTRL_LCLAS_NM,대분류
+96,식품원재료코드,OPEN API,,,LAST_UPDT_DTM,최종수정일시
+96,식품원재료코드,OPEN API,,,USE_YN,사용여부
+96,식품원재료코드,OPEN API,,,VALD_END_DT,유효종료일자
+96,식품원재료코드,OPEN API,,,VALD_BGN_DT,유효시작일자
+96,식품원재료코드,OPEN API,,,RAWMTRL_STATS_CD_NM,원재료코드명
+96,식품원재료코드,OPEN API,,,RAWMTRL_STATS_CD,원재료코드
+96,식품원재료코드,OPEN API,,,PRCSS_PROCS_CD_NM,가공공정코드명
+96,식품원재료코드,OPEN API,,,PRCSS_PROCS_CD,가공공정코드
+96,식품원재료코드,OPEN API,,,RAWMTRL_CD,원재료코드
+97,식품위생검사기관 지정 현황,OPEN API,keyid,인증키,WORK_SCOPE,업무범위
+97,식품위생검사기관 지정 현황,OPEN API,serviceId,서비스명,APPN_END_DT,지정종료일자
+97,식품위생검사기관 지정 현황,OPEN API,dataType,요청파일 타입,APPN_BGN_DT,지정일자
+97,식품위생검사기관 지정 현황,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자
+97,식품위생검사기관 지정 현황,OPEN API,endIdx,요청종료위치,BSSH_NM,기관명
+97,식품위생검사기관 지정 현황,OPEN API,,,PRSEC_INSTT_RCOGN_NO,지정번호
+98,식품위생교육내역,OPEN API,keyid,인증키,COMPL_DTM,수료일자
+98,식품위생교육내역,OPEN API,serviceId,서비스명,CTFHV_NO,수료증번호
+98,식품위생교육내역,OPEN API,dataType,요청파일 타입,CMPLTR_NAME,성명
+98,식품위생교육내역,OPEN API,startidx,요청시작위치,EDC_OBJ_NM,교육대상
+98,식품위생교육내역,OPEN API,endIdx,요청종료위치,INDUTY_NM,업종
+98,식품위생교육내역,OPEN API,CHNG_DT,변경일자,BSSH_NM,업소명
+98,식품위생교육내역,OPEN API,LCNS_NO,인허가번호((NULL값 존재),LCNS_NO,인허가번호
+98,식품위생교육내역,OPEN API,COMPL_ST_DTM,수료일자_범위_시작(YYYYMMDD),EDC_DVS_NM,교육구분
+98,식품위생교육내역,OPEN API,COMPL_END_DTM,수료일자_범위_종료(YYYYMMDD),ADDR,업소주소
+98,식품위생교육내역,OPEN API,INSTT_CD_NM,교육기관명,EDC_PLC,교육장소명
+98,식품위생교육내역,OPEN API,,,EDC_PROCES_NM,교육과정명
+98,식품위생교육내역,OPEN API,,,INSTT_CD_NM,교육기관명
+98,식품위생교육내역,OPEN API,,,EDC_COMPL_NMPR,교육수료인원
+98,식품위생교육내역,OPEN API,,,EDC_MEDIA,매체
+98,식품위생교육내역,OPEN API,,,EDC_TYPE_NM,교육유형
+99,식품위생등급평가관리내역,OPEN API,keyid,인증키,BSSH_NM,업체명
+99,식품위생등급평가관리내역,OPEN API,serviceId,서비스명,LCNS_NO,인허가번호
+99,식품위생등급평가관리내역,OPEN API,dataType,요청파일 타입,BSSH_LOC_CD_NM,업소위치
+99,식품위생등급평가관리내역,OPEN API,startidx,요청시작위치,EVL_GRD_CD_NM,평가등급
+99,식품위생등급평가관리내역,OPEN API,endIdx,요청종료위치,EVL_SCORE,평가점수
+99,식품위생등급평가관리내역,OPEN API,CHNG_DT,변경일자,EVL_DT,평가일자
+99,식품위생등급평가관리내역,OPEN API,LCNS_NO,인허가번호,EVL_TYPE_DVS_CD_NM,평가유형구분
+99,식품위생등급평가관리내역,OPEN API,BSSH_NM,업체명,EVL_PLAN_DT,평가계획일자
+99,식품위생등급평가관리내역,OPEN API,,,EVL_INCPCTY_YN,점검불능여부
+99,식품위생등급평가관리내역,OPEN API,,,ADDR,주소
+99,식품위생등급평가관리내역,OPEN API,,,PRSDNT_NM,대표자
+99,식품위생등급평가관리내역,OPEN API,,,EVL_SEQ,평가일련번호
+100,식품위생심의위원회 개최 결과,OPEN API,keyid,인증키,,
+100,식품위생심의위원회 개최 결과,OPEN API,serviceId,서비스명,,
+100,식품위생심의위원회 개최 결과,OPEN API,dataType,요청파일 타입,,
+100,식품위생심의위원회 개최 결과,OPEN API,startidx,요청시작위치,,
+100,식품위생심의위원회 개최 결과,OPEN API,endIdx,요청종료위치,,
+101,식품이력추적관리 등록 현황,OPEN API,keyid,인증키,BTYPE,업종
+101,식품이력추적관리 등록 현황,OPEN API,serviceId,서비스명,BRNCH_NM,업체명
+101,식품이력추적관리 등록 현황,OPEN API,dataType,요청파일 타입,ADDR,주소
+101,식품이력추적관리 등록 현황,OPEN API,startidx,요청시작위치,MAKE_TYPE,제조구분
+101,식품이력추적관리 등록 현황,OPEN API,endIdx,요청종료위치,PDT_TYPE,식품유형
+101,식품이력추적관리 등록 현황,OPEN API,MOD_DT,최종수정일(YYYYMMDD),PDT_BARCD,바코드
+101,식품이력추적관리 등록 현황,OPEN API,BRNCH_NM,업체명,PDT_NM,제품명
+101,식품이력추적관리 등록 현황,OPEN API,BTYPE,업종,MOD_DT,최종수정일(YYYYMMDD)
+101,식품이력추적관리 등록 현황,OPEN API,PDT_NM,제품명,CRCL_PRD,소비기한
+101,식품이력추적관리 등록 현황,OPEN API,PDT_TYPE,식품유형,FOOD_HISTRACE_NUM,식품이력추적관리번호
+101,식품이력추적관리 등록 현황,OPEN API,,,MNFT_DAY,제조일자
+101,식품이력추적관리 등록 현황,OPEN API,,,PRDLST_REPORT_NO,품목보고번호
+101,식품이력추적관리 등록 현황,OPEN API,,,FOOD_TYPE,식품구분
+101,식품이력추적관리 등록 현황,OPEN API,,,REG_NUM,등록번호
+102,식품접객업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+102,식품접객업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+102,식품접객업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+102,식품접객업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+102,식품접객업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+102,식품접객업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+102,식품접객업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+102,식품접객업 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+102,식품접객업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+103,식품접객업소 위생등급 지정현황,OPEN API,keyid,인증키,ADDR,주소
+103,식품접객업소 위생등급 지정현황,OPEN API,serviceId,서비스명,PRSDNT_NM,대표자
+103,식품접객업소 위생등급 지정현황,OPEN API,dataType,요청파일 타입,BSSH_NM,업소명
+103,식품접객업소 위생등급 지정현황,OPEN API,startidx,요청시작위치,LCNS_NO,인허가번호
+103,식품접객업소 위생등급 지정현황,OPEN API,endIdx,요청종료위치,INDUTY_NM,업종
+103,식품접객업소 위생등급 지정현황,OPEN API,CHNG_DT,변경일자,HG_ASGN_YMD,지정일자
+103,식품접객업소 위생등급 지정현황,OPEN API,LCNS_NO,인허가번호,HG_ASGN_NO,지정번호
+103,식품접객업소 위생등급 지정현황,OPEN API,ASGN_FROM,지정시작일(YYYYMMDD),HG_ASGN_LV,지정등급
+103,식품접객업소 위생등급 지정현황,OPEN API,UPSO_NM,업소명,INSTT_CD_NM,인허가관할기관
+103,식품접객업소 위생등급 지정현황,OPEN API,ADDR,주소,CHNG_DT,변경일자(YYYYMMDD)
+103,식품접객업소 위생등급 지정현황,OPEN API,WRKR_REG_NO,사업자등록번호,CLSBIZ_DT,폐업일자
+103,식품접객업소 위생등급 지정현황,OPEN API,HG_ASGN_LV,지정등급,CLSBIZ_DVS_CD_NM,영업상태
+103,식품접객업소 위생등급 지정현황,OPEN API,INSTT_CD_NM,인허가관할기관,ASGN_CANCEL_YMD,지정취소일자
+103,식품접객업소 위생등급 지정현황,OPEN API,,,WRKR_REG_NO,사업자등록번호
+103,식품접객업소 위생등급 지정현황,OPEN API,,,TELNO,업소전화번호
+103,식품접객업소 위생등급 지정현황,OPEN API,,,ASGN_TO,지정종료일자
+103,식품접객업소 위생등급 지정현황,OPEN API,,,ASGN_FROM,지정시작일자
+103,식품접객업소 위생등급 지정현황,OPEN API,,,HG_ASGN_NM,지정기관
+104,식품접객업정보,OPEN API,keyid,인증키,HG_LV,위생등급
+104,식품접객업정보,OPEN API,serviceId,서비스명,INSTT_NM,기관명
+104,식품접객업정보,OPEN API,dataType,요청파일 타입,TELNO,전화번호
+104,식품접객업정보,OPEN API,startidx,요청시작위치,LOCP_ADDR,주소
+104,식품접객업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+104,식품접객업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+104,식품접객업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+104,식품접객업정보,OPEN API,CRET_DTM,데이터생성일,BSN_LCNS_LEDG_NO,영업대장전산키(고유값)
+104,식품접객업정보,OPEN API,BSSH_NM,업소명,CRET_DTM,데이터생성일시
+104,식품접객업정보,OPEN API,,,BSSH_NM,업소명
+104,식품접객업정보,OPEN API,,,LAST_UPDT_DTM,최종수정일시
+104,식품접객업정보,OPEN API,,,SITE_Y,경도
+104,식품접객업정보,OPEN API,,,SITE_X,위도
+104,식품접객업정보,OPEN API,,,CLSBIZ_DT,폐업일자
+104,식품접객업정보,OPEN API,,,CALC_YMD,나트륨저감화업소취소일
+104,식품접객업정보,OPEN API,,,APPT_YMD,나트륨저감화업소지정일
+104,식품접객업정보,OPEN API,,,JOIN_YMD,나트륨저감화참여일
+104,식품접객업정보,OPEN API,,,PART_GBN,나트륨저감화업소여부
+104,식품접객업정보,OPEN API,,,ASGN_GIGAN_TO,위생등급지정종료일
+104,식품접객업정보,OPEN API,,,ASGN_GIGAN_FROM,위생등급지정시작일
+104,식품접객업정보,OPEN API,,,LCNS_NO,인허가 번호
+105,식품제조가공업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+105,식품제조가공업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+105,식품제조가공업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+105,식품제조가공업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+105,식품제조가공업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+105,식품제조가공업 폐업정보,OPEN API,CHNG_DT,변경일자(YYYYMMDD),INDUTY_NM,업종
+105,식품제조가공업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+105,식품제조가공업 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+105,식품제조가공업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+106,식품제조가공업정보,OPEN API,keyid,인증키,TELNO,전화번호
+106,식품제조가공업정보,OPEN API,serviceId,서비스명,PRMS_DT,허가일자
+106,식품제조가공업정보,OPEN API,dataType,요청파일 타입,INDUTY_NM,업종
+106,식품제조가공업정보,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자명
+106,식품제조가공업정보,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+106,식품제조가공업정보,OPEN API,CHNG_DT,변경일자,INSTT_NM,기관명
+106,식품제조가공업정보,OPEN API,BSSH_NM,업소명,LOCP_ADDR,주소
+106,식품제조가공업정보,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가 번호
+107,식품조사처리업 인허가 현황,OPEN API,keyid,인증키,LOCP_ADDR,주소
+107,식품조사처리업 인허가 현황,OPEN API,serviceId,서비스명,TELNO,전화번호
+107,식품조사처리업 인허가 현황,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+107,식품조사처리업 인허가 현황,OPEN API,startidx,요청시작위치,FOOD_HF_LS_CL_CD_NM,식품건기축산분류
+107,식품조사처리업 인허가 현황,OPEN API,endIdx,요청종료위치,INDUTY_NM,업종
+107,식품조사처리업 인허가 현황,OPEN API,CHNG_DT,변경일자,PRSDNT_NM,대표자명
+107,식품조사처리업 인허가 현황,OPEN API,LCNS_NO,인허가번호,BSSH_NM,업소명
+107,식품조사처리업 인허가 현황,OPEN API,,,LCNS_NO,인허가 번호
+108,식품첨가물공전,OPEN API,keyid,인증키,VALD_END_DT,유효종료일자
+108,식품첨가물공전,OPEN API,serviceId,서비스명,VALD_BEGN_DT,유효개시일자
+108,식품첨가물공전,OPEN API,dataType,요청파일 타입,SPEC_VAL_SUMUP,기준규격값 요약
+108,식품첨가물공전,OPEN API,startidx,요청시작위치,SPEC_VAL,기준규격값
+108,식품첨가물공전,OPEN API,endIdx,요청종료위치,FNPRT_ITM_NM,세부항목명
+108,식품첨가물공전,OPEN API,PRDLST_CD,품목유형코드,T_KOR_NM,시험항목 한글명
+108,식품첨가물공전,OPEN API,LAST_UPDT_DTM,최종수정일(YYYYMMDD),TESTITM_CD,시험항목코드
+108,식품첨가물공전,OPEN API,TESTITM_CD,시험항목코드,PC_KOR_NM,품목한글명
+108,식품첨가물공전,OPEN API,,,UNIT_NM,단위명
+108,식품첨가물공전,OPEN API,,,INJRY_YN,위해여부
+108,식품첨가물공전,OPEN API,,,MIMM_VAL,최소값
+108,식품첨가물공전,OPEN API,,,MXMM_VAL,최대값
+108,식품첨가물공전,OPEN API,,,SORC,출처
+108,식품첨가물공전,OPEN API,,,PRDLST_CD,품목코드
+109,식품첨가물의 기준 및 규격 현황,OPEN API,keyid,인증키,VALD_END_DT,유효종료일자
+109,식품첨가물의 기준 및 규격 현황,OPEN API,serviceId,서비스명,VALD_BEGN_DT,유효개시일자
+109,식품첨가물의 기준 및 규격 현황,OPEN API,dataType,요청파일 타입,SPEC_VAL_SUMUP,기준규격값 요약
+109,식품첨가물의 기준 및 규격 현황,OPEN API,startidx,요청시작위치,SPEC_VAL,기준규격값
+109,식품첨가물의 기준 및 규격 현황,OPEN API,endIdx,요청종료위치,PIAM_KOR_NM,품목항목속성 한글명
+109,식품첨가물의 기준 및 규격 현황,OPEN API,LAST_UPDT_DTM,최종수정일(YYYYMMDD),FNPRT_ITM_NM,세부항목명
+109,식품첨가물의 기준 및 규격 현황,OPEN API,PRDLST_CD,품목유형코드,T_KOR_NM,시험항목 한글명
+109,식품첨가물의 기준 및 규격 현황,OPEN API,,,PRDLST_CD,품목분류코드
+109,식품첨가물의 기준 및 규격 현황,OPEN API,,,LAST_UPDT_DTM,수정일자
+109,식품첨가물의 기준 및 규격 현황,OPEN API,,,UPDT_PRVNS,수정사유
+109,식품첨가물의 기준 및 규격 현황,OPEN API,,,UNIT_NM,단위명
+109,식품첨가물의 기준 및 규격 현황,OPEN API,,,INJRY_YN,위해여부
+109,식품첨가물의 기준 및 규격 현황,OPEN API,,,MIMM_VAL,최소값
+109,식품첨가물의 기준 및 규격 현황,OPEN API,,,MXMM_VAL,최대값
+109,식품첨가물의 기준 및 규격 현황,OPEN API,,,SORC,출처
+109,식품첨가물의 기준 및 규격 현황,OPEN API,,,PC_KOR_NM,품목한글명
+110,식품첨가물의 표시기준,OPEN API,keyid,인증키,,
+110,식품첨가물의 표시기준,OPEN API,serviceId,서비스명,,
+110,식품첨가물의 표시기준,OPEN API,dataType,요청파일 타입,,
+110,식품첨가물의 표시기준,OPEN API,startidx,요청시작위치,,
+110,식품첨가물의 표시기준,OPEN API,endIdx,요청종료위치,,
+111,식품첨가물의 한시적 기준 및 규격 인정 현황,OPEN API,keyid,인증키,PRDT_NM,제품명
+111,식품첨가물의 한시적 기준 및 규격 인정 현황,OPEN API,serviceId,서비스명,MC_NM,제조회사
+111,식품첨가물의 한시적 기준 및 규격 인정 현황,OPEN API,dataType,요청파일 타입,TELNO,전화번호
+111,식품첨가물의 한시적 기준 및 규격 인정 현황,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자명
+111,식품첨가물의 한시적 기준 및 규격 인정 현황,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+111,식품첨가물의 한시적 기준 및 규격 인정 현황,OPEN API,,,RCOGN_DT,인정일자
+111,식품첨가물의 한시적 기준 및 규격 인정 현황,OPEN API,,,LIMIT_STDR_STND_RCOGN_NO,인정번호
+112,식품첨가물제조업,OPEN API,keyid,인증키,TELNO,전화번호
+112,식품첨가물제조업,OPEN API,serviceId,서비스명,PRMS_DT,허가일자
+112,식품첨가물제조업,OPEN API,dataType,요청파일 타입,INDUTY_NM,업종
+112,식품첨가물제조업,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자명
+112,식품첨가물제조업,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+112,식품첨가물제조업,OPEN API,CHNG_DT,변경일자,INSTT_NM,기관명
+112,식품첨가물제조업,OPEN API,LCNS_NO,인허가번호,LOCP_ADDR,주소
+112,식품첨가물제조업,OPEN API,,,LCNS_NO,인허가 번호
+113,식품첨가물제조업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+113,식품첨가물제조업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+113,식품첨가물제조업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+113,식품첨가물제조업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+113,식품첨가물제조업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+113,식품첨가물제조업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+113,식품첨가물제조업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+113,식품첨가물제조업 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+113,식품첨가물제조업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+114,식품판매업 인허가 대장,OPEN API,keyid,인증키,INSTT_NM,기관명
+114,식품판매업 인허가 대장,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+114,식품판매업 인허가 대장,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+114,식품판매업 인허가 대장,OPEN API,startidx,요청시작위치,INDUTY_NM,업종
+114,식품판매업 인허가 대장,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+114,식품판매업 인허가 대장,OPEN API,CHNG_DT, 변경일자(YYYYMMDD),BSSH_NM,업소명
+114,식품판매업 인허가 대장,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가번호
+114,식품판매업 인허가 대장,OPEN API,BSSH_NM,업체명,,
+115,식품판매업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+115,식품판매업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+115,식품판매업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+115,식품판매업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+115,식품판매업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+115,식품판매업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+115,식품판매업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+115,식품판매업 폐업정보,OPEN API,,,BSSH_NM,업소명
+115,식품판매업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+116,신고대상분류기준,OPEN API,keyid,인증키,USER_DFN_CLMN_2,분류2
+116,신고대상분류기준,OPEN API,serviceId,서비스명,USER_DFN_CLMN_1,분류1
+116,신고대상분류기준,OPEN API,dataType,요청파일 타입,FNPRT_CD_NM,신고분류
+116,신고대상분류기준,OPEN API,startidx,요청시작위치,CMMN_CD_NM,분류
+116,신고대상분류기준,OPEN API,endIdx,요청종료위치,,
+117,어류질병정보,OPEN API,keyid,인증키,DGNS_MTHD_CN,진단방법내용
+117,어류질병정보,OPEN API,serviceId,서비스명,CURE_PREVNT_MESUR_CN,치료예방대책내용
+117,어류질병정보,OPEN API,dataType,요청파일 타입,SYMPTMS_CAUS_CN,증상원인내용
+117,어류질병정보,OPEN API,startidx,요청시작위치,FISHSPCS_NM,어종명
+117,어류질병정보,OPEN API,endIdx,요청종료위치,ARA_DVS_NM,지역구분명
+117,어류질병정보,OPEN API,,,DISS_CL_DVS_NM,질병분류구분명
+117,어류질병정보,OPEN API,,,DISS_NM,질병명
+118,어린이 급식센터 지원현황,OPEN API,keyid,인증키,ETC_REG_CO,기타 수
+118,어린이 급식센터 지원현황,OPEN API,serviceId,서비스명,DCCNTR_NMPR_CO,어린이집 인원수
+118,어린이 급식센터 지원현황,OPEN API,dataType,요청파일 타입,DCCNTR_REG_CO,어린이집 수
+118,어린이 급식센터 지원현황,OPEN API,startidx,요청시작위치,KNDRGR_NMPR_CO,유치원 인원수
+118,어린이 급식센터 지원현황,OPEN API,endIdx,요청종료위치,KNDRGR_REG_CO,유치원 수
+118,어린이 급식센터 지원현황,OPEN API,REPORT_YR,년도(YYYY),REPORT_QU,분기
+118,어린이 급식센터 지원현황,OPEN API,CNTER_NM,센터명,REPORT_YR,년도
+118,어린이 급식센터 지원현황,OPEN API,,,CNTER_NM,센터명
+118,어린이 급식센터 지원현황,OPEN API,,,ETC_NMPR_CO,기타 인원수
+118,어린이 급식센터 지원현황,OPEN API,,,INSTT_NM,관할기관
+119,어린이 기호식품 품질인증 현황 및 재심사 현황,OPEN API,keyid,인증키,APPN_END_DT,만료일자
+119,어린이 기호식품 품질인증 현황 및 재심사 현황,OPEN API,serviceId,서비스명,APPN_BGN_DT,인증일자
+119,어린이 기호식품 품질인증 현황 및 재심사 현황,OPEN API,dataType,요청파일 타입,CN_WT,제품용량
+119,어린이 기호식품 품질인증 현황 및 재심사 현황,OPEN API,startidx,요청시작위치,PRDLST_NM,제품명
+119,어린이 기호식품 품질인증 현황 및 재심사 현황,OPEN API,endIdx,요청종료위치,PRDLST_CD_NM,식품유형
+119,어린이 기호식품 품질인증 현황 및 재심사 현황,OPEN API,,,LCNS_NO,인허가번호
+119,어린이 기호식품 품질인증 현황 및 재심사 현황,OPEN API,,,BSSH_NM,업소명
+119,어린이 기호식품 품질인증 현황 및 재심사 현황,OPEN API,,,PRDLST_REPORT_NO,품목보고번호
+119,어린이 기호식품 품질인증 현황 및 재심사 현황,OPEN API,,,CHILD_FAVOR_FOOD_TYPE_NM,제품형태
+119,어린이 기호식품 품질인증 현황 및 재심사 현황,OPEN API,,,CHILD_FFQ_CRTFC_NO,인증번호
+120,어린이 식품안전보호구역 관리 현황,OPEN API,keyid,인증키,UPJONG,업종(미사용)
+120,어린이 식품안전보호구역 관리 현황,OPEN API,serviceId,서비스명,UPSO_NM,업소명(미사용)
+120,어린이 식품안전보호구역 관리 현황,OPEN API,dataType,요청파일 타입,BSSH_NO,업소고유번호(미사용)
+120,어린이 식품안전보호구역 관리 현황,OPEN API,startidx,요청시작위치,APPN_DT,지정일자
+120,어린이 식품안전보호구역 관리 현황,OPEN API,endIdx,요청종료위치,ADDR,위치
+120,어린이 식품안전보호구역 관리 현황,OPEN API,APPN_DT,지정일자,FOOD_SAFE_PRTC_ZONE_NM,식품안전보호구역지정명
+120,어린이 식품안전보호구역 관리 현황,OPEN API,SCHL_NM,학교명,SCHL_NM,학교명
+120,어린이 식품안전보호구역 관리 현황,OPEN API,,,HOLD_INSTT_NM,관할기관
+121,어린이 우수판매업소 지정현황,OPEN API,keyid,인증키,HOLD_INSTT_CD,관할기관
+121,어린이 우수판매업소 지정현황,OPEN API,serviceId,서비스명,APLC_DT,지정_일자
+121,어린이 우수판매업소 지정현황,OPEN API,dataType,요청파일 타입,ADDR,주소
+121,어린이 우수판매업소 지정현황,OPEN API,startidx,요청시작위치,UPJONG,업종
+121,어린이 우수판매업소 지정현황,OPEN API,endIdx,요청종료위치,UPSO_NM,업소명
+121,어린이 우수판매업소 지정현황,OPEN API,APPN_DT,지정일자(YYYYMMDD),GNT_NO,인허가번호
+121,어린이 우수판매업소 지정현황,OPEN API,UPSO_NM,업소명,,
+121,어린이 우수판매업소 지정현황,OPEN API,GNT_NO,인허가번호,,
+122,영업소재지 GIS 코드,OPEN API,keyid,인증키,TONG,통
+122,영업소재지 GIS 코드,OPEN API,serviceId,서비스명,ISSNO,호
+122,영업소재지 GIS 코드,OPEN API,dataType,요청파일 타입,LNBR,번지
+122,영업소재지 GIS 코드,OPEN API,startidx,요청시작위치,SAN,산
+122,영업소재지 GIS 코드,OPEN API,endIdx,요청종료위치,LOCPLC,소재지
+122,영업소재지 GIS 코드,OPEN API,CHNG_DT,최종수정일,BSSH_NM,업소명
+122,영업소재지 GIS 코드,OPEN API,LCNS_NO,인허가번호,UFID_CD,UFID코드
+122,영업소재지 GIS 코드,OPEN API,,,BDMERGEMANAGENO,건물통합관리번호
+122,영업소재지 GIS 코드,OPEN API,,,PNU_CD,PNU코드
+122,영업소재지 GIS 코드,OPEN API,,,ROADNMADDRSPCLADDR,도로명주소특수주소
+122,영업소재지 GIS 코드,OPEN API,,,ROADNMADDRBDSUBNO,도로명주소건물부번호
+122,영업소재지 GIS 코드,OPEN API,,,ROADNMADDRBDORIGNO,도로명주소건물본번호
+122,영업소재지 GIS 코드,OPEN API,,,ROADNMADDRBDFLRDVS,도로명주소건물층구분
+122,영업소재지 GIS 코드,OPEN API,,,LCNS_NO,인허가번호
+122,영업소재지 GIS 코드,OPEN API,,,ROADNMADDREMDCD,도로명주소읍면동코드
+122,영업소재지 GIS 코드,OPEN API,,,ROADNMADDREMDDVS,도로명주소읍면동구분
+122,영업소재지 GIS 코드,OPEN API,,,ROADNMSIGNGUCD,도로명시군구코드
+122,영업소재지 GIS 코드,OPEN API,,,SPCPPISSNO,특수지호
+122,영업소재지 GIS 코드,OPEN API,,,SPCPPDONG,특수지동
+122,영업소재지 GIS 코드,OPEN API,,,SPCLADDR,특수주소
+122,영업소재지 GIS 코드,OPEN API,,,BAN,반
+123,용기.포장류제조업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+123,용기.포장류제조업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+123,용기.포장류제조업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+123,용기.포장류제조업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+123,용기.포장류제조업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+123,용기.포장류제조업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+123,용기.포장류제조업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+123,용기.포장류제조업 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+123,용기.포장류제조업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+124,용어사전(기구용기포장∙식의약품용어집),OPEN API,keyid,인증키,LAST_UPDT_DTM,최종수정일
+124,용어사전(기구용기포장∙식의약품용어집),OPEN API,serviceId,서비스명,SAUS,출처
+124,용어사전(기구용기포장∙식의약품용어집),OPEN API,dataType,요청파일 타입,KEYWORD,연관어
+124,용어사전(기구용기포장∙식의약품용어집),OPEN API,startidx,요청시작위치,DTL_DESC,설명
+124,용어사전(기구용기포장∙식의약품용어집),OPEN API,endIdx,요청종료위치,FRNTNFISH,외국어
+124,용어사전(기구용기포장∙식의약품용어집),OPEN API,WORD,단어,WORD,단어
+124,용어사전(기구용기포장∙식의약품용어집),OPEN API,CHNG_DT,변경일자,,
+125,우수수입업소 등록 현황,OPEN API,keyid,인증키,PRDLST_NM,품목명
+125,우수수입업소 등록 현황,OPEN API,serviceId,서비스명,PRDLST_CNT,품목수
+125,우수수입업소 등록 현황,OPEN API,dataType,요청파일 타입,INCM_PRDT_XPORT_MC_NM,수입제품제조회사명
+125,우수수입업소 등록 현황,OPEN API,startidx,요청시작위치,EXCOURY_NATN_CD_NM,수출국가
+125,우수수입업소 등록 현황,OPEN API,endIdx,요청종료위치,ADDR,소재지
+125,우수수입업소 등록 현황,OPEN API,,,BSSH_NM,업소명
+125,우수수입업소 등록 현황,OPEN API,,,PRMS_DT,허가일자
+125,우수수입업소 등록 현황,OPEN API,,,LCNS_NO,인허가번호
+125,우수수입업소 등록 현황,OPEN API,,,EXCLNC_INCM_BSSH_REGNO,우수수입업소등록번호
+126,위생공통교육기관내역,OPEN API,keyid,인증키,PRMS_DT,허가일자
+126,위생공통교육기관내역,OPEN API,serviceId,서비스명,TELNO,전화번호
+126,위생공통교육기관내역,OPEN API,dataType,요청파일 타입,LOCP_ADDR_DTL,주소상세
+126,위생공통교육기관내역,OPEN API,startidx,요청시작위치,LOCP_ADDR,주소
+126,위생공통교육기관내역,OPEN API,endIdx,요청종료위치,ZIPNO,우편번호
+126,위생공통교육기관내역,OPEN API,,,BSSH_NM,업소명
+127,위생관리등급별 업소 현황,OPEN API,keyid,인증키,EVL_DT,평가일자
+127,위생관리등급별 업소 현황,OPEN API,serviceId,서비스명,EVL_GRD_NM,평가등급
+127,위생관리등급별 업소 현황,OPEN API,dataType,요청파일 타입,EVL_TYPE_DVS_NM,평가유형
+127,위생관리등급별 업소 현황,OPEN API,startidx,요청시작위치,BSSH_NM,업소명
+127,위생관리등급별 업소 현황,OPEN API,endIdx,요청종료위치,LCNS_NO,인허가번호
+128,위생용품 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+128,위생용품 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+128,위생용품 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+128,위생용품 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+128,위생용품 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+128,위생용품 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+128,위생용품 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+128,위생용품 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+128,위생용품 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+129,위생용품수입업영업신고대장,OPEN API,keyid,인증키,TELNO,전화번호
+129,위생용품수입업영업신고대장,OPEN API,serviceId,서비스명,INSTT_NM,기관명
+129,위생용품수입업영업신고대장,OPEN API,dataType,요청파일 타입,LOCP_ADDR,주소
+129,위생용품수입업영업신고대장,OPEN API,startidx,요청시작위치,PRMS_DT,허가일자
+129,위생용품수입업영업신고대장,OPEN API,endIdx,요청종료위치,INDUTY_NM,업종
+129,위생용품수입업영업신고대장,OPEN API,CHNG_DT,변경일자,PRSDNT_NM,대표자명
+129,위생용품수입업영업신고대장,OPEN API,LCNS_NO,인허가번호,BSSH_NM,업소명
+129,위생용품수입업영업신고대장,OPEN API,BSSH_NM,업소명,LCNS_NO,인허가번호
+130,위생용품영업 생산실적보고,OPEN API,keyid,인증키,PRDCTN_QY,생산량(KG/위생물수건:매)
+130,위생용품영업 생산실적보고,OPEN API,serviceId,서비스명,PRDLST_REPORT_NO,품목제조보고번호
+130,위생용품영업 생산실적보고,OPEN API,dataType,요청파일 타입,EVL_YR,보고년도
+130,위생용품영업 생산실적보고,OPEN API,startidx,요청시작위치,LCNS_NO,인허가번호
+130,위생용품영업 생산실적보고,OPEN API,endIdx,요청종료위치,H_ITEM_NM,품목유형
+130,위생용품영업 생산실적보고,OPEN API,EVL_YR,생산실적보고년도(YYYY)(필수),GUBUN,품목구분
+130,위생용품영업 생산실적보고,OPEN API,LCNS_NO,인허가번호,PRDLST_NM,품목명
+130,위생용품영업 생산실적보고,OPEN API,H_ITEM_NM,품목유형,BSSH_NM,업소명
+131,위생용품영업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+131,위생용품영업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+131,위생용품영업정보,OPEN API,dataType,요청파일 타입,TELNO,전화번호
+131,위생용품영업정보,OPEN API,startidx,요청시작위치,PRMS_DT,허가일자
+131,위생용품영업정보,OPEN API,endIdx,요청종료위치,INDUTY_NM,업종
+131,위생용품영업정보,OPEN API,CHNG_DT,변경일자,PRSDNT_NM,대표자명
+131,위생용품영업정보,OPEN API,LCNS_NO,인허가번호,BSSH_NM,업소명
+131,위생용품영업정보,OPEN API,,,LCNS_NO,인허가번호
+132,위생용품품목제조보고,OPEN API,keyid,인증키,INDUTY_CD_NM,업종
+132,위생용품품목제조보고,OPEN API,serviceId,서비스명,POG_DAYCNT,유통/소비기한
+132,위생용품품목제조보고,OPEN API,dataType,요청파일 타입,PRODUCTION,생산종료여부
+132,위생용품품목제조보고,OPEN API,startidx,요청시작위치,PRDLST_DCNM,유형
+132,위생용품품목제조보고,OPEN API,endIdx,요청종료위치,PRDLST_NM,제품명
+132,위생용품품목제조보고,OPEN API,CHNG_DT,변경일자(YYYYMMDD),PRMS_DT,허가일자
+132,위생용품품목제조보고,OPEN API,PRDLST_REPORT_NO,품목제조번호,PRDLST_REPORT_NO,품목제조번호
+132,위생용품품목제조보고,OPEN API,BSSH_NM,업소명,BSSH_NM,업소명
+132,위생용품품목제조보고,OPEN API,PRDLST_NM,품목명,LAST_UPDT_DTM,최종수정일자
+132,위생용품품목제조보고,OPEN API,,,LCNS_NO,인허가번호
+133,위생용품품목제조보고(원재료),OPEN API,keyid,인증키,RAWMTRL_NM,원재료
+133,위생용품품목제조보고(원재료),OPEN API,serviceId,서비스명,PRDLST_DCNM,유형
+133,위생용품품목제조보고(원재료),OPEN API,dataType,요청파일 타입,PRDLST_NM,품목명
+133,위생용품품목제조보고(원재료),OPEN API,startidx,요청시작위치,PRMS_DT,보고일자
+133,위생용품품목제조보고(원재료),OPEN API,endIdx,요청종료위치,PRDLST_REPORT_NO,품목제조번호
+133,위생용품품목제조보고(원재료),OPEN API,CHNG_DT,변경일자,BSSH_NM,업소명
+133,위생용품품목제조보고(원재료),OPEN API,PRDLST_REPORT_NO,품목제조번호,LCNS_NO,인허가번호
+133,위생용품품목제조보고(원재료),OPEN API,LCNS_NO,인허가번호,,
+133,위생용품품목제조보고(원재료),OPEN API,BSSH_NM,업소명,,
+133,위생용품품목제조보고(원재료),OPEN API,PRDLST_NM,품목명,,
+133,위생용품품목제조보고(원재료),OPEN API,PRMS_DT,보고일자,,
+134,유전자변형식품등의 안전성 평가 심사 결과 현황,OPEN API,keyid,인증키,GMO_PRDT_KND_CL_NM,제품종류
+134,유전자변형식품등의 안전성 평가 심사 결과 현황,OPEN API,serviceId,서비스명,GMO_SAFTY_NO,통보 번호
+134,유전자변형식품등의 안전성 평가 심사 결과 현황,OPEN API,dataType,요청파일 타입,ENDOW_CHARTR_CN,부여된 특성 내용
+134,유전자변형식품등의 안전성 평가 심사 결과 현황,OPEN API,startidx,요청시작위치,PRMS_DT,허가 일자
+134,유전자변형식품등의 안전성 평가 심사 결과 현황,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+134,유전자변형식품등의 안전성 평가 심사 결과 현황,OPEN API,,,BSSH_NM,업소명
+134,유전자변형식품등의 안전성 평가 심사 결과 현황,OPEN API,,,INJECTION_GENE_CN,삽입된 유전자 내용
+134,유전자변형식품등의 안전성 평가 심사 결과 현황,OPEN API,,,GOODS_NM,상품 명
+134,유전자변형식품등의 안전성 평가 심사 결과 현황,OPEN API,,,PRDLST_NM,품목 명
+135,유전자변형식품등의 표시기준,OPEN API,keyid,인증키,,
+135,유전자변형식품등의 표시기준,OPEN API,serviceId,서비스명,,
+135,유전자변형식품등의 표시기준,OPEN API,dataType,요청파일 타입,,
+135,유전자변형식품등의 표시기준,OPEN API,startidx,요청시작위치,,
+135,유전자변형식품등의 표시기준,OPEN API,endIdx,요청종료위치,,
+136,유통바코드,OPEN API,keyid,인증키,HRNK_PRDLST_NM,품목분류_중분류
+136,유통바코드,OPEN API,serviceId,서비스명,PRDLST_NM,품목분류_소분류
+136,유통바코드,OPEN API,dataType,요청파일 타입,LAST_UPDT_DTM,최종수정일시
+136,유통바코드,OPEN API,startidx,요청시작위치,PRDT_NM,제품명
+136,유통바코드,OPEN API,endIdx,요청종료위치,CMPNY_NM,회사명
+136,유통바코드,OPEN API,CHNG_DT,변경일자,PRDLST_REPORT_NO,품목보고번호
+136,유통바코드,OPEN API,PRDLST_REPORT_NO,품목제조보고번호,HTRK_PRDLST_NM,품목분류_대분류
+136,유통바코드,OPEN API,PRDT_NM,제품명,BRCD_NO,바코드번호
+136,유통바코드,OPEN API,BRCD_NO,바코드번호,,
+137,음식점업소 인허가 변경 정보,OPEN API,keyid,인증키,CHNG_PRVNS,변경사유
+137,음식점업소 인허가 변경 정보,OPEN API,serviceId,서비스명,CHNG_AF_CN,변경후내용
+137,음식점업소 인허가 변경 정보,OPEN API,dataType,요청파일 타입,CHNG_BF_CN,변경전내용
+137,음식점업소 인허가 변경 정보,OPEN API,startidx,요청시작위치,CHNG_DT,변경일자
+137,음식점업소 인허가 변경 정보,OPEN API,endIdx,요청종료위치,SITE_ADDR,주소
+137,음식점업소 인허가 변경 정보,OPEN API,BSSH_NM,업소명,TELNO,전화번호
+137,음식점업소 인허가 변경 정보,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가번호
+137,음식점업소 인허가 변경 정보,OPEN API,,,INDUTY_CD_NM,업종명
+137,음식점업소 인허가 변경 정보,OPEN API,,,BSSH_NM,업소명
+138,인허가 업소 정보,OPEN API,keyid,인증키,ADDR,주소
+138,인허가 업소 정보,OPEN API,serviceId,서비스명,PRMS_DT,허가일자
+138,인허가 업소 정보,OPEN API,dataType,요청파일 타입,TELNO,전화번호
+138,인허가 업소 정보,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자명
+138,인허가 업소 정보,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+138,인허가 업소 정보,OPEN API,LCNS_NO,영업고유구분번호(인허가번호),INDUTY_CD_NM,업종
+138,인허가 업소 정보,OPEN API,INDUTY_CD_NM,업종,LCNS_NO,영업고유구분번호(인허가번호)
+138,인허가 업소 정보,OPEN API,BSSH_NM,업소명,,
+138,인허가 업소 정보,OPEN API,CHNG_DT,최종수정일자(YYYYMMDD),,
+139,잔류동물의약품 식품별 잔류허용 기준,OPEN API,keyid,인증키,SCLAS_NM,소분류
+139,잔류동물의약품 식품별 잔류허용 기준,OPEN API,serviceId,서비스명,MLSFC_NM,중분류
+139,잔류동물의약품 식품별 잔류허용 기준,OPEN API,dataType,요청파일 타입,LCLAS_NM,대분류
+139,잔류동물의약품 식품별 잔류허용 기준,OPEN API,startidx,요청시작위치,TMPR_STDR_APPLC_YN,잠정기준적용여부
+139,잔류동물의약품 식품별 잔류허용 기준,OPEN API,endIdx,요청종료위치,DEDE_NTK_QTY,일일섭취량
+139,잔류동물의약품 식품별 잔류허용 기준,OPEN API,,,FOOD_ENG_NM,식품영문명
+139,잔류동물의약품 식품별 잔류허용 기준,OPEN API,,,FOOD_KOR_NM,식품한글명
+140,조리식품의 레시피 DB,OPEN API,keyid,인증키,INFO_FAT,지방
+140,조리식품의 레시피 DB,OPEN API,serviceId,서비스명,INFO_PRO,단백질
+140,조리식품의 레시피 DB,OPEN API,dataType,요청파일 타입,INFO_CAR,탄수화물
+140,조리식품의 레시피 DB,OPEN API,startidx,요청시작위치,INFO_ENG,열량
+140,조리식품의 레시피 DB,OPEN API,endIdx,요청종료위치,RCP_NA_TIP,저감 조리법 TIP 
+140,조리식품의 레시피 DB,OPEN API,RCP_NM,메뉴명,MANUAL_IMG20,만드는법_이미지_20
+140,조리식품의 레시피 DB,OPEN API,RCP_PARTS_DTLS,재료정보1,MANUAL20,만드는법_20
+140,조리식품의 레시피 DB,OPEN API,CHNG_DT,변경일자(YYYYMMDD),MANUAL_IMG19,만드는법_이미지_19
+140,조리식품의 레시피 DB,OPEN API,RCP_PAT2,"요리종류(ex) 반찬, 국, 후식 등)",MANUAL19,만드는법_19
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG18,만드는법_이미지_18
+140,조리식품의 레시피 DB,OPEN API,,,INFO_WGT,중량(1인분)
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL18,만드는법_18
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG17,만드는법_이미지_17
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL17,만드는법_17
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG16,만드는법_이미지_16
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL16,만드는법_16
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG15,만드는법_이미지_15
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL15,만드는법_15
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG14,만드는법_이미지_14
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL14,만드는법_14
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG13,만드는법_이미지_13
+140,조리식품의 레시피 DB,OPEN API,,,RCP_PAT2,요리종류
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL13,만드는법_13
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG12,만드는법_이미지_12
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL12,만드는법_12
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG11,만드는법_이미지_11
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL11,만드는법_11
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG10,만드는법_이미지_10
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL10,만드는법_10
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG09,만드는법_이미지_09
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL09,만드는법_09
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG08,만드는법_이미지_08
+140,조리식품의 레시피 DB,OPEN API,,,RCP_WAY2,조리방법
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL08,만드는법_08
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG07,만드는법_이미지_07
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL07,만드는법_07
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG06,만드는법_이미지_06
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL06,만드는법_06
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG05,만드는법_이미지_05
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL05,만드는법_05
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG04,만드는법_이미지_04
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL04,만드는법_04
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG03,만드는법_이미지_03
+140,조리식품의 레시피 DB,OPEN API,,,RCP_NM,메뉴명
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL03,만드는법_03
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG02,만드는법_이미지_02
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL02,만드는법_02
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL_IMG01,만드는법_이미지_01
+140,조리식품의 레시피 DB,OPEN API,,,MANUAL01,만드는법_01
+140,조리식품의 레시피 DB,OPEN API,,,RCP_PARTS_DTLS,재료정보
+140,조리식품의 레시피 DB,OPEN API,,,ATT_FILE_NO_MK,이미지경로(대)
+140,조리식품의 레시피 DB,OPEN API,,,ATT_FILE_NO_MAIN,이미지경로(소)
+140,조리식품의 레시피 DB,OPEN API,,,HASH_TAG,해쉬태그
+140,조리식품의 레시피 DB,OPEN API,,,INFO_NA,나트륨
+140,조리식품의 레시피 DB,OPEN API,,,RCP_SEQ,일련번호
+141,주류제조.면허자 식품제조.가공영업 등록 현황,OPEN API,keyid,인증키,TELNO,전화번호
+141,주류제조.면허자 식품제조.가공영업 등록 현황,OPEN API,serviceId,서비스명,INSTT_NM,기관명
+141,주류제조.면허자 식품제조.가공영업 등록 현황,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+141,주류제조.면허자 식품제조.가공영업 등록 현황,OPEN API,startidx,요청시작위치,INDUTY_NM,업종명
+141,주류제조.면허자 식품제조.가공영업 등록 현황,OPEN API,endIdx,요청종료위치,LCNS_NO,인허가번호
+141,주류제조.면허자 식품제조.가공영업 등록 현황,OPEN API,CHNG_DT,변경일자,ADDR,주소
+141,주류제조.면허자 식품제조.가공영업 등록 현황,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+141,주류제조.면허자 식품제조.가공영업 등록 현황,OPEN API,,,BSSH_NM,업소명
+142,즉석판매제조가공업 인허가 대장,OPEN API,keyid,인증키,INSTT_NM,기관명
+142,즉석판매제조가공업 인허가 대장,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+142,즉석판매제조가공업 인허가 대장,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+142,즉석판매제조가공업 인허가 대장,OPEN API,startidx,요청시작위치,INDUTY_NM,업종
+142,즉석판매제조가공업 인허가 대장,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+142,즉석판매제조가공업 인허가 대장,OPEN API,CHNG_DT, 변경일자(YYYYMMDD),BSSH_NM,업소명
+142,즉석판매제조가공업 인허가 대장,OPEN API,BSSH_NM,업소명,LCNS_NO,인허가번호
+142,즉석판매제조가공업 인허가 대장,OPEN API,LCNS_NO,인허가번호,,
+143,즉석판매제조가공업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+143,즉석판매제조가공업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+143,즉석판매제조가공업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+143,즉석판매제조가공업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+143,즉석판매제조가공업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+143,즉석판매제조가공업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+143,즉석판매제조가공업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+143,즉석판매제조가공업 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+143,즉석판매제조가공업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+144,지하수수질측정망 측정결과,OPEN API,keyid,인증키,TOTEEC,총대장균군
+144,지하수수질측정망 측정결과,OPEN API,serviceId,서비스명,HYDRIONDNSTY,수소이온농도
+144,지하수수질측정망 측정결과,OPEN API,dataType,요청파일 타입,DKPS_YN_NM,음용 여부
+144,지하수수질측정망 측정결과,OPEN API,startidx,요청시작위치,PRPOS_NM,용도
+144,지하수수질측정망 측정결과,OPEN API,endIdx,요청종료위치,ADDR,주소
+144,지하수수질측정망 측정결과,OPEN API,YR,년도,SIGNGU_NM,시군구
+144,지하수수질측정망 측정결과,OPEN API,ADDR,주소,SPOT_NO,지점 번호
+144,지하수수질측정망 측정결과,OPEN API,ARA,지역구분(일반지역/오염지역),ARA,오염구분
+144,지하수수질측정망 측정결과,OPEN API,,,ARA_YN,오염지역 여부
+144,지하수수질측정망 측정결과,OPEN API,,,EC,전기전도도
+144,지하수수질측정망 측정결과,OPEN API,,,XYLEN,크실렌
+144,지하수수질측정망 측정결과,OPEN API,,,ETBEN,에틸벤젠
+144,지하수수질측정망 측정결과,OPEN API,,,TOLUE,톨루엔
+144,지하수수질측정망 측정결과,OPEN API,,,BENZ,벤젠
+144,지하수수질측정망 측정결과,OPEN API,,,TCE111,111트리클로로에탄
+144,지하수수질측정망 측정결과,OPEN API,,,PCE,테트라클로로에틸렌
+144,지하수수질측정망 측정결과,OPEN API,,,TCE,트리클로로에틸렌
+144,지하수수질측정망 측정결과,OPEN API,,,QU,분기
+144,지하수수질측정망 측정결과,OPEN API,,,CR6,6가크롬
+144,지하수수질측정망 측정결과,OPEN API,,,PB,납
+144,지하수수질측정망 측정결과,OPEN API,,,PHNL,페놀
+144,지하수수질측정망 측정결과,OPEN API,,,ORGNICPH,유기인
+144,지하수수질측정망 측정결과,OPEN API,,,MRC,수은
+144,지하수수질측정망 측정결과,OPEN API,,,CYN,시안
+144,지하수수질측정망 측정결과,OPEN API,,,AS_,비소
+144,지하수수질측정망 측정결과,OPEN API,,,CDMM,카드뮴
+144,지하수수질측정망 측정결과,OPEN API,,,CI,염소이온
+144,지하수수질측정망 측정결과,OPEN API,,,NO3N,질산성질소
+144,지하수수질측정망 측정결과,OPEN API,,,YR,년도
+145,집단급식소 설치 현황,OPEN API,keyid,인증키,CNSGN_BSSH_NM,위탁업소명
+145,집단급식소 설치 현황,OPEN API,serviceId,서비스명,FCPRV_ADDR,급식소주소
+145,집단급식소 설치 현황,OPEN API,dataType,요청파일 타입,FCPRV_PRSDNT_NM,급식소대표자명
+145,집단급식소 설치 현황,OPEN API,startidx,요청시작위치,FCPRV_NM,급식소명
+145,집단급식소 설치 현황,OPEN API,endIdx,요청종료위치,MLSV_MTHD_CD_NM,급식방법명
+145,집단급식소 설치 현황,OPEN API,,,CNCTR_MANAGE_YN,집중관리여부
+145,집단급식소 설치 현황,OPEN API,,,INDUTY_CL_CD_NM,업종분류명
+145,집단급식소 설치 현황,OPEN API,,,SIGNGU_CD_NM,시군구명
+145,집단급식소 설치 현황,OPEN API,,,RM,비고
+145,집단급식소 설치 현황,OPEN API,,,CNSGN_BSSH_ADDR,위탁업소주소
+145,집단급식소 설치 현황,OPEN API,,,CNSGN_PRSDNT_NM,위탁대표자명
+145,집단급식소 설치 현황,OPEN API,,,ORGN_MLSV_YN,단체급식여부
+145,집단급식소 설치 현황,OPEN API,,,CNCTR_MANAGE_BSSH_NO,집중관리업소번호
+146,집단급식소 인허가 대장,OPEN API,keyid,인증키,INSTT_NM,기관명
+146,집단급식소 인허가 대장,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+146,집단급식소 인허가 대장,OPEN API,dataType,요청파일 타입,PRMS_DT,허가일자
+146,집단급식소 인허가 대장,OPEN API,startidx,요청시작위치,INDUTY_NM,업종
+146,집단급식소 인허가 대장,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자명
+146,집단급식소 인허가 대장,OPEN API,CHNG_DT, 변경일자(YYYYMMDD),BSSH_NM,업소명
+146,집단급식소 인허가 대장,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가번호
+146,집단급식소 인허가 대장,OPEN API,BSSH_NM,업소명,,
+147,집단급식소 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+147,집단급식소 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+147,집단급식소 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+147,집단급식소 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+147,집단급식소 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+147,집단급식소 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+147,집단급식소 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+147,집단급식소 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+147,집단급식소 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+148,처분기준코드,OPEN API,keyid,인증키,VALD_BGN_DT,유효시작일자
+148,처분기준코드,OPEN API,serviceId,서비스명,USE_YN,사용여부
+148,처분기준코드,OPEN API,dataType,요청파일 타입,VILT_TYPE_CD_NM,위반유형명
+148,처분기준코드,OPEN API,startidx,요청시작위치,VILT_TYPE_CD,위반유형코드
+148,처분기준코드,OPEN API,endIdx,요청종료위치,BASIS_LAWORD,근거법령
+148,처분기준코드,OPEN API,VALD_BGN_DT,유효시작일자(YYYYMMDD),DSPS_STDR_CD_NM,처분기준코드명
+148,처분기준코드,OPEN API,VALD_END_DT,유효종료일자(YYYYMMDD),LV_NO,레벨
+148,처분기준코드,OPEN API,,,HRNK_DSPS_STDR_CD,상위처분기준코드
+148,처분기준코드,OPEN API,,,LAST_UPDT_DTM,최종수정일시
+148,처분기준코드,OPEN API,,,VALD_END_DT,유효종료일자
+148,처분기준코드,OPEN API,,,DSPS_STDR_CD,처분기준코드
+149,축산물 가공업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+149,축산물 가공업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+149,축산물 가공업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+149,축산물 가공업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+149,축산물 가공업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+149,축산물 가공업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+149,축산물 가공업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+149,축산물 가공업 폐업정보,OPEN API,,,BSSH_NM,업소명
+149,축산물 가공업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+150,축산물 가공업허가정보,OPEN API,keyid,인증키,TELNO,전화번호
+150,축산물 가공업허가정보,OPEN API,serviceId,서비스명,INSTT_NM,기관명
+150,축산물 가공업허가정보,OPEN API,dataType,요청파일 타입,LOCP_ADDR,주소
+150,축산물 가공업허가정보,OPEN API,startidx,요청시작위치,PRMS_DT,허가일자
+150,축산물 가공업허가정보,OPEN API,endIdx,요청종료위치,INDUTY_NM,업종
+150,축산물 가공업허가정보,OPEN API,CHNG_DT,변경일자,PRSDNT_NM,대표자명
+150,축산물 가공업허가정보,OPEN API,LCNS_NO,인허가번호,BSSH_NM,업소명
+150,축산물 가공업허가정보,OPEN API,,,LCNS_NO,인허가번호
+151,축산물 보관업영업허가대장,OPEN API,keyid,인증키,PRMS_DT,허가일자
+151,축산물 보관업영업허가대장,OPEN API,serviceId,서비스명,INDUTY_NM,업종
+151,축산물 보관업영업허가대장,OPEN API,dataType,요청파일 타입,PRSDNT_NM,대표자명
+151,축산물 보관업영업허가대장,OPEN API,startidx,요청시작위치,BSSH_NM,업소명
+151,축산물 보관업영업허가대장,OPEN API,endIdx,요청종료위치,INSTT_NM,기관명
+151,축산물 보관업영업허가대장,OPEN API,CHNG_DT,변경일자,LOCP_ADDR,주소
+151,축산물 보관업영업허가대장,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가 번호
+152,축산물 생산실적정보,OPEN API,keyid,인증키,FYER_PRDCTN_ABRT_QY,연간생산능력(KG)
+152,축산물 생산실적정보,OPEN API,serviceId,서비스명,PRDLST_REPORT_NO,품목제조보고번호
+152,축산물 생산실적정보,OPEN API,dataType,요청파일 타입,EVL_YR,보고년도
+152,축산물 생산실적정보,OPEN API,startidx,요청시작위치,LCNS_NO,인허가번호
+152,축산물 생산실적정보,OPEN API,endIdx,요청종료위치,H_ITEM_NM,품목유형
+152,축산물 생산실적정보,OPEN API,EVL_YR,생산실적보고년도(YYYY)(필수),GUBUN,품목구분
+152,축산물 생산실적정보,OPEN API,LCNS_NO,인허가번호,PRDLST_NM,품목명
+152,축산물 생산실적정보,OPEN API,PRDLST_CD_NM,품목유형,PRDCTN_QY,생산량(KG)
+152,축산물 생산실적정보,OPEN API,BSSH_NM,업소명,BSSH_NM,업소명
+153,축산물 식육포장처리업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+153,축산물 식육포장처리업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+153,축산물 식육포장처리업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+153,축산물 식육포장처리업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+153,축산물 식육포장처리업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+153,축산물 식육포장처리업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+153,축산물 식육포장처리업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+153,축산물 식육포장처리업 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+153,축산물 식육포장처리업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+154,축산물 식육포장처리업영업허가대장,OPEN API,keyid,인증키,PRMS_DT,허가일자
+154,축산물 식육포장처리업영업허가대장,OPEN API,serviceId,서비스명,CLSBIZ_DVS_NM,영업상태
+154,축산물 식육포장처리업영업허가대장,OPEN API,dataType,요청파일 타입,INDUTY_NM,업종
+154,축산물 식육포장처리업영업허가대장,OPEN API,startidx,요청시작위치,PRSDNT_NM,대표자명
+154,축산물 식육포장처리업영업허가대장,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+154,축산물 식육포장처리업영업허가대장,OPEN API,CHNG_DT,변경일자,TELNO,전화번호
+154,축산물 식육포장처리업영업허가대장,OPEN API,LCNS_NO,인허가번호,INSTT_NM,기관명
+154,축산물 식육포장처리업영업허가대장,OPEN API,,,LOCP_ADDR,주소
+154,축산물 식육포장처리업영업허가대장,OPEN API,,,LCNS_NO,인허가 번호
+155,축산물 운반업영업신고대장,OPEN API,keyid,인증키,PRMS_DT,허가일자
+155,축산물 운반업영업신고대장,OPEN API,serviceId,서비스명,INDUTY_NM,업종
+155,축산물 운반업영업신고대장,OPEN API,dataType,요청파일 타입,PRSDNT_NM,대표자명
+155,축산물 운반업영업신고대장,OPEN API,startidx,요청시작위치,BSSH_NM,업소명
+155,축산물 운반업영업신고대장,OPEN API,endIdx,요청종료위치,INSTT_NM,기관명
+155,축산물 운반업영업신고대장,OPEN API,CHNG_DT,변경일자,LOCP_ADDR,주소
+155,축산물 운반업영업신고대장,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가 번호
+156,축산물 집유업영업허가대장,OPEN API,keyid,인증키,CLSTMP_END_DT,휴업종료일자
+156,축산물 집유업영업허가대장,OPEN API,serviceId,서비스명,CLSTMP_BGN_DT,휴업시작일자
+156,축산물 집유업영업허가대장,OPEN API,dataType,요청파일 타입,CLSBIZ_DT,폐업 일자
+156,축산물 집유업영업허가대장,OPEN API,startidx,요청시작위치,PRMS_DT,허가일자
+156,축산물 집유업영업허가대장,OPEN API,endIdx,요청종료위치,CLSBIZ_DVS_NM,영업상태
+156,축산물 집유업영업허가대장,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+156,축산물 집유업영업허가대장,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+156,축산물 집유업영업허가대장,OPEN API,,,BSSH_NM,업소명
+156,축산물 집유업영업허가대장,OPEN API,,,INSTT_NM,기관명
+156,축산물 집유업영업허가대장,OPEN API,,,LOCP_ADDR,주소
+156,축산물 집유업영업허가대장,OPEN API,,,LCNS_NO,인허가 번호
+157,축산물 판매업 폐업정보,OPEN API,keyid,인증키,INSTT_NM,기관명
+157,축산물 판매업 폐업정보,OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+157,축산물 판매업 폐업정보,OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+157,축산물 판매업 폐업정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+157,축산물 판매업 폐업정보,OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+157,축산물 판매업 폐업정보,OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+157,축산물 판매업 폐업정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+157,축산물 판매업 폐업정보,OPEN API,CLSBIZ_DT,폐업일자,BSSH_NM,업소명
+157,축산물 판매업 폐업정보,OPEN API,,,LCNS_NO,인허가번호
+158,축산물 판매업영업신고대장,OPEN API,keyid,인증키,PRMS_DT,허가일자
+158,축산물 판매업영업신고대장,OPEN API,serviceId,서비스명,INDUTY_NM,업종
+158,축산물 판매업영업신고대장,OPEN API,dataType,요청파일 타입,PRSDNT_NM,대표자명
+158,축산물 판매업영업신고대장,OPEN API,startidx,요청시작위치,BSSH_NM,업소명
+158,축산물 판매업영업신고대장,OPEN API,endIdx,요청종료위치,INSTT_NM,기관명
+158,축산물 판매업영업신고대장,OPEN API,CHNG_DT,변경일자,LOCP_ADDR,주소
+158,축산물 판매업영업신고대장,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가 번호
+159,축산물 품목제조정보,OPEN API,keyid,인증키,CHILD_CRTFC_YN,어린이기호식품품질인증여부
+159,축산물 품목제조정보,OPEN API,serviceId,서비스명,HIENG_LNTRT_DVS_NM,고열량저영양식품여부
+159,축산물 품목제조정보,OPEN API,dataType,요청파일 타입,PRODUCTION,생산종료여부
+159,축산물 품목제조정보,OPEN API,startidx,요청시작위치,PRDLST_DCNM,유형
+159,축산물 품목제조정보,OPEN API,endIdx,요청종료위치,PRDLST_NM,제품명
+159,축산물 품목제조정보,OPEN API,CHNG_DT,변경일자(YYYYMMDD),PRMS_DT,보고일자
+159,축산물 품목제조정보,OPEN API,PRDLST_REPORT_NO,품목제조번호,PRDLST_REPORT_NO,품목제조번호
+159,축산물 품목제조정보,OPEN API,BSSH_NM,업소명,BSSH_NM,업소명
+159,축산물 품목제조정보,OPEN API,PRDLST_NM,품목명,LAST_UPDT_DTM,최종수정일자
+159,축산물 품목제조정보,OPEN API,PRMS_DT,보고일자,INDUTY_CD_NM,업종
+159,축산물 품목제조정보,OPEN API,PRDLST_DCNM,품목유형,POG_DAYCNT,소비기한
+159,축산물 품목제조정보,OPEN API,LCNS_NO,인허가번호,LCNS_NO,인허가번호
+160,"축산물(도축업,보관업,운반업,집유업,식용란선별포장업) 폐업정보",OPEN API,keyid,인증키,INSTT_NM,기관명
+160,"축산물(도축업,보관업,운반업,집유업,식용란선별포장업) 폐업정보",OPEN API,serviceId,서비스명,LOCP_ADDR,주소
+160,"축산물(도축업,보관업,운반업,집유업,식용란선별포장업) 폐업정보",OPEN API,dataType,요청파일 타입,CLSBIZ_DVS_CD_NM,페업상태
+160,"축산물(도축업,보관업,운반업,집유업,식용란선별포장업) 폐업정보",OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+160,"축산물(도축업,보관업,운반업,집유업,식용란선별포장업) 폐업정보",OPEN API,endIdx,요청종료위치,PRMS_DT,허가일자
+160,"축산물(도축업,보관업,운반업,집유업,식용란선별포장업) 폐업정보",OPEN API,CHNG_DT,변경일자,INDUTY_NM,업종
+160,"축산물(도축업,보관업,운반업,집유업,식용란선별포장업) 폐업정보",OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+160,"축산물(도축업,보관업,운반업,집유업,식용란선별포장업) 폐업정보",OPEN API,,,BSSH_NM,업소명
+160,"축산물(도축업,보관업,운반업,집유업,식용란선별포장업) 폐업정보",OPEN API,,,LCNS_NO,인허가번호
+161,축산물HACCP 지정정보,OPEN API,keyid,인증키,HACCP_APPN_NO,HACCP 지정번호
+161,축산물HACCP 지정정보,OPEN API,serviceId,서비스명,HACCP_APPN_DT,HACCP 지정일자
+161,축산물HACCP 지정정보,OPEN API,dataType,요청파일 타입,SITE_ADDR,업소주소
+161,축산물HACCP 지정정보,OPEN API,startidx,요청시작위치,CLSBIZ_DT,폐업일자
+161,축산물HACCP 지정정보,OPEN API,endIdx,요청종료위치,CLSBIZ_DVS_CD_NM,영업상태
+161,축산물HACCP 지정정보,OPEN API,LCNS_NO,인허가번호,PRSDNT_NM,대표자명
+161,축산물HACCP 지정정보,OPEN API,HACCP_APPN_NO,HACCP 지정번호,INDUTY_CD_NM,업종명
+161,축산물HACCP 지정정보,OPEN API,CHNG_DT,변경일자,BSSH_NM,업소명
+161,축산물HACCP 지정정보,OPEN API,,,CRTFC_RETN_DT,인증반납일자
+161,축산물HACCP 지정정보,OPEN API,,,CRTFC_ENDDT,인증종료일자
+161,축산물HACCP 지정정보,OPEN API,,,ASGN_CANCL_DT,지정취소일자
+161,축산물HACCP 지정정보,OPEN API,,,LCNS_NO,인허가번호
+162,축산물위생검사기관 지정 현황,OPEN API,keyid,인증키,WORK_SCOPE,업무범위
+162,축산물위생검사기관 지정 현황,OPEN API,serviceId,서비스명,APPN_END_DT,지정종료일자
+162,축산물위생검사기관 지정 현황,OPEN API,dataType,요청파일 타입,APPN_BGN_DT,지정시작일자
+162,축산물위생검사기관 지정 현황,OPEN API,startidx,요청시작위치,ADDR,주소
+162,축산물위생검사기관 지정 현황,OPEN API,endIdx,요청종료위치,PRSDNT_NM,대표자
+162,축산물위생검사기관 지정 현황,OPEN API,,,BSSH_NM,검사기관명
+163,축산물의 표시기준,OPEN API,keyid,인증키,,
+163,축산물의 표시기준,OPEN API,serviceId,서비스명,,
+163,축산물의 표시기준,OPEN API,dataType,요청파일 타입,,
+163,축산물의 표시기준,OPEN API,startidx,요청시작위치,,
+163,축산물의 표시기준,OPEN API,endIdx,요청종료위치,,
+164,축산물품목제조보고(원재료),OPEN API,keyid,인증키,CHNG_DT,변경일자
+164,축산물품목제조보고(원재료),OPEN API,serviceId,서비스명,LCNS_NO,인허가번호
+164,축산물품목제조보고(원재료),OPEN API,dataType,요청파일 타입,RAWMTRL_NM,원재료
+164,축산물품목제조보고(원재료),OPEN API,startidx,요청시작위치,PRDLST_DCNM,유형
+164,축산물품목제조보고(원재료),OPEN API,endIdx,요청종료위치,PRDLST_NM,품목명
+164,축산물품목제조보고(원재료),OPEN API,CHNG_DT,변경일자,PRMS_DT,보고일자
+164,축산물품목제조보고(원재료),OPEN API,PRDLST_REPORT_NO,품목제조번호,PRDLST_REPORT_NO,품목제조번호
+164,축산물품목제조보고(원재료),OPEN API,LCNS_NO,인허가번호,BSSH_NM,업소명
+164,축산물품목제조보고(원재료),OPEN API,PRMS_DT,보고일자,,
+165,토양지하수 토양실태조사정보,OPEN API,keyid,인증키,AS_,비소
+165,토양지하수 토양실태조사정보,OPEN API,serviceId,서비스명,COPPR,구리
+165,토양지하수 토양실태조사정보,OPEN API,dataType,요청파일 타입,CDMM,카드뮴
+165,토양지하수 토양실태조사정보,OPEN API,startidx,요청시작위치,AREA,면적
+165,토양지하수 토양실태조사정보,OPEN API,endIdx,요청종료위치,LNDCGR_NM,지목 명
+165,토양지하수 토양실태조사정보,OPEN API,CHNG_DT,변경일자,ADDR,주소
+165,토양지하수 토양실태조사정보,OPEN API,EXAM_YR,조사년도,CHARTR_CL_NM,특성 분류 명
+165,토양지하수 토양실태조사정보,OPEN API,ADDR,주소,RM,비고
+165,토양지하수 토양실태조사정보,OPEN API,,,HYDRIONDNSTY,수소이온농도
+165,토양지하수 토양실태조사정보,OPEN API,,,PCE,테트라클로로에틸렌
+165,토양지하수 토양실태조사정보,OPEN API,,,TCE,트리클로로에틸렌
+165,토양지하수 토양실태조사정보,OPEN API,,,TPH,석유계총탄화수소
+165,토양지하수 토양실태조사정보,OPEN API,,,XYLEN,크실렌
+165,토양지하수 토양실태조사정보,OPEN API,,,ETBEN,에틸벤젠
+165,토양지하수 토양실태조사정보,OPEN API,,,TOLUE,톨루엔
+165,토양지하수 토양실태조사정보,OPEN API,,,BENZ,벤젠
+165,토양지하수 토양실태조사정보,OPEN API,,,EXAM_YR,조사 년도
+165,토양지하수 토양실태조사정보,OPEN API,,,PHNL,페놀
+165,토양지하수 토양실태조사정보,OPEN API,,,CYN,시안
+165,토양지하수 토양실태조사정보,OPEN API,,,PCT,폴리클로리네이트페닐
+165,토양지하수 토양실태조사정보,OPEN API,,,ORGNICPH,유기인
+165,토양지하수 토양실태조사정보,OPEN API,,,IMCOW,불소
+165,토양지하수 토양실태조사정보,OPEN API,,,NICKEL,니켈
+165,토양지하수 토양실태조사정보,OPEN API,,,ZINC,아연
+165,토양지하수 토양실태조사정보,OPEN API,,,CR6,6가크롬
+165,토양지하수 토양실태조사정보,OPEN API,,,PB,납
+165,토양지하수 토양실태조사정보,OPEN API,,,MRC,수은
+165,토양지하수 토양실태조사정보,OPEN API,,,SOIL_SEQ,토양 일련번호
+166,패류독소정보,OPEN API,keyid,인증키,ORGNP_NM,원산지명
+166,패류독소정보,OPEN API,serviceId,서비스명,WTNESSMAN_NM,입회자명
+166,패류독소정보,OPEN API,dataType,요청파일 타입,PICK_DT,채취일자
+166,패류독소정보,OPEN API,startidx,요청시작위치,INSTT_NM,기관명
+166,패류독소정보,OPEN API,endIdx,요청종료위치,SPLORE_NO,시료번호
+166,패류독소정보,OPEN API,EXAM_SEAR,조사해역명,EXAM_SEAR_NM,조사해역명
+166,패류독소정보,OPEN API,,,EXAM_SPOT_NM,조사지점명
+166,패류독소정보,OPEN API,,,FIT_YN,적합여부
+166,패류독소정보,OPEN API,,,SPLORE_DSUSE_DT,시료폐기일자
+166,패류독소정보,OPEN API,,,TEMOD,수온
+166,패류독소정보,OPEN API,,,SALT,염분
+166,패류독소정보,OPEN API,,,PRDLST_NM,품목명
+167,푸드트럭지정현황조회,OPEN API,keyid,인증키,CHNG_DT,변경일자(YYYYMMDD)
+167,푸드트럭지정현황조회,OPEN API,serviceId,서비스명,TELNO,업소전화번호
+167,푸드트럭지정현황조회,OPEN API,dataType,요청파일 타입,PRSDNT_NM,업소대표자명
+167,푸드트럭지정현황조회,OPEN API,startidx,요청시작위치,LOCP_ADDR,업소주소
+167,푸드트럭지정현황조회,OPEN API,endIdx,요청종료위치,BSSH_NM,업소명
+167,푸드트럭지정현황조회,OPEN API,LCNS_NO,인허가번호,INDUTY_CDNM,업종명
+167,푸드트럭지정현황조회,OPEN API,BSSH_NM,업소명,INSTT_CDNM,인허가기관명
+167,푸드트럭지정현황조회,OPEN API,CHNG_DT,변경일자(YYYYMMDD),PRMS_DT,인허가일자
+167,푸드트럭지정현황조회,OPEN API,,,LCNS_NO,인허가번호
+168,품목유형코드,OPEN API,keyid,인증키,HTRK_PRDLST_CD,최상위품목코드
+168,품목유형코드,OPEN API,serviceId,서비스명,HRNK_PRDLST_CD,상위품목코드
+168,품목유형코드,OPEN API,dataType,요청파일 타입,VALD_END_DT,유효종료일자
+168,품목유형코드,OPEN API,startidx,요청시작위치,VALD_BEGN_DT,유효개시일자
+168,품목유형코드,OPEN API,endIdx,요청종료위치,DFN,정의
+168,품목유형코드,OPEN API,LAST_UPDT_DTM,최종수정일(YYYYMMDD),ENG_NM,영문명
+168,품목유형코드,OPEN API,,,KOR_NM,한글명
+168,품목유형코드,OPEN API,,,PRDLST_CD,품목코드
+168,품목유형코드,OPEN API,,,CHD_SMBL_FD_YN,어린이기호식품 여부
+168,품목유형코드,OPEN API,,,LAST_UPDT_DTM,최종수정일
+168,품목유형코드,OPEN API,,,FDGRP_YN,식품군여부
+168,품목유형코드,OPEN API,,,RM,비고
+168,품목유형코드,OPEN API,,,USE_YN,사용여부
+168,품목유형코드,OPEN API,,,UPDT_PRVNS,수정사유
+168,품목유형코드,OPEN API,,,PRDLST_YN,품목여부
+168,품목유형코드,OPEN API,,,PIAM_KOR_NM,속성한글명
+168,품목유형코드,OPEN API,,,ATTRB_SEQ,속성일련번호
+168,품목유형코드,OPEN API,,,MXTR_PRDLST_YN,조합품목여부
+168,품목유형코드,OPEN API,,,LV,레벨
+169,하수도 수질정보,OPEN API,keyid,인증키,MESURE_DT,측정일자
+169,하수도 수질정보,OPEN API,serviceId,서비스명,ROADNM_DTL_ADDR,도로명상세주소
+169,하수도 수질정보,OPEN API,dataType,요청파일 타입,ROADNM_BASS_ADDR,도로명기본주소
+169,하수도 수질정보,OPEN API,startidx,요청시작위치,DTL_ADDR,상세주소
+169,하수도 수질정보,OPEN API,endIdx,요청종료위치,BASS_ADDR,기본주소
+169,하수도 수질정보,OPEN API,CHNG_DT,변경일자,ZIPNO,우편번호
+169,하수도 수질정보,OPEN API,,,SIGNGU_NM,시군구명
+169,하수도 수질정보,OPEN API,,,ECLGY_TOXCTY,상태독성
+169,하수도 수질정보,OPEN API,,,TEMOD,수온
+169,하수도 수질정보,OPEN API,,,CTPRVN_NM,시도명
+169,하수도 수질정보,OPEN API,,,EEC_QTY,대장균군수량
+169,하수도 수질정보,OPEN API,,,TN,TN
+169,하수도 수질정보,OPEN API,,,TP,TP
+169,하수도 수질정보,OPEN API,,,SS,SS
+169,하수도 수질정보,OPEN API,,,COD,COD
+169,하수도 수질정보,OPEN API,,,BOD,BOD
+169,하수도 수질정보,OPEN API,,,BASE_FCLTY_DVS_NM,기초시설구분명
+169,하수도 수질정보,OPEN API,,,RIVR_NM,하천명
+169,하수도 수질정보,OPEN API,,,PAPRONSLF_NM,지자체명
+169,하수도 수질정보,OPEN API,,,FCLTY_CD,시설코드
+169,하수도 수질정보,OPEN API,,,FCLTY_NM,시설명
+170,해외 위해식품 회수정보,OPEN API,keyid,인증키,NTCTXT_NO,게시글번호
+170,해외 위해식품 회수정보,OPEN API,serviceId,서비스명,DOWNLOAD_URL,이미지 다운로드 URL
+170,해외 위해식품 회수정보,OPEN API,dataType,요청파일 타입,BDT,본문내용
+170,해외 위해식품 회수정보,OPEN API,startidx,요청시작위치,CRET_DTM,생성일자
+170,해외 위해식품 회수정보,OPEN API,endIdx,요청종료위치,DETECT_TITL,유해물질
+170,해외 위해식품 회수정보,OPEN API,ST_CRET_DTM,생성일자시작범위(YYYYMMDD),TITL,제품명
+170,해외 위해식품 회수정보,OPEN API,END_CRET_DTM,생성일자종료범위(YYYYMMDD),,
+171,해외직구 위해식품 차단정보,OPEN API,keyid,인증키,IMAGE_URL,이미지URL
+171,해외직구 위해식품 차단정보,OPEN API,serviceId,서비스명,LAST_UPDT_DTM,최종수정일
+171,해외직구 위해식품 차단정보,OPEN API,dataType,요청파일 타입,CRET_DTM,등록일
+171,해외직구 위해식품 차단정보,OPEN API,startidx,요청시작위치,END_YMD,적용종료일
+171,해외직구 위해식품 차단정보,OPEN API,endIdx,요청종료위치,STT_YMD,적용시작일
+171,해외직구 위해식품 차단정보,OPEN API,CRET_DTM,등록일자(YYYYMMDD),INGR_NM_LST,위해성분명
+171,해외직구 위해식품 차단정보,OPEN API,LAST_UPDT_DTM,최종수정일자(YYYYMMDD),MUFC_CNTRY_NM,제조국가명
+171,해외직구 위해식품 차단정보,OPEN API,PRDT_NM,제품명,MUFC_NM,제조사명
+171,해외직구 위해식품 차단정보,OPEN API,MUFC_NM,제조사명,BARCD_CTN,바코드번호
+171,해외직구 위해식품 차단정보,OPEN API,MUFC_CNTRY_NM,제조국가명,SELF_IMPORT_SEQ,일련번호(고유키값)
+171,해외직구 위해식품 차단정보,OPEN API,INGR_NM_LST,위해성분명,PRDT_NM,제품명
+172,행정처분결과,OPEN API,keyid,인증키,ADDR,주소
+172,행정처분결과,OPEN API,serviceId,서비스명,VILTCN,위반일자및위반내용
+172,행정처분결과,OPEN API,dataType,요청파일 타입,DSPS_TYPECD_NM,처분유형
+172,행정처분결과,OPEN API,startidx,요청시작위치,DSPS_ENDDT,처분종료일(영업정지의경우)
+172,행정처분결과,OPEN API,endIdx,요청종료위치,DSPS_BGNDT,처분시작일(영업정지의경우)
+172,행정처분결과,OPEN API,CHNG_DT,변경일자(YYYYMMDD),DSPS_DCSNDT,처분확정일자
+172,행정처분결과,OPEN API,DSPS_DCSNDT,확정일자(YYYYMMDD),LCNS_NO,인허가번호
+172,행정처분결과,OPEN API,LCNS_NO,인허가번호,INDUTY_CD_NM,업종
+172,행정처분결과,OPEN API,,,DSPSDTLS_SEQ,행정처분전산키
+172,행정처분결과,OPEN API,,,DSPS_INSTTCD_NM,처분기관명
+172,행정처분결과,OPEN API,,,LAST_UPDT_DTM,최종수정일
+172,행정처분결과,OPEN API,,,PUBLIC_DT,공개기한
+172,행정처분결과,OPEN API,,,LAWORD_CD_NM,위반법령
+172,행정처분결과,OPEN API,,,DSPSCN,처분내용
+172,행정처분결과,OPEN API,,,PRSDNT_NM,대표자명
+172,행정처분결과,OPEN API,,,TEL_NO,전화번호
+172,행정처분결과,OPEN API,,,PRCSCITYPOINT_BSSHNM,업소명
+173,행정처분결과(수입식품업),OPEN API,keyid,인증키,ADDR,주소
+173,행정처분결과(수입식품업),OPEN API,serviceId,서비스명,VILTCN,위반일자 및 위반내용
+173,행정처분결과(수입식품업),OPEN API,dataType,요청파일 타입,DSPS_TYPECD_NM,처분유형
+173,행정처분결과(수입식품업),OPEN API,startidx,요청시작위치,DSPS_ENDDT,처분종료일(영업정지의경우)
+173,행정처분결과(수입식품업),OPEN API,endIdx,요청종료위치,DSPS_BGNDT,처분시작일(영업정지의경우)
+173,행정처분결과(수입식품업),OPEN API,CHNG_DT,변경일자(YYYYMMDD),DSPS_DCSNDT,처분확정일자
+173,행정처분결과(수입식품업),OPEN API,DSPS_DCSNDT,확정일자(YYYYMMDD),LCNS_NO,인허가번호
+173,행정처분결과(수입식품업),OPEN API,LCNS_NO,인허가번호,INDUTY_CD_NM,업종
+173,행정처분결과(수입식품업),OPEN API,,,DSPS_INSTTCD_NM,처분기관명
+173,행정처분결과(수입식품업),OPEN API,,,DSPSDTLS_SEQ,행정처분전산키
+173,행정처분결과(수입식품업),OPEN API,,,LAST_UPDT_DTM,최종수정일
+173,행정처분결과(수입식품업),OPEN API,,,PUBLIC_DT,공개기한
+173,행정처분결과(수입식품업),OPEN API,,,DSPSCN,처분내용
+173,행정처분결과(수입식품업),OPEN API,,,LAWORD_CD_NM,위반법령
+173,행정처분결과(수입식품업),OPEN API,,,PRSDNT_NM,대표자명
+173,행정처분결과(수입식품업),OPEN API,,,TELNO,전화번호
+173,행정처분결과(수입식품업),OPEN API,,,PRCSCITYPOINT_BSSHNM,업소명
+174,행정처분결과(식품접객업),OPEN API,keyid,인증키,ADDR,주소
+174,행정처분결과(식품접객업),OPEN API,serviceId,서비스명,VILTCN,위반일자및위반내용
+174,행정처분결과(식품접객업),OPEN API,dataType,요청파일 타입,DSPS_TYPECD_NM,처분유형
+174,행정처분결과(식품접객업),OPEN API,startidx,요청시작위치,DSPS_ENDDT,처분종료일(영업정지의경우)
+174,행정처분결과(식품접객업),OPEN API,endIdx,요청종료위치,DSPS_BGNDT,처분시작일(영업정지의경우)
+174,행정처분결과(식품접객업),OPEN API,CHNG_DT,변경일자(YYYYMMDD),DSPS_DCSNDT,처분확정일자
+174,행정처분결과(식품접객업),OPEN API,DSPS_DCSNDT,확정일자(YYYYMMDD),LCNS_NO,인허가번호
+174,행정처분결과(식품접객업),OPEN API,LCNS_NO,인허가번호,INDUTY_CD_NM,업종
+174,행정처분결과(식품접객업),OPEN API,,,DSPSDTLS_SEQ,행정처분전산키
+174,행정처분결과(식품접객업),OPEN API,,,DSPS_INSTTCD_NM,처분기관명
+174,행정처분결과(식품접객업),OPEN API,,,LAST_UPDT_DTM,최종수정일
+174,행정처분결과(식품접객업),OPEN API,,,PUBLIC_DT,공개기한
+174,행정처분결과(식품접객업),OPEN API,,,LAWORD_CD_NM,위반법령
+174,행정처분결과(식품접객업),OPEN API,,,DSPSCN,처분내용
+174,행정처분결과(식품접객업),OPEN API,,,PRSDNT_NM,대표자명
+174,행정처분결과(식품접객업),OPEN API,,,TEL_NO,전화번호
+174,행정처분결과(식품접객업),OPEN API,,,PRCSCITYPOINT_BSSHNM,업소명
+175,행정처분결과(식품제조가공업),OPEN API,keyid,인증키,ADDR,주소
+175,행정처분결과(식품제조가공업),OPEN API,serviceId,서비스명,VILTCN,위반일자및위반내용
+175,행정처분결과(식품제조가공업),OPEN API,dataType,요청파일 타입,DSPS_TYPECD_NM,처분유형
+175,행정처분결과(식품제조가공업),OPEN API,startidx,요청시작위치,DSPS_ENDDT,처분종료일(영업정지의경우)
+175,행정처분결과(식품제조가공업),OPEN API,endIdx,요청종료위치,DSPS_BGNDT,처분시작일(영업정지의경우)
+175,행정처분결과(식품제조가공업),OPEN API,CHNG_DT,변경일자(YYYYMMDD),DSPS_DCSNDT,처분확정일자
+175,행정처분결과(식품제조가공업),OPEN API,DSPS_DCSNDT,확정일자(YYYYMMDD),LCNS_NO,인허가번호
+175,행정처분결과(식품제조가공업),OPEN API,LCNS_NO,인허가번호,INDUTY_CD_NM,업종
+175,행정처분결과(식품제조가공업),OPEN API,,,DSPS_INSTTCD_NM,처분기관명
+175,행정처분결과(식품제조가공업),OPEN API,,,DSPSDTLS_SEQ,행정처분전산키
+175,행정처분결과(식품제조가공업),OPEN API,,,LAST_UPDT_DTM,최종수정일
+175,행정처분결과(식품제조가공업),OPEN API,,,PUBLIC_DT,공개기한
+175,행정처분결과(식품제조가공업),OPEN API,,,DSPSCN,처분내용
+175,행정처분결과(식품제조가공업),OPEN API,,,LAWORD_CD_NM,위반법령
+175,행정처분결과(식품제조가공업),OPEN API,,,PRSDNT_NM,대표자명
+175,행정처분결과(식품제조가공업),OPEN API,,,TELNO,전화번호
+175,행정처분결과(식품제조가공업),OPEN API,,,PRCSCITYPOINT_BSSHNM,업소명
+176,행정처분결과(식품판매업),OPEN API,keyid,인증키,ADDR,주소
+176,행정처분결과(식품판매업),OPEN API,serviceId,서비스명,VILTCN,위반일자 및 위반내용
+176,행정처분결과(식품판매업),OPEN API,dataType,요청파일 타입,DSPS_TYPECD_NM,처분유형
+176,행정처분결과(식품판매업),OPEN API,startidx,요청시작위치,DSPS_ENDDT,처분종료일(영업정지의경우)
+176,행정처분결과(식품판매업),OPEN API,endIdx,요청종료위치,DSPS_BGNDT,처분시작일(영업정지의경우)
+176,행정처분결과(식품판매업),OPEN API,CHNG_DT,변경일자(YYYYMMDD),DSPS_DCSNDT,처분확정일자
+176,행정처분결과(식품판매업),OPEN API,DSPS_DCSNDT,확정일자(YYYYMMDD),LCNS_NO,인허가번호
+176,행정처분결과(식품판매업),OPEN API,LCNS_NO,인허가번호,INDUTY_CD_NM,업종
+176,행정처분결과(식품판매업),OPEN API,,,DSPS_INSTTCD_NM,처분기관명
+176,행정처분결과(식품판매업),OPEN API,,,DSPSDTLS_SEQ,행정처분전산키
+176,행정처분결과(식품판매업),OPEN API,,,LAST_UPDT_DTM,최종수정일
+176,행정처분결과(식품판매업),OPEN API,,,PUBLIC_DT,공개기한
+176,행정처분결과(식품판매업),OPEN API,,,DSPSCN,처분내용
+176,행정처분결과(식품판매업),OPEN API,,,LAWORD_CD_NM,위반법령
+176,행정처분결과(식품판매업),OPEN API,,,PRSDNT_NM,대표자명
+176,행정처분결과(식품판매업),OPEN API,,,TELNO,전화번호
+176,행정처분결과(식품판매업),OPEN API,,,PRCSCITYPOINT_BSSHNM,업소명
+177,회수.판매중지 정보,OPEN API,keyid,인증키,MNFDT,제조일자
+177,회수.판매중지 정보,OPEN API,serviceId,서비스명,FRMLCUNIT,포장단위
+177,회수.판매중지 정보,OPEN API,dataType,요청파일 타입,BRCDNO,바코드번호
+177,회수.판매중지 정보,OPEN API,startidx,요청시작위치,TELNO,전화번호
+177,회수.판매중지 정보,OPEN API,endIdx,요청종료위치,ADDR,업체주소
+177,회수.판매중지 정보,OPEN API,CRET_DTM,등록일자(YYYYMMDD),BSSHNM,제조업체명
+177,회수.판매중지 정보,OPEN API,PRDLST_REPORT_NO,품목제조보고번호,RTRVLPRVNS,회수사유
+177,회수.판매중지 정보,OPEN API,,,LCNS_NO,업체인허가번호
+177,회수.판매중지 정보,OPEN API,,,PRDTNM,제품명
+177,회수.판매중지 정보,OPEN API,,,PRDLST_CD_NM,품목유형(품목코드명)
+177,회수.판매중지 정보,OPEN API,,,RTRVL_GRDCD_NM,회수등급
+177,회수.판매중지 정보,OPEN API,,,PRDLST_REPORT_NO,품목제조보고번호
+177,회수.판매중지 정보,OPEN API,,,RTRVLDSUSE_SEQ,회수.판매중지 일련번호
+177,회수.판매중지 정보,OPEN API,,,CRET_DTM,등록일
+177,회수.판매중지 정보,OPEN API,,,PRDLST_CD,품목코드
+177,회수.판매중지 정보,OPEN API,,,IMG_FILE_PATH,제품사진 URL
+177,회수.판매중지 정보,OPEN API,,,PRDLST_TYPE,식품분류
+177,회수.판매중지 정보,OPEN API,,,DISTBTMLMT,유통/소비기한
+177,회수.판매중지 정보,OPEN API,,,RTRVLPLANDOC_RTRVLMTHD,회수방법
+178,후대교배종의 안전성 평가 신청 및 검토 정보,OPEN API,keyid,인증키,GOODS_NM,제품명
+178,후대교배종의 안전성 평가 신청 및 검토 정보,OPEN API,serviceId,서비스명,GMO_PRDT_KND,제품종류
+178,후대교배종의 안전성 평가 신청 및 검토 정보,OPEN API,dataType,요청파일 타입,LMOCHILD_CHARTR_CHNGE_YN,특성변화여부
+178,후대교배종의 안전성 평가 신청 및 검토 정보,OPEN API,startidx,요청시작위치,LMOCHILD_DFFPNT_YN,차이점여부
+178,후대교배종의 안전성 평가 신청 및 검토 정보,OPEN API,endIdx,요청종료위치,LMOCHILD_BTHTR_CRSS_YN,이종간교배여부
+178,후대교배종의 안전성 평가 신청 및 검토 정보,OPEN API,,,PRDLST_NM,품목명
+178,후대교배종의 안전성 평가 신청 및 검토 정보,OPEN API,,,PRMS_DT,허가일자
+178,후대교배종의 안전성 평가 신청 및 검토 정보,OPEN API,,,PRSDNT_NM,대표자명
+178,후대교배종의 안전성 평가 신청 및 검토 정보,OPEN API,,,BSSH_NM,업소명
+179,식품등 표시기준,File,,,,
+180,식품위생심의위원회 개최 결과,File,,,,
+181,식품첨가물의 표시기준,File,,,,
+182,유전자변형식품등의 표시기준,File,,,,
+183,축산물의 표시기준,File,,,,
+184,식품영양성분DB정보,Link,,,,
