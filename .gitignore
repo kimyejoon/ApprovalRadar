@@ -1,7 +1,21 @@
+# Node
 node_modules/
-.DS_Store
 dist/
 build/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.pytest_cache/
+
+# OS
+.DS_Store
+
+# Env
 .env
 .env.local
 .env.development.local
