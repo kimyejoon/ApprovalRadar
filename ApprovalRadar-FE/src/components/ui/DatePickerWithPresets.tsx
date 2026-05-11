@@ -3,14 +3,14 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfToday 
 import { ko } from "date-fns/locale"
 import { Calendar as CalendarIcon } from "lucide-react"
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import { cn } from "../../lib/utils"
+import { Button } from "./button"
+import { Calendar } from "./calendar"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "./popover"
 
 interface DatePickerWithPresetsProps {
   date: { from: Date; to: Date } | undefined;

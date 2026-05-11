@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "./card";
 
 interface DashboardIndicatorsProps {
   data: { status: string; [key: string]: unknown }[];
