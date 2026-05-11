@@ -6,6 +6,14 @@ import { Modal } from './components/ui/Modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCodeCell } from './components/ui/Table';
 import { KoreaMapSelector } from './components/ui/KoreaMapSelector';
 
+const ALL_REGIONS = [
+  '서울특별시', '부산광역시', '대구광역시', '인천광역시', '광주광역시',
+  '대전광역시', '울산광역시', '세종특별자치시', '경기도', '강원도',
+  '충청북도', '충청남도', '전라북도', '전라남도', '경상북도', '경상남도', '제주특별자치도'
+];
+const METRO_REGIONS = ['서울특별시', '인천광역시', '경기도', '강원도'];
+const NON_METRO_REGIONS = ALL_REGIONS.filter(r => !METRO_REGIONS.includes(r));
+
 function formatApprovalDate(dateStr: string) {
   if (!dateStr) return '-';
   
@@ -449,6 +457,22 @@ export default function App() {
       >
         <div className="p-2 sm:p-4 flex flex-col items-center">
           <p className="text-sm text-text-muted mb-4 text-center">지도를 클릭하여 여러 지역을 선택할 수 있습니다.</p>
+          
+          {/* Quick Select Buttons */}
+          <div className="flex flex-wrap justify-center gap-2 mb-4 w-full max-w-[500px]">
+            <Button variant="secondary" onClick={() => setTempLocationFilters(METRO_REGIONS)} className="text-xs py-1 px-3">
+              빠른선택: 수도권
+            </Button>
+            <Button variant="secondary" onClick={() => setTempLocationFilters(NON_METRO_REGIONS)} className="text-xs py-1 px-3">
+              수도권 외
+            </Button>
+            <Button variant="secondary" onClick={() => setTempLocationFilters(ALL_REGIONS)} className="text-xs py-1 px-3">
+              전국 선택
+            </Button>
+            <Button variant="secondary" onClick={() => setTempLocationFilters([])} className="text-xs py-1 px-3">
+              초기화
+            </Button>
+          </div>
           
           {/* Selected Location Tags in Modal */}
           {tempLocationFilters.length > 0 && (
