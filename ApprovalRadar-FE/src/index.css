@@ -7,6 +7,7 @@
   --color-border-subtle: var(--border-subtle);
   --color-border-standard: var(--border-standard);
   --color-border-prominent: var(--border-prominent);
+  
   --color-brand: #3ecf8e;
   --color-brand-link: #00c573;
   --color-brand-border: rgba(62, 207, 142, 0.3);
@@ -14,6 +15,26 @@
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
+
+  /* Shadcn UI mapping */
+  --color-foreground: var(--text-primary);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text-primary);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text-primary);
+  --color-primary: var(--brand);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--bg);
+  --color-secondary-foreground: var(--text-secondary);
+  --color-muted: var(--border-subtle);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--text-primary);
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--border-standard);
+  --color-input: var(--border-standard);
+  --color-ring: var(--brand);
 
   --font-sans: 'Pretendard', 'Circular', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-mono: 'Source Code Pro', 'Office Code Pro', Menlo, monospace;
@@ -30,6 +51,7 @@
     --text-primary: #171717;
     --text-secondary: #4d4d4d;
     --text-muted: #898989;
+    --accent: #f4f4f5;
   }
 
   .dark {
@@ -42,6 +64,7 @@
     --text-primary: #fafafa;
     --text-secondary: #b4b4b4;
     --text-muted: #898989;
+    --accent: #27272a;
   }
   
   body {
