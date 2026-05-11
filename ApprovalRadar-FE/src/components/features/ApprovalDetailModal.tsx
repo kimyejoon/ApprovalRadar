@@ -1,0 +1,72 @@
+import { Button } from '../ui/button';
+import { Modal } from '../ui/Modal';
+import { formatApprovalDate } from '../../lib/utils';
+import { type ApprovalMappedItem } from '../../lib/api';
+
+interface ApprovalDetailModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedItem: ApprovalMappedItem | null;
+}
+
+export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalDetailModalProps) {
+  return (
+    <Modal 
+      isOpen={isOpen} 
+      onClose={onClose}
+      title="인허가 변동 상세 내역"
+    >
+      {selectedItem && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <div className="text-text-muted mb-1">업소명</div>
+              <div className="font-medium text-text-primary">{selectedItem.name}</div>
+            </div>
+            <div>
+              <div className="text-text-muted mb-1">인허가번호</div>
+              <div className="font-mono text-text-primary">{selectedItem.id}</div>
+            </div>
+            <div className="col-span-2">
+              <div className="text-text-muted mb-1">소재지</div>
+              <div className="text-text-primary">{selectedItem.location}</div>
+            </div>
+            <div>
+              <div className="text-text-muted mb-1">대표자명</div>
+              <div className="text-text-primary">{selectedItem.owner}</div>
+            </div>
+            <div>
+              <div className="text-text-muted mb-1">전화번호</div>
+              <div className="font-mono text-text-primary">{selectedItem.phone}</div>
+            </div>
+            <div>
+              <div className="text-text-muted mb-1">영업상태</div>
+              <div className="text-text-primary">
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  selectedItem.status.includes('정상') 
+                    ? 'bg-brand/10 text-brand' 
+                    : 'bg-border-prominent text-text-muted'
+                }`}>
+                  {selectedItem.status}
+                </span>
+              </div>
+            </div>
+            <div>
+              <div className="text-text-muted mb-1">업종</div>
+              <div className="text-text-primary">{selectedItem.type}</div>
+            </div>
+            <div className="col-span-2">
+              <div className="text-text-muted mb-1">인허가시각</div>
+              <div className="text-text-primary">{formatApprovalDate(selectedItem.approvalDate)}</div>
+            </div>
+          </div>
+          
+          <div className="pt-6 border-t border-border-standard flex justify-end gap-3">
+            <Button variant="ghost" onClick={onClose}>닫기</Button>
+            <Button variant="default">추가 작업</Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
