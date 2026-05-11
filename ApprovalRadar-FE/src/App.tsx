@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { DownloadSimple, CaretLeft, CaretRight, CaretUp, CaretDown, ArrowsDownUp } from '@phosphor-icons/react';
+import { DownloadSimple, CaretLeft, CaretRight, CaretUp, CaretDown, ArrowsDownUp, MagnifyingGlass } from '@phosphor-icons/react';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Button } from './components/ui/Button';
 import { Modal } from './components/ui/Modal';
@@ -99,6 +99,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleSort = (key: SortKey) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -108,23 +109,33 @@ export default function App() {
     setSortConfig({ key, direction });
   };
 
-  const sortedData = useMemo(() => {
-    const sortableItems = [...data];
+  const filteredAndSortedData = useMemo(() => {
+    let result = [...data];
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(item => 
+        item.name.toLowerCase().includes(query) ||
+        item.owner.toLowerCase().includes(query) ||
+        item.id.toLowerCase().includes(query)
+      );
+    }
+
     if (sortConfig !== null) {
-      sortableItems.sort((a, b) => {
+      result.sort((a, b) => {
         const { key, direction } = sortConfig;
         if (a[key] < b[key]) return direction === 'asc' ? -1 : 1;
         if (a[key] > b[key]) return direction === 'asc' ? 1 : -1;
         return 0;
       });
     }
-    return sortableItems;
-  }, [data, sortConfig]);
+    return result;
+  }, [data, sortConfig, searchQuery]);
 
   // Pagination logic
-  const totalPages = Math.max(1, Math.ceil(sortedData.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedData.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = sortedData.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedData = filteredAndSortedData.slice(startIndex, startIndex + itemsPerPage);
 
   // Simulate live data arriving (리스트 밀림 방식)
   useEffect(() => {
@@ -161,6 +172,21 @@ export default function App() {
             엑셀 내보내기
           </Button>
         </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="mb-6 flex items-center bg-surface border border-border-standard rounded-lg px-3 py-2 w-full max-w-md focus-within:ring-1 focus-within:ring-brand focus-within:border-brand transition-all shadow-sm">
+        <MagnifyingGlass className="w-5 h-5 text-text-muted mr-2" />
+        <input 
+          type="text" 
+          placeholder="업소명, 대표자명, 인허가번호 검색..." 
+          className="bg-transparent border-none outline-none text-text-primary text-sm w-full placeholder:text-text-muted"
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1);
+          }}
+        />
       </div>
 
       <Table>
@@ -223,7 +249,7 @@ export default function App() {
         
         <div className="flex items-center gap-4">
           <span className="text-text-muted">
-            총 {data.length}개 중 {data.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + itemsPerPage, data.length)}
+            총 {filteredAndSortedData.length}개 중 {filteredAndSortedData.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredAndSortedData.length)}
           </span>
           <div className="flex items-center gap-1">
             <Button 
