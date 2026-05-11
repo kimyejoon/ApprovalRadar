@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { format, startOfToday } from 'date-fns';
 import { DownloadSimple, CaretLeft, CaretRight, CaretUp, CaretDown, ArrowsDownUp, MagnifyingGlass, X, ArrowCounterClockwise } from '@phosphor-icons/react';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Button } from './components/ui/button';
@@ -7,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCod
 import { KoreaMapSelector } from './components/ui/KoreaMapSelector';
 import { DatePickerWithPresets } from './components/ui/DatePickerWithPresets';
 import { DashboardIndicators } from './components/ui/DashboardIndicators';
-import { startOfToday, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
+import { fetchApprovals, type ApprovalData } from './lib/api';
 
 const ALL_REGIONS = [
   '서울특별시', '부산광역시', '대구광역시', '인천광역시', '광주광역시',
@@ -29,7 +31,6 @@ function formatApprovalDate(dateStr: string) {
   const h = String(date.getHours()).padStart(2, '0');
   const min = String(date.getMinutes()).padStart(2, '0');
 
-  // Check if original string contains time information
   const hasTime = dateStr.includes('T') || /\s\d{2}:/.test(dateStr);
   
   if (hasTime) {
@@ -37,43 +38,6 @@ function formatApprovalDate(dateStr: string) {
   }
   return `${y}년 ${m}월 ${d}일`;
 }
-
-// Dummy data
-const INITIAL_DATA = [
-  {
-    id: 'TR-2026-001',
-    name: '최고의 식당',
-    type: '일반음식점',
-    location: '서울특별시 강남구 테헤란로 123',
-    owner: '홍길동',
-    status: '영업/정상',
-    approvalDate: '2026-05-11T14:30:00',
-    phone: '02-1234-5678',
-    isTransfer: true,
-  },
-  {
-    id: 'TR-2026-002',
-    name: '맛있는 베이커리',
-    type: '제과점영업',
-    location: '서울특별시 서초구 서초대로 456',
-    owner: '김철수',
-    status: '영업/정상',
-    approvalDate: '2026-05-11',
-    phone: '02-9876-5432',
-    isTransfer: false,
-  },
-  {
-    id: 'TR-2026-003',
-    name: '조용한 카페',
-    type: '휴게음식점',
-    location: '서울특별시 송파구 올림픽로 789',
-    owner: '이영희',
-    status: '폐업',
-    approvalDate: '2026-05-10T09:15:00',
-    phone: '02-5555-4444',
-    isTransfer: false,
-  }
-];
 
 type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id';
 
@@ -106,8 +70,7 @@ function SortableHead({ label, sortKey, sortConfig, onSort }: SortableHeadProps)
 }
 
 export default function App() {
-  const [data, setData] = useState(INITIAL_DATA);
-  const [selectedItem, setSelectedItem] = useState<typeof INITIAL_DATA[0] | null>(null);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
@@ -122,6 +85,46 @@ export default function App() {
     to: startOfToday()
   });
 
+  const { data: apiResponse, isLoading, isError } = useQuery({
+    queryKey: ['approvals', currentPage, itemsPerPage, searchQuery, statusFilter, locationFilters, dateRange, sortConfig],
+    queryFn: () => fetchApprovals({
+      page: currentPage,
+      size: itemsPerPage,
+      search: searchQuery.trim() || undefined,
+      start_date: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined,
+      end_date: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
+      regions: locationFilters.length > 0 ? locationFilters.join(',') : undefined,
+      statuses: statusFilter !== '전체' ? statusFilter : undefined,
+      sort_by: sortConfig ? (
+        sortConfig.key === 'id' ? 'license_no' :
+        sortConfig.key === 'name' ? 'business_name' :
+        sortConfig.key === 'owner' ? 'representative_name' :
+        sortConfig.key === 'approvalDate' ? 'license_date' :
+        sortConfig.key === 'phone' ? 'phone_number' : 'created_at'
+      ) : 'created_at',
+      sort_order: sortConfig ? sortConfig.direction : 'desc',
+    }),
+    refetchInterval: 1000 * 60 * 5, // 5 min polling
+    refetchOnWindowFocus: true,
+  });
+
+  const mappedData = apiResponse?.data.map((item: ApprovalData) => ({
+    id: item.license_no,
+    name: item.business_name,
+    type: '-', // 업종 필드 부재
+    location: item.address,
+    owner: item.representative_name,
+    status: item.business_status,
+    approvalDate: item.license_date,
+    phone: item.phone_number,
+    isTransfer: false,
+    raw: item,
+  })) || [];
+
+  const totalPages = apiResponse?.meta.total_pages || 1;
+  const totalCount = apiResponse?.meta.total_count || 0;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+
   const handleSort = (key: SortKey) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -130,81 +133,12 @@ export default function App() {
     setSortConfig({ key, direction });
   };
 
-  const filteredAndSortedData = useMemo(() => {
-    let result = [...data];
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(item => 
-        item.name.toLowerCase().includes(query) ||
-        item.owner.toLowerCase().includes(query) ||
-        item.id.toLowerCase().includes(query)
-      );
-    }
-
-    if (statusFilter !== '전체') {
-      result = result.filter(item => item.status.includes(statusFilter));
-    }
-
-    if (dateRange && dateRange.from) {
-      const from = startOfDay(dateRange.from);
-      const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
-      result = result.filter(item => {
-        const itemDate = parseISO(item.approvalDate);
-        return isWithinInterval(itemDate, { start: from, end: to });
-      });
-    }
-
-    if (locationFilters.length > 0) {
-      result = result.filter(item => 
-        locationFilters.some(loc => item.location.includes(loc))
-      );
-    }
-
-    if (sortConfig !== null) {
-      result.sort((a, b) => {
-        const { key, direction } = sortConfig;
-        if (a[key] < b[key]) return direction === 'asc' ? -1 : 1;
-        if (a[key] > b[key]) return direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-    return result;
-  }, [data, sortConfig, searchQuery, statusFilter, locationFilters, dateRange]);
-
-  // Pagination logic
-  const totalPages = Math.max(1, Math.ceil(filteredAndSortedData.length / itemsPerPage));
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = filteredAndSortedData.slice(startIndex, startIndex + itemsPerPage);
-
-  // Simulate live data arriving (리스트 밀림 방식)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const newItem = {
-        id: `TR-2026-00${Math.floor(Math.random() * 10) + 4}`,
-        name: '새로 수집된 식당 ' + Math.floor(Math.random() * 100),
-        type: '일반음식점',
-        location: '서울특별시 마포구 월드컵북로',
-        owner: '박신규',
-        status: '영업/정상',
-        approvalDate: new Date().toISOString(),
-        phone: `02-${Math.floor(Math.random() * 9000) + 1000}-${Math.floor(Math.random() * 9000) + 1000}`,
-        isTransfer: Math.random() > 0.5,
-      };
-      
-      // Add new item to the top of the list (리스트 밀림)
-      setData(prev => [newItem, ...prev]);
-    }, 15000); // 15 seconds for demo
-
-    return () => clearInterval(timer);
-  }, []);
-
   return (
     <DashboardLayout>
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-sans font-medium text-text-primary tracking-tight">금일 변동 내역</h2>
-          <p className="text-text-muted mt-1 text-sm">총 {data.length}건의 인허가 변동 데이터가 실시간으로 수집되고 있습니다.</p>
+          <p className="text-text-muted mt-1 text-sm">총 {totalCount}건의 인허가 변동 데이터가 실시간으로 수집되고 있습니다.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => console.log('Export Excel')} className="gap-2">
@@ -215,7 +149,7 @@ export default function App() {
       </div>
 
       {/* Dashboard Top Indicators */}
-      <DashboardIndicators data={data} />
+      <DashboardIndicators data={mappedData} />
 
       {/* Search Bar & Date Picker */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -304,31 +238,45 @@ export default function App() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {paginatedData.map((item, index) => (
-            <TableRow 
-              key={item.id + index} 
-              onClick={() => setSelectedItem(item)}
-              className="cursor-pointer group"
-            >
-              <TableCell className="font-medium text-text-primary group-hover:text-brand transition-colors">
-                {item.name}
-              </TableCell>
-              <TableCell className="max-w-[200px] truncate">{item.location}</TableCell>
-              <TableCodeCell>{item.id}</TableCodeCell>
-              <TableCell>{item.owner}</TableCell>
-              <TableCell>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  item.status.includes('정상') 
-                    ? 'bg-brand/10 text-brand' 
-                    : 'bg-border-prominent text-text-muted'
-                }`}>
-                  {item.status}
-                </span>
-              </TableCell>
-              <TableCell className="text-xs text-text-muted">{formatApprovalDate(item.approvalDate)}</TableCell>
-              <TableCell className="font-mono text-xs">{item.phone}</TableCell>
+          {isLoading ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-8 text-text-muted">데이터를 불러오는 중입니다...</TableCell>
             </TableRow>
-          ))}
+          ) : isError ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-8 text-text-muted">데이터를 불러오는데 실패했습니다.</TableCell>
+            </TableRow>
+          ) : mappedData.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-8 text-text-muted">검색 결과가 없습니다.</TableCell>
+            </TableRow>
+          ) : (
+            mappedData.map((item, index) => (
+              <TableRow 
+                key={item.id + '-' + index} 
+                onClick={() => setSelectedItem(item)}
+                className="cursor-pointer group"
+              >
+                <TableCell className="font-medium text-text-primary group-hover:text-brand transition-colors">
+                  {item.name}
+                </TableCell>
+                <TableCell className="max-w-[200px] truncate">{item.location}</TableCell>
+                <TableCodeCell>{item.id}</TableCodeCell>
+                <TableCell>{item.owner}</TableCell>
+                <TableCell>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    item.status.includes('정상') 
+                      ? 'bg-brand/10 text-brand' 
+                      : 'bg-border-prominent text-text-muted'
+                  }`}>
+                    {item.status}
+                  </span>
+                </TableCell>
+                <TableCell className="text-xs text-text-muted">{formatApprovalDate(item.approvalDate)}</TableCell>
+                <TableCell className="font-mono text-xs">{item.phone}</TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
 
@@ -351,7 +299,7 @@ export default function App() {
         
         <div className="flex items-center gap-4">
           <span className="text-text-muted">
-            총 {filteredAndSortedData.length}개 중 {filteredAndSortedData.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredAndSortedData.length)}
+            총 {totalCount}개 중 {totalCount === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + itemsPerPage, totalCount)}
           </span>
           <div className="flex items-center gap-1">
             <Button 
