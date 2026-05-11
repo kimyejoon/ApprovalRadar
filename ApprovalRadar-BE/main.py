@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import json
@@ -37,6 +37,11 @@ class BusinessResponse(BaseModel):
     data: List[BusinessModel]
     meta: Optional[PaginationMeta] = None
 
+def parse_comma_separated_list(regions: Optional[str] = Query(None, description="콤마(,)로 구분된 지역 목록 (예: 서울,강원,경기)")) -> Optional[List[str]]:
+    if not regions:
+        return None
+    return [r.strip() for r in regions.split(',') if r.strip()]
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
@@ -72,14 +77,14 @@ app.add_middleware(
 def read_root():
     return {"message": "Welcome to the Food Safety Data API"}
 
-@app.get("/api/businesses", response_model=BusinessResponse)
-def get_businesses(
+@app.get("/api/v1/approvals", response_model=BusinessResponse)
+def get_approvals(
     page: int = Query(1, ge=1, description="페이지 번호"),
     size: int = Query(10, ge=1, le=100, description="페이지 당 항목 수"),
     search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
     start_date: Optional[str] = Query(None, description="조회 시작일 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)"),
-    regions: Optional[str] = Query(None, description="콤마(,)로 구분된 지역 목록 (예: 서울,강원,경기)"),
+    regions: Optional[List[str]] = Depends(parse_comma_separated_list),
     sort_by: str = Query("created_at", description="정렬 기준 컬럼"),
     sort_order: str = Query("desc", description="정렬 방향 (asc | desc)")
 ):
@@ -104,9 +109,8 @@ def get_businesses(
                 params.append(end_date)
                 
             if regions:
-                region_list = [r.strip() for r in regions.split(',')]
                 region_conditions = []
-                for r in region_list:
+                for r in regions:
                     region_conditions.append("address LIKE ?")
                     params.append(f"%{r}%")
                 if region_conditions:
