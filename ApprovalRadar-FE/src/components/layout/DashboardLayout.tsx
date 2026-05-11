@@ -1,11 +1,22 @@
-import React from 'react';
-import { Radar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Radar, Sun, Moon } from 'lucide-react';
+import { Button } from '../ui/Button';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
   return (
     <div className="flex h-screen bg-background text-text-primary overflow-hidden">
       {/* Sidebar */}
@@ -32,6 +43,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Header */}
         <header className="h-16 border-b border-border-standard flex items-center justify-between px-8 shrink-0">
           <h1 className="font-sans text-xl tracking-tight m-0">실시간 인허가 변동 모니터링</h1>
+          <Button variant="ghost" size="sm" className="w-10 h-10 p-0 rounded-full" onClick={() => setIsDark(!isDark)}>
+            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </Button>
         </header>
 
         {/* Page Content */}

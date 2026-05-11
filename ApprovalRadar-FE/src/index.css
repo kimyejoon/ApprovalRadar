@@ -1,26 +1,47 @@
 @import "tailwindcss";
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 
 @theme {
-  --color-background: #171717;
-  --color-surface: #0f0f0f;
-  --color-border-subtle: #242424;
-  --color-border-standard: #2e2e2e;
-  --color-border-prominent: #363636;
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-standard: var(--border-standard);
+  --color-border-prominent: var(--border-prominent);
   --color-brand: #3ecf8e;
   --color-brand-link: #00c573;
   --color-brand-border: rgba(62, 207, 142, 0.3);
   
-  --color-text-primary: #fafafa;
-  --color-text-secondary: #b4b4b4;
-  --color-text-muted: #898989;
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
 
-  --font-sans: 'Circular', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-sans: 'Pretendard', 'Circular', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-mono: 'Source Code Pro', 'Office Code Pro', Menlo, monospace;
 }
 
 @layer base {
   :root {
+    color-scheme: light;
+    --bg: #ffffff;
+    --surface: #f9f9f9;
+    --border-subtle: #f0f0f0;
+    --border-standard: #e5e5e5;
+    --border-prominent: #d4d4d4;
+    --text-primary: #171717;
+    --text-secondary: #4d4d4d;
+    --text-muted: #898989;
+  }
+
+  .dark {
     color-scheme: dark;
+    --bg: #171717;
+    --surface: #0f0f0f;
+    --border-subtle: #242424;
+    --border-standard: #2e2e2e;
+    --border-prominent: #363636;
+    --text-primary: #fafafa;
+    --text-secondary: #b4b4b4;
+    --text-muted: #898989;
   }
   
   body {
