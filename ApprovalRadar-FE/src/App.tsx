@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { DownloadSimple, CaretLeft, CaretRight, CaretUp, CaretDown, ArrowsDownUp, MagnifyingGlass, X } from '@phosphor-icons/react';
+import { DownloadSimple, CaretLeft, CaretRight, CaretUp, CaretDown, ArrowsDownUp, MagnifyingGlass, X, ArrowCounterClockwise } from '@phosphor-icons/react';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Button } from './components/ui/Button';
 import { Modal } from './components/ui/Modal';
@@ -469,7 +469,8 @@ export default function App() {
             <Button variant="secondary" onClick={() => setTempLocationFilters(ALL_REGIONS)} className="text-xs py-1 px-3">
               전국 선택
             </Button>
-            <Button variant="secondary" onClick={() => setTempLocationFilters([])} className="text-xs py-1 px-3">
+            <Button variant="secondary" onClick={() => setTempLocationFilters([])} className="text-xs py-1 px-3 flex items-center gap-1 text-text-muted hover:text-text-primary transition-colors">
+              <ArrowCounterClockwise weight="bold" className="w-3.5 h-3.5" />
               초기화
             </Button>
           </div>
