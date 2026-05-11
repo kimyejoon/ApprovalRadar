@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DownloadSimple } from '@phosphor-icons/react';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Button } from './components/ui/Button';
 import { Modal } from './components/ui/Modal';
@@ -71,7 +72,10 @@ export default function App() {
           <p className="text-text-muted mt-1 text-sm">총 {data.length}건의 인허가 변동 데이터가 실시간으로 수집되고 있습니다.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => console.log('Export Excel')}>엑셀 내보내기</Button>
+          <Button variant="secondary" onClick={() => console.log('Export Excel')} className="gap-2">
+            <DownloadSimple weight="bold" className="w-4 h-4" />
+            엑셀 내보내기
+          </Button>
         </div>
       </div>
 

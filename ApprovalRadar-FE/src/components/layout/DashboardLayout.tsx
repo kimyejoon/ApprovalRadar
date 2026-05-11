@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Radar, Sun, Moon } from 'lucide-react';
+import { Radar, Sun, Moon } from '@phosphor-icons/react';
 import { Button } from '../ui/Button';
 
 interface DashboardLayoutProps {
