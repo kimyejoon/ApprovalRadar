@@ -1,5 +1,5 @@
 
-import { format, subDays, startOfWeek, startOfMonth, startOfToday } from "date-fns"
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfToday } from "date-fns"
 import { ko } from "date-fns/locale"
 import { Calendar as CalendarIcon } from "lucide-react"
 
@@ -55,23 +55,16 @@ export function DatePickerWithPresets({ date, setDate }: DatePickerWithPresetsPr
           <Button
             variant="ghost"
             className="justify-start font-normal"
-            onClick={() => setDate({ from: startOfWeek(startOfToday(), { weekStartsOn: 1 }), to: startOfToday() })}
+            onClick={() => setDate({ from: startOfWeek(startOfToday(), { weekStartsOn: 1 }), to: endOfWeek(startOfToday(), { weekStartsOn: 1 }) })}
           >
             이번 주
           </Button>
           <Button
             variant="ghost"
             className="justify-start font-normal"
-            onClick={() => setDate({ from: startOfMonth(startOfToday()), to: startOfToday() })}
+            onClick={() => setDate({ from: startOfMonth(startOfToday()), to: endOfMonth(startOfToday()) })}
           >
             이번 달
-          </Button>
-          <Button
-            variant="ghost"
-            className="justify-start font-normal"
-            onClick={() => setDate({ from: subDays(startOfToday(), 7), to: startOfToday() })}
-          >
-            최근 7일
           </Button>
         </div>
         <div className="p-4">
