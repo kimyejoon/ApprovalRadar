@@ -5,7 +5,7 @@
   "description": "ApprovalRadar Monorepo (FE/BE)",
   "scripts": {
     "start:fe": "cd ApprovalRadar-FE && npm run dev",
-    "start:be": "cd ApprovalRadar-BE && uvicorn main:app --reload",
+    "start:be": "cd ApprovalRadar-BE && uvicorn main:app --host 0.0.0.0 --reload",
     "start": "concurrently \"npm run start:fe\" \"npm run start:be\""
   },
   "devDependencies": {
