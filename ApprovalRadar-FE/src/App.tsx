@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DownloadSimple } from '@phosphor-icons/react';
+import { DownloadSimple, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Button } from './components/ui/Button';
 import { Modal } from './components/ui/Modal';
@@ -66,6 +66,13 @@ const INITIAL_DATA = [
 export default function App() {
   const [data, setData] = useState(INITIAL_DATA);
   const [selectedItem, setSelectedItem] = useState<typeof INITIAL_DATA[0] | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  // Pagination logic
+  const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = data.slice(startIndex, startIndex + itemsPerPage);
 
   // Simulate live data arriving (리스트 밀림 방식)
   useEffect(() => {
@@ -117,7 +124,7 @@ export default function App() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((item, index) => (
+          {paginatedData.map((item, index) => (
             <TableRow 
               key={item.id + index} 
               onClick={() => setSelectedItem(item)}
@@ -144,6 +151,50 @@ export default function App() {
           ))}
         </TableBody>
       </Table>
+
+      <div className="mt-4 flex items-center justify-between text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-text-muted">페이지당 행:</span>
+          <select 
+            className="bg-surface border border-border-standard rounded-md px-2 py-1 text-text-primary focus:outline-none focus:ring-1 focus:ring-brand"
+            value={itemsPerPage}
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <span className="text-text-muted">
+            총 {data.length}개 중 {data.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + itemsPerPage, data.length)}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-8 h-8 p-0 disabled:opacity-30" 
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            >
+              <CaretLeft weight="bold" className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-8 h-8 p-0 disabled:opacity-30" 
+              disabled={currentPage === totalPages || totalPages === 0}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            >
+              <CaretRight weight="bold" className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
 
       <Modal 
         isOpen={!!selectedItem} 
