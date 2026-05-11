@@ -44,7 +44,7 @@ export function DatePickerWithPresets({ date, setDate }: DatePickerWithPresetsPr
         </Button>
       </PopoverTrigger>
       <PopoverContent className="flex w-auto p-0" align="start">
-        <div className="flex flex-col gap-2 p-3 border-r border-border-standard">
+        <div className="flex flex-col gap-3 p-4 border-r border-border-standard">
           <Button
             variant="ghost"
             className="justify-start font-normal"
@@ -74,7 +74,7 @@ export function DatePickerWithPresets({ date, setDate }: DatePickerWithPresetsPr
             최근 7일
           </Button>
         </div>
-        <div className="p-3">
+        <div className="p-4">
           <Calendar
             mode="range"
             defaultMonth={date?.from}
