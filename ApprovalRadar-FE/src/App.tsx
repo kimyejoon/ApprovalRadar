@@ -63,7 +63,7 @@ const INITIAL_DATA = [
   }
 ];
 
-type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone';
+type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id';
 
 interface SortableHeadProps {
   label: string;
@@ -100,6 +100,8 @@ export default function App() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('전체');
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
 
   const handleSort = (key: SortKey) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -121,6 +123,10 @@ export default function App() {
       );
     }
 
+    if (statusFilter !== '전체') {
+      result = result.filter(item => item.status.includes(statusFilter));
+    }
+
     if (sortConfig !== null) {
       result.sort((a, b) => {
         const { key, direction } = sortConfig;
@@ -130,7 +136,7 @@ export default function App() {
       });
     }
     return result;
-  }, [data, sortConfig, searchQuery]);
+  }, [data, sortConfig, searchQuery, statusFilter]);
 
   // Pagination logic
   const totalPages = Math.max(1, Math.ceil(filteredAndSortedData.length / itemsPerPage));
@@ -194,9 +200,39 @@ export default function App() {
           <TableRow>
             <SortableHead label="업소명" sortKey="name" sortConfig={sortConfig} onSort={handleSort} />
             <TableHead>소재지</TableHead>
-            <TableHead>인허가번호</TableHead>
+            <SortableHead label="인허가번호" sortKey="id" sortConfig={sortConfig} onSort={handleSort} />
             <SortableHead label="대표자명" sortKey="owner" sortConfig={sortConfig} onSort={handleSort} />
-            <TableHead>영업상태</TableHead>
+            <TableHead className="relative">
+              <button 
+                className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
+                onClick={() => setIsStatusFilterOpen(!isStatusFilterOpen)}
+              >
+                영업상태
+                <CaretDown weight="bold" className={`w-4 h-4 transition-transform ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {isStatusFilterOpen && (
+                <div className="absolute top-full left-0 mt-1 w-32 bg-surface border border-border-standard rounded-md shadow-lg p-1.5 z-10 flex flex-col gap-0.5">
+                  {['전체', '영업/정상', '폐업'].map(status => (
+                    <label key={status} className="flex items-center gap-2 px-2 py-1.5 hover:bg-border-subtle rounded cursor-pointer text-sm font-normal text-text-primary">
+                      <input 
+                        type="radio" 
+                        name="status" 
+                        value={status}
+                        checked={statusFilter === status}
+                        onChange={(e) => {
+                          setStatusFilter(e.target.value);
+                          setIsStatusFilterOpen(false);
+                          setCurrentPage(1);
+                        }}
+                        className="accent-brand"
+                      />
+                      {status}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </TableHead>
             <SortableHead label="인허가시각" sortKey="approvalDate" sortConfig={sortConfig} onSort={handleSort} />
             <SortableHead label="전화번호" sortKey="phone" sortConfig={sortConfig} onSort={handleSort} />
           </TableRow>
