@@ -102,7 +102,8 @@ export default function App() {
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('전체');
-  const [locationFilter, setLocationFilter] = useState('전체');
+  const [locationFilters, setLocationFilters] = useState<string[]>([]);
+  const [tempLocationFilters, setTempLocationFilters] = useState<string[]>([]);
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [isLocationFilterOpen, setIsLocationFilterOpen] = useState(false);
 
@@ -130,8 +131,10 @@ export default function App() {
       result = result.filter(item => item.status.includes(statusFilter));
     }
 
-    if (locationFilter !== '전체') {
-      result = result.filter(item => item.location.includes(locationFilter));
+    if (locationFilters.length > 0) {
+      result = result.filter(item => 
+        locationFilters.some(loc => item.location.includes(loc))
+      );
     }
 
     if (sortConfig !== null) {
@@ -143,7 +146,7 @@ export default function App() {
       });
     }
     return result;
-  }, [data, sortConfig, searchQuery, statusFilter, locationFilter]);
+  }, [data, sortConfig, searchQuery, statusFilter, locationFilters]);
 
   // Pagination logic
   const totalPages = Math.max(1, Math.ceil(filteredAndSortedData.length / itemsPerPage));
@@ -204,8 +207,8 @@ export default function App() {
         </div>
         
         {/* Active Filters */}
-        {(statusFilter !== '전체' || locationFilter !== '전체') && (
-          <div className="flex gap-2">
+        {(statusFilter !== '전체' || locationFilters.length > 0) && (
+          <div className="flex flex-wrap gap-2">
             {statusFilter !== '전체' && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
                 영업상태: {statusFilter}
@@ -221,12 +224,12 @@ export default function App() {
               </span>
             )}
             
-            {locationFilter !== '전체' && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
-                소재지: {locationFilter}
+            {locationFilters.map(loc => (
+              <span key={loc} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
+                소재지: {loc}
                 <button 
                   onClick={() => {
-                    setLocationFilter('전체');
+                    setLocationFilters(prev => prev.filter(l => l !== loc));
                     setCurrentPage(1);
                   }}
                   className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
@@ -234,7 +237,7 @@ export default function App() {
                   <X weight="bold" className="w-3.5 h-3.5" />
                 </button>
               </span>
-            )}
+            ))}
           </div>
         )}
       </div>
@@ -246,7 +249,10 @@ export default function App() {
             <TableHead>
               <button 
                 className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
-                onClick={() => setIsLocationFilterOpen(true)}
+                onClick={() => {
+                  setTempLocationFilters(locationFilters);
+                  setIsLocationFilterOpen(true);
+                }}
               >
                 소재지
                 <CaretDown weight="bold" className="w-4 h-4" />
@@ -442,17 +448,20 @@ export default function App() {
         title="소재지 필터"
       >
         <div className="p-2 sm:p-4">
-          <p className="text-sm text-text-muted mb-4 text-center">지도를 클릭하여 원하는 지역을 선택하세요.</p>
+          <p className="text-sm text-text-muted mb-4 text-center">지도를 클릭하여 여러 지역을 선택할 수 있습니다.</p>
           <KoreaMapSelector 
-            selectedLocation={locationFilter} 
-            onSelect={(loc) => {
-              setLocationFilter(loc);
-              setCurrentPage(1);
-              setIsLocationFilterOpen(false); // Close on select
+            selectedLocations={tempLocationFilters} 
+            onSelect={(locations) => {
+              setTempLocationFilters(locations);
             }} 
           />
           <div className="flex justify-end gap-2 mt-6">
-            <Button variant="secondary" onClick={() => setIsLocationFilterOpen(false)}>닫기</Button>
+            <Button variant="secondary" onClick={() => setIsLocationFilterOpen(false)}>취소</Button>
+            <Button variant="primary" onClick={() => {
+              setLocationFilters(tempLocationFilters);
+              setCurrentPage(1);
+              setIsLocationFilterOpen(false);
+            }}>적용</Button>
           </div>
         </div>
       </Modal>

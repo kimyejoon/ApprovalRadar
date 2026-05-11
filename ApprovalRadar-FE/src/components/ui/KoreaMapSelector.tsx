@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
 interface KoreaMapSelectorProps {
-  selectedLocation: string;
-  onSelect: (location: string) => void;
+  selectedLocations: string[];
+  onSelect: (locations: string[]) => void;
 }
 
-export function KoreaMapSelector({ selectedLocation, onSelect }: KoreaMapSelectorProps) {
+export function KoreaMapSelector({ selectedLocations, onSelect }: KoreaMapSelectorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgLoaded, setSvgLoaded] = useState(false);
 
@@ -52,7 +52,7 @@ export function KoreaMapSelector({ selectedLocation, onSelect }: KoreaMapSelecto
       });
   }, []);
 
-  // 2. Handle interactions and updates when selectedLocation or svgLoaded changes
+  // 2. Handle interactions and updates when selectedLocations or svgLoaded changes
   useEffect(() => {
     if (!svgLoaded || !containerRef.current) return;
     
@@ -61,25 +61,35 @@ export function KoreaMapSelector({ selectedLocation, onSelect }: KoreaMapSelecto
 
     const regions = svg.querySelectorAll('path[id], g[id]');
     
-    const handleMouseEnter = (e: Event) => {
-      const el = e.currentTarget as HTMLElement;
-      if (el.id !== selectedLocation) {
-        el.style.fill = '#cbd5e1'; // Tailwind slate-300
+    const isSelected = (id: string) => selectedLocations.includes(id);
+
+    const applyStyle = (el: HTMLElement, hovered: boolean) => {
+      if (isSelected(el.id)) {
+        // Supabase accent style (Green outline with faint fill)
+        el.style.fill = hovered ? 'rgba(62, 207, 142, 0.2)' : 'rgba(62, 207, 142, 0.1)';
+        el.style.stroke = '#3ecf8e'; // Brand color
+      } else {
+        // Default style
+        el.style.fill = hovered ? '#cbd5e1' : '#f1f5f9';
+        el.style.stroke = '#ffffff';
       }
     };
 
+    const handleMouseEnter = (e: Event) => {
+      applyStyle(e.currentTarget as HTMLElement, true);
+    };
+
     const handleMouseLeave = (e: Event) => {
-      const el = e.currentTarget as HTMLElement;
-      if (el.id !== selectedLocation) {
-        el.style.fill = '#f1f5f9'; // Tailwind slate-100
-      } else {
-        el.style.fill = '#2563eb'; // Brand color
-      }
+      applyStyle(e.currentTarget as HTMLElement, false);
     };
 
     const handleClick = (e: Event) => {
       const el = e.currentTarget as HTMLElement;
-      onSelect(el.id === selectedLocation ? '전체' : el.id); // Toggle off if clicked again
+      if (isSelected(el.id)) {
+        onSelect(selectedLocations.filter(loc => loc !== el.id));
+      } else {
+        onSelect([...selectedLocations, el.id]);
+      }
     };
 
     regions.forEach((region) => {
@@ -87,12 +97,7 @@ export function KoreaMapSelector({ selectedLocation, onSelect }: KoreaMapSelecto
       
       const el = region as HTMLElement;
       
-      // Set current color based on selectedLocation
-      if (el.id === selectedLocation) {
-        el.style.fill = '#2563eb'; // Brand color
-      } else {
-        el.style.fill = '#f1f5f9'; // Default color
-      }
+      applyStyle(el, false);
 
       // Attach events
       el.addEventListener('mouseenter', handleMouseEnter);
@@ -110,7 +115,7 @@ export function KoreaMapSelector({ selectedLocation, onSelect }: KoreaMapSelecto
         el.removeEventListener('click', handleClick);
       });
     };
-  }, [selectedLocation, svgLoaded, onSelect]);
+  }, [selectedLocations, svgLoaded, onSelect]);
 
   return (
     <div className="w-full relative flex justify-center items-center p-4">
