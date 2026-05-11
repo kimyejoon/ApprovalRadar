@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { X } from '@phosphor-icons/react';
-import { Button } from './Button';
+import { Button } from './button';
 
 interface ModalProps {
   isOpen: boolean;

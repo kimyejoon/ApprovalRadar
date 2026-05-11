@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Broadcast, Sun, Moon } from '@phosphor-icons/react';
-import { Button } from '../ui/Button';
+import { Button } from '../ui/button';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;

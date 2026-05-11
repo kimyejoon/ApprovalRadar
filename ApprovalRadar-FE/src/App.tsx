@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { DownloadSimple, CaretLeft, CaretRight, CaretUp, CaretDown, ArrowsDownUp, MagnifyingGlass, X, ArrowCounterClockwise } from '@phosphor-icons/react';
 import { DashboardLayout } from './components/layout/DashboardLayout';
-import { Button } from './components/ui/Button';
+import { Button } from './components/ui/button';
 import { Modal } from './components/ui/Modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCodeCell } from './components/ui/Table';
 import { KoreaMapSelector } from './components/ui/KoreaMapSelector';
