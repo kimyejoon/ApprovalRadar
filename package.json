@@ -1,0 +1,14 @@
+{
+  "name": "approvalradar-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ApprovalRadar Monorepo (FE/BE)",
+  "workspaces": [
+    "ApprovalRadar-FE",
+    "ApprovalRadar-BE"
+  ],
+  "scripts": {
+    "start:fe": "npm run start --workspace=ApprovalRadar-FE",
+    "start:be": "npm run start --workspace=ApprovalRadar-BE"
+  }
+}
