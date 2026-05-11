@@ -5,6 +5,9 @@ import { Button } from './components/ui/Button';
 import { Modal } from './components/ui/Modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCodeCell } from './components/ui/Table';
 import { KoreaMapSelector } from './components/ui/KoreaMapSelector';
+import { DatePickerWithPresets } from './components/ui/DatePickerWithPresets';
+import { DashboardIndicators } from './components/ui/DashboardIndicators';
+import { startOfToday, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
 
 const ALL_REGIONS = [
   '서울특별시', '부산광역시', '대구광역시', '인천광역시', '광주광역시',
@@ -114,6 +117,10 @@ export default function App() {
   const [tempLocationFilters, setTempLocationFilters] = useState<string[]>([]);
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [isLocationFilterOpen, setIsLocationFilterOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>({
+    from: startOfToday(),
+    to: startOfToday()
+  });
 
   const handleSort = (key: SortKey) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -139,6 +146,15 @@ export default function App() {
       result = result.filter(item => item.status.includes(statusFilter));
     }
 
+    if (dateRange && dateRange.from) {
+      const from = startOfDay(dateRange.from);
+      const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+      result = result.filter(item => {
+        const itemDate = parseISO(item.approvalDate);
+        return isWithinInterval(itemDate, { start: from, end: to });
+      });
+    }
+
     if (locationFilters.length > 0) {
       result = result.filter(item => 
         locationFilters.some(loc => item.location.includes(loc))
@@ -154,7 +170,7 @@ export default function App() {
       });
     }
     return result;
-  }, [data, sortConfig, searchQuery, statusFilter, locationFilters]);
+  }, [data, sortConfig, searchQuery, statusFilter, locationFilters, dateRange]);
 
   // Pagination logic
   const totalPages = Math.max(1, Math.ceil(filteredAndSortedData.length / itemsPerPage));
@@ -198,8 +214,11 @@ export default function App() {
         </div>
       </div>
 
-      {/* Search Bar & Active Filters */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
+      {/* Dashboard Top Indicators */}
+      <DashboardIndicators data={data} />
+
+      {/* Search Bar & Date Picker */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center bg-surface border border-border-standard rounded-lg px-3 py-2 w-full max-w-md focus-within:ring-1 focus-within:ring-brand focus-within:border-brand transition-all shadow-sm">
           <MagnifyingGlass className="w-5 h-5 text-text-muted mr-2" />
           <input 
@@ -214,41 +233,44 @@ export default function App() {
           />
         </div>
         
-        {/* Active Filters */}
-        {(statusFilter !== '전체' || locationFilters.length > 0) && (
-          <div className="flex flex-wrap gap-2">
-            {statusFilter !== '전체' && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
-                영업상태: {statusFilter}
-                <button 
-                  onClick={() => {
-                    setStatusFilter('전체');
-                    setCurrentPage(1);
-                  }}
-                  className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
-                >
-                  <X weight="bold" className="w-3.5 h-3.5" />
-                </button>
-              </span>
-            )}
-            
-            {locationFilters.map(loc => (
-              <span key={loc} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
-                소재지: {loc}
-                <button 
-                  onClick={() => {
-                    setLocationFilters(prev => prev.filter(l => l !== loc));
-                    setCurrentPage(1);
-                  }}
-                  className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
-                >
-                  <X weight="bold" className="w-3.5 h-3.5" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Date Filter */}
+        <DatePickerWithPresets date={dateRange} setDate={(newDate) => { setDateRange(newDate); setCurrentPage(1); }} />
       </div>
+
+      {/* Active Filters Row */}
+      {(statusFilter !== '전체' || locationFilters.length > 0) && (
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          {statusFilter !== '전체' && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
+              영업상태: {statusFilter}
+              <button 
+                onClick={() => {
+                  setStatusFilter('전체');
+                  setCurrentPage(1);
+                }}
+                className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
+              >
+                <X weight="bold" className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          )}
+          
+          {locationFilters.map(loc => (
+            <span key={loc} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
+              소재지: {loc}
+              <button 
+                onClick={() => {
+                  setLocationFilters(prev => prev.filter(l => l !== loc));
+                  setCurrentPage(1);
+                }}
+                className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
+              >
+                <X weight="bold" className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       <Table>
         <TableHeader>
@@ -406,7 +428,7 @@ export default function App() {
             
             <div className="pt-6 border-t border-border-standard flex justify-end gap-3">
               <Button variant="ghost" onClick={() => setSelectedItem(null)}>닫기</Button>
-              <Button variant="primary">추가 작업</Button>
+              <Button variant="default">추가 작업</Button>
             </div>
           </div>
         )}
@@ -500,7 +522,7 @@ export default function App() {
           />
           <div className="flex justify-end gap-2 mt-6 w-full max-w-[500px]">
             <Button variant="secondary" onClick={() => setIsLocationFilterOpen(false)}>취소</Button>
-            <Button variant="primary" onClick={() => {
+            <Button variant="default" onClick={() => {
               setLocationFilters(tempLocationFilters);
               setCurrentPage(1);
               setIsLocationFilterOpen(false);
