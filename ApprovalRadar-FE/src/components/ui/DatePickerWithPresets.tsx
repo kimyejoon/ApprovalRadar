@@ -76,7 +76,6 @@ export function DatePickerWithPresets({ date, setDate }: DatePickerWithPresetsPr
         </div>
         <div className="p-3">
           <Calendar
-            initialFocus
             mode="range"
             defaultMonth={date?.from}
             selected={{ from: date?.from, to: date?.to }}
