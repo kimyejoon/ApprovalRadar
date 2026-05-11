@@ -459,5 +459,3 @@ export default function App() {
     </DashboardLayout>
   );
 }
-
-export default App;
