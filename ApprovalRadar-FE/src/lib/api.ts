@@ -6,12 +6,25 @@ export interface ApprovalData {
   business_status: string;
   license_date: string;
   phone_number: string;
-  representative_history: any[];
-  licensing_history: any[];
+  representative_history: unknown[];
+  licensing_history: unknown[];
   last_event_date: string;
   created_at: string;
   updated_at: string;
   is_new: number;
+}
+
+export interface ApprovalMappedItem {
+  id: string;
+  name: string;
+  type: string;
+  location: string;
+  owner: string;
+  status: string;
+  approvalDate: string;
+  phone: string;
+  isTransfer: boolean;
+  raw: ApprovalData;
 }
 
 export interface ApprovalsResponse {

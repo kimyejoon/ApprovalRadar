@@ -1,43 +1,17 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfToday } from 'date-fns';
-import { DownloadSimple, CaretLeft, CaretRight, CaretUp, CaretDown, ArrowsDownUp, MagnifyingGlass, X, ArrowCounterClockwise } from '@phosphor-icons/react';
+import { DownloadSimple, CaretLeft, CaretRight, CaretUp, CaretDown, ArrowsDownUp, MagnifyingGlass, X } from '@phosphor-icons/react';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Button } from './components/ui/button';
-import { Modal } from './components/ui/Modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCodeCell } from './components/ui/Table';
-import { KoreaMapSelector } from './components/ui/KoreaMapSelector';
 import { DatePickerWithPresets } from './components/ui/DatePickerWithPresets';
 import { DashboardIndicators } from './components/ui/DashboardIndicators';
-import { fetchApprovals, type ApprovalData } from './lib/api';
-
-const ALL_REGIONS = [
-  '서울특별시', '부산광역시', '대구광역시', '인천광역시', '광주광역시',
-  '대전광역시', '울산광역시', '세종특별자치시', '경기도', '강원도',
-  '충청북도', '충청남도', '전라북도', '전라남도', '경상북도', '경상남도', '제주특별자치도'
-];
-const METRO_REGIONS = ['서울특별시', '인천광역시', '경기도', '강원도'];
-const NON_METRO_REGIONS = ALL_REGIONS.filter(r => !METRO_REGIONS.includes(r));
-
-function formatApprovalDate(dateStr: string) {
-  if (!dateStr) return '-';
-  
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr;
-
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  const h = String(date.getHours()).padStart(2, '0');
-  const min = String(date.getMinutes()).padStart(2, '0');
-
-  const hasTime = dateStr.includes('T') || /\s\d{2}:/.test(dateStr);
-  
-  if (hasTime) {
-    return `${y}년 ${m}월 ${d}일 ${h}시 ${min}분`;
-  }
-  return `${y}년 ${m}월 ${d}일`;
-}
+import { fetchApprovals, type ApprovalData, type ApprovalMappedItem } from './lib/api';
+import { formatApprovalDate } from './lib/utils';
+import { ApprovalDetailModal } from './components/features/ApprovalDetailModal';
+import { StatusFilterModal } from './components/features/StatusFilterModal';
+import { LocationFilterModal } from './components/features/LocationFilterModal';
 
 type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id';
 
@@ -70,7 +44,7 @@ function SortableHead({ label, sortKey, sortConfig, onSort }: SortableHeadProps)
 }
 
 export default function App() {
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<ApprovalMappedItem | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
@@ -324,160 +298,31 @@ export default function App() {
         </div>
       </div>
 
-      <Modal 
+      <ApprovalDetailModal 
         isOpen={!!selectedItem} 
-        onClose={() => setSelectedItem(null)}
-        title="인허가 변동 상세 내역"
-      >
-        {selectedItem && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <div className="text-text-muted mb-1">업소명</div>
-                <div className="font-medium text-text-primary">{selectedItem.name}</div>
-              </div>
-              <div>
-                <div className="text-text-muted mb-1">인허가번호</div>
-                <div className="font-mono text-text-primary">{selectedItem.id}</div>
-              </div>
-              <div className="col-span-2">
-                <div className="text-text-muted mb-1">소재지</div>
-                <div className="text-text-primary">{selectedItem.location}</div>
-              </div>
-              <div>
-                <div className="text-text-muted mb-1">대표자명</div>
-                <div className="text-text-primary">{selectedItem.owner}</div>
-              </div>
-              <div>
-                <div className="text-text-muted mb-1">전화번호</div>
-                <div className="font-mono text-text-primary">{selectedItem.phone}</div>
-              </div>
-              <div>
-                <div className="text-text-muted mb-1">영업상태</div>
-                <div className="text-text-primary">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    selectedItem.status.includes('정상') 
-                      ? 'bg-brand/10 text-brand' 
-                      : 'bg-border-prominent text-text-muted'
-                  }`}>
-                    {selectedItem.status}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <div className="text-text-muted mb-1">업종</div>
-                <div className="text-text-primary">{selectedItem.type}</div>
-              </div>
-              <div className="col-span-2">
-                <div className="text-text-muted mb-1">인허가시각</div>
-                <div className="text-text-primary">{formatApprovalDate(selectedItem.approvalDate)}</div>
-              </div>
-            </div>
-            
-            <div className="pt-6 border-t border-border-standard flex justify-end gap-3">
-              <Button variant="ghost" onClick={() => setSelectedItem(null)}>닫기</Button>
-              <Button variant="default">추가 작업</Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+        onClose={() => setSelectedItem(null)} 
+        selectedItem={selectedItem} 
+      />
 
-      <Modal 
+      <StatusFilterModal 
         isOpen={isStatusFilterOpen} 
-        onClose={() => setIsStatusFilterOpen(false)}
-        title="영업상태 필터"
-      >
-        <div className="space-y-4">
-          <div className="flex flex-col gap-2">
-            {['전체', '영업/정상', '폐업'].map(status => (
-              <label 
-                key={status} 
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-colors ${
-                  statusFilter === status 
-                    ? 'border-brand bg-brand/5' 
-                    : 'border-border-standard hover:bg-border-subtle/50'
-                }`}
-              >
-                <input 
-                  type="radio" 
-                  name="status_modal" 
-                  value={status}
-                  checked={statusFilter === status}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="accent-brand w-4 h-4"
-                />
-                <span className="text-sm font-medium text-text-primary">{status}</span>
-              </label>
-            ))}
-          </div>
-          <div className="flex justify-end mt-2">
-            <Button variant="secondary" onClick={() => setIsStatusFilterOpen(false)}>닫기</Button>
-          </div>
-        </div>
-      </Modal>
+        onClose={() => setIsStatusFilterOpen(false)} 
+        statusFilter={statusFilter} 
+        setStatusFilter={setStatusFilter} 
+        onFilterChange={() => setCurrentPage(1)} 
+      />
 
-      {/* Location Filter Modal */}
-      <Modal
-        isOpen={isLocationFilterOpen}
-        onClose={() => setIsLocationFilterOpen(false)}
-        title="소재지 필터"
-      >
-        <div className="p-2 sm:p-4 flex flex-col items-center">
-          <p className="text-sm text-text-muted mb-4 text-center">지도를 클릭하여 여러 지역을 선택할 수 있습니다.</p>
-          
-          {/* Quick Select Buttons */}
-          <div className="flex flex-wrap justify-center gap-2 mb-4 w-full max-w-[500px]">
-            <Button variant="secondary" onClick={() => setTempLocationFilters(METRO_REGIONS)} className="text-xs py-1 px-3">
-              빠른선택: 수도권
-            </Button>
-            <Button variant="secondary" onClick={() => setTempLocationFilters(NON_METRO_REGIONS)} className="text-xs py-1 px-3">
-              수도권 외
-            </Button>
-            <Button variant="secondary" onClick={() => setTempLocationFilters(ALL_REGIONS)} className="text-xs py-1 px-3">
-              전국 선택
-            </Button>
-            <Button variant="secondary" onClick={() => setTempLocationFilters([])} className="text-xs py-1 px-3 flex items-center gap-1 text-text-muted hover:text-text-primary transition-colors">
-              <ArrowCounterClockwise weight="bold" className="w-3.5 h-3.5" />
-              초기화
-            </Button>
-          </div>
-          
-          {/* Selected Location Tags in Modal */}
-          {tempLocationFilters.length > 0 && (
-            <div className="flex flex-wrap justify-center gap-2 mb-4 w-full max-w-[500px]">
-              {tempLocationFilters.map(loc => (
-                <span key={loc} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm transition-all">
-                  {loc}
-                  <button 
-                    onClick={() => setTempLocationFilters(prev => prev.filter(l => l !== loc))}
-                    className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
-                  >
-                    <X weight="bold" className="w-3.5 h-3.5" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          <KoreaMapSelector 
-            selectedLocations={tempLocationFilters} 
-            onSelect={(locations) => {
-              setTempLocationFilters(locations);
-            }} 
-          />
-          <div className="flex justify-end gap-2 mt-6 w-full max-w-[500px]">
-            <Button variant="secondary" onClick={() => setIsLocationFilterOpen(false)}>취소</Button>
-            <Button variant="default" onClick={() => {
-              setLocationFilters(tempLocationFilters);
-              setCurrentPage(1);
-              setIsLocationFilterOpen(false);
-            }}>적용</Button>
-          </div>
-        </div>
-      </Modal>
+      <LocationFilterModal 
+        isOpen={isLocationFilterOpen} 
+        onClose={() => setIsLocationFilterOpen(false)} 
+        tempLocationFilters={tempLocationFilters} 
+        setTempLocationFilters={setTempLocationFilters} 
+        onApply={() => {
+          setLocationFilters(tempLocationFilters);
+          setCurrentPage(1);
+          setIsLocationFilterOpen(false);
+        }} 
+      />
     </DashboardLayout>
   );
 }
