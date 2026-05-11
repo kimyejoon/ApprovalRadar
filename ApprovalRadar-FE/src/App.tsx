@@ -4,6 +4,7 @@ import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Button } from './components/ui/Button';
 import { Modal } from './components/ui/Modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCodeCell } from './components/ui/Table';
+import { KoreaMapSelector } from './components/ui/KoreaMapSelector';
 
 function formatApprovalDate(dateStr: string) {
   if (!dateStr) return '-';
@@ -101,7 +102,9 @@ export default function App() {
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('전체');
+  const [locationFilter, setLocationFilter] = useState('전체');
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
+  const [isLocationFilterOpen, setIsLocationFilterOpen] = useState(false);
 
   const handleSort = (key: SortKey) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -127,6 +130,10 @@ export default function App() {
       result = result.filter(item => item.status.includes(statusFilter));
     }
 
+    if (locationFilter !== '전체') {
+      result = result.filter(item => item.location.includes(locationFilter));
+    }
+
     if (sortConfig !== null) {
       result.sort((a, b) => {
         const { key, direction } = sortConfig;
@@ -136,7 +143,7 @@ export default function App() {
       });
     }
     return result;
-  }, [data, sortConfig, searchQuery, statusFilter]);
+  }, [data, sortConfig, searchQuery, statusFilter, locationFilter]);
 
   // Pagination logic
   const totalPages = Math.max(1, Math.ceil(filteredAndSortedData.length / itemsPerPage));
@@ -197,20 +204,37 @@ export default function App() {
         </div>
         
         {/* Active Filters */}
-        {statusFilter !== '전체' && (
+        {(statusFilter !== '전체' || locationFilter !== '전체') && (
           <div className="flex gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
-              영업상태: {statusFilter}
-              <button 
-                onClick={() => {
-                  setStatusFilter('전체');
-                  setCurrentPage(1);
-                }}
-                className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
-              >
-                <X weight="bold" className="w-3.5 h-3.5" />
-              </button>
-            </span>
+            {statusFilter !== '전체' && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
+                영업상태: {statusFilter}
+                <button 
+                  onClick={() => {
+                    setStatusFilter('전체');
+                    setCurrentPage(1);
+                  }}
+                  className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
+                >
+                  <X weight="bold" className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            
+            {locationFilter !== '전체' && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
+                소재지: {locationFilter}
+                <button 
+                  onClick={() => {
+                    setLocationFilter('전체');
+                    setCurrentPage(1);
+                  }}
+                  className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
+                >
+                  <X weight="bold" className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -219,7 +243,15 @@ export default function App() {
         <TableHeader>
           <TableRow>
             <SortableHead label="업소명" sortKey="name" sortConfig={sortConfig} onSort={handleSort} />
-            <TableHead>소재지</TableHead>
+            <TableHead>
+              <button 
+                className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
+                onClick={() => setIsLocationFilterOpen(true)}
+              >
+                소재지
+                <CaretDown weight="bold" className="w-4 h-4" />
+              </button>
+            </TableHead>
             <SortableHead label="인허가번호" sortKey="id" sortConfig={sortConfig} onSort={handleSort} />
             <SortableHead label="대표자명" sortKey="owner" sortConfig={sortConfig} onSort={handleSort} />
             <TableHead>
@@ -397,11 +429,35 @@ export default function App() {
               </label>
             ))}
           </div>
-          <div className="pt-2 flex justify-end">
-            <Button variant="primary" onClick={() => setIsStatusFilterOpen(false)}>적용 및 닫기</Button>
+          <div className="flex justify-end mt-2">
+            <Button variant="secondary" onClick={() => setIsStatusFilterOpen(false)}>닫기</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Location Filter Modal */}
+      <Modal
+        isOpen={isLocationFilterOpen}
+        onClose={() => setIsLocationFilterOpen(false)}
+        title="소재지 필터"
+      >
+        <div className="p-2 sm:p-4">
+          <p className="text-sm text-text-muted mb-4 text-center">지도를 클릭하여 원하는 지역을 선택하세요.</p>
+          <KoreaMapSelector 
+            selectedLocation={locationFilter} 
+            onSelect={(loc) => {
+              setLocationFilter(loc);
+              setCurrentPage(1);
+              setIsLocationFilterOpen(false); // Close on select
+            }} 
+          />
+          <div className="flex justify-end gap-2 mt-6">
+            <Button variant="secondary" onClick={() => setIsLocationFilterOpen(false)}>닫기</Button>
           </div>
         </div>
       </Modal>
     </DashboardLayout>
   );
 }
+
+export default App;
