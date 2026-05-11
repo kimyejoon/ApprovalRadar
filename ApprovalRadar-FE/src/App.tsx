@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { DownloadSimple, CaretLeft, CaretRight, CaretUp, CaretDown, ArrowsDownUp, MagnifyingGlass } from '@phosphor-icons/react';
+import { DownloadSimple, CaretLeft, CaretRight, CaretUp, CaretDown, ArrowsDownUp, MagnifyingGlass, X } from '@phosphor-icons/react';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Button } from './components/ui/Button';
 import { Modal } from './components/ui/Modal';
@@ -180,19 +180,39 @@ export default function App() {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-6 flex items-center bg-surface border border-border-standard rounded-lg px-3 py-2 w-full max-w-md focus-within:ring-1 focus-within:ring-brand focus-within:border-brand transition-all shadow-sm">
-        <MagnifyingGlass className="w-5 h-5 text-text-muted mr-2" />
-        <input 
-          type="text" 
-          placeholder="업소명, 대표자명, 인허가번호 검색..." 
-          className="bg-transparent border-none outline-none text-text-primary text-sm w-full placeholder:text-text-muted"
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setCurrentPage(1);
-          }}
-        />
+      {/* Search Bar & Active Filters */}
+      <div className="mb-6 flex flex-col gap-3">
+        <div className="flex items-center bg-surface border border-border-standard rounded-lg px-3 py-2 w-full max-w-md focus-within:ring-1 focus-within:ring-brand focus-within:border-brand transition-all shadow-sm">
+          <MagnifyingGlass className="w-5 h-5 text-text-muted mr-2" />
+          <input 
+            type="text" 
+            placeholder="업소명, 대표자명, 인허가번호 검색..." 
+            className="bg-transparent border-none outline-none text-text-primary text-sm w-full placeholder:text-text-muted"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+          />
+        </div>
+        
+        {/* Active Filters */}
+        {statusFilter !== '전체' && (
+          <div className="flex gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
+              영업상태: {statusFilter}
+              <button 
+                onClick={() => {
+                  setStatusFilter('전체');
+                  setCurrentPage(1);
+                }}
+                className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
+              >
+                <X weight="bold" className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          </div>
+        )}
       </div>
 
       <Table>
@@ -202,36 +222,14 @@ export default function App() {
             <TableHead>소재지</TableHead>
             <SortableHead label="인허가번호" sortKey="id" sortConfig={sortConfig} onSort={handleSort} />
             <SortableHead label="대표자명" sortKey="owner" sortConfig={sortConfig} onSort={handleSort} />
-            <TableHead className="relative">
+            <TableHead>
               <button 
                 className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
-                onClick={() => setIsStatusFilterOpen(!isStatusFilterOpen)}
+                onClick={() => setIsStatusFilterOpen(true)}
               >
                 영업상태
-                <CaretDown weight="bold" className={`w-4 h-4 transition-transform ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
+                <CaretDown weight="bold" className="w-4 h-4" />
               </button>
-              
-              {isStatusFilterOpen && (
-                <div className="absolute top-full left-0 mt-1 w-32 bg-surface border border-border-standard rounded-md shadow-lg p-1.5 z-10 flex flex-col gap-0.5">
-                  {['전체', '영업/정상', '폐업'].map(status => (
-                    <label key={status} className="flex items-center gap-2 px-2 py-1.5 hover:bg-border-subtle rounded cursor-pointer text-sm font-normal text-text-primary">
-                      <input 
-                        type="radio" 
-                        name="status" 
-                        value={status}
-                        checked={statusFilter === status}
-                        onChange={(e) => {
-                          setStatusFilter(e.target.value);
-                          setIsStatusFilterOpen(false);
-                          setCurrentPage(1);
-                        }}
-                        className="accent-brand"
-                      />
-                      {status}
-                    </label>
-                  ))}
-                </div>
-              )}
             </TableHead>
             <SortableHead label="인허가시각" sortKey="approvalDate" sortConfig={sortConfig} onSort={handleSort} />
             <SortableHead label="전화번호" sortKey="phone" sortConfig={sortConfig} onSort={handleSort} />
@@ -366,6 +364,43 @@ export default function App() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal 
+        isOpen={isStatusFilterOpen} 
+        onClose={() => setIsStatusFilterOpen(false)}
+        title="영업상태 필터"
+      >
+        <div className="space-y-4">
+          <div className="flex flex-col gap-2">
+            {['전체', '영업/정상', '폐업'].map(status => (
+              <label 
+                key={status} 
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-colors ${
+                  statusFilter === status 
+                    ? 'border-brand bg-brand/5' 
+                    : 'border-border-standard hover:bg-border-subtle/50'
+                }`}
+              >
+                <input 
+                  type="radio" 
+                  name="status_modal" 
+                  value={status}
+                  checked={statusFilter === status}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="accent-brand w-4 h-4"
+                />
+                <span className="text-sm font-medium text-text-primary">{status}</span>
+              </label>
+            ))}
+          </div>
+          <div className="pt-2 flex justify-end">
+            <Button variant="primary" onClick={() => setIsStatusFilterOpen(false)}>적용 및 닫기</Button>
+          </div>
+        </div>
       </Modal>
     </DashboardLayout>
   );
