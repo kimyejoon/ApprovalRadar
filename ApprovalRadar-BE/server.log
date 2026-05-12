@@ -1,0 +1,17 @@
+INFO:     Started server process [36933]
+INFO:     Waiting for application startup.
+2026-05-12 18:13:39,922 [INFO] ApprovalRadar - Initializing Database...
+2026-05-12 18:13:39,923 [INFO] ApprovalRadar - Configuring APScheduler jobs...
+2026-05-12 18:13:39,925 [INFO] ApprovalRadar - Adding initial catch-up scraper job to background...
+2026-05-12 18:13:39,926 [INFO] ApprovalRadar - APScheduler started successfully.
+2026-05-12 18:13:39,926 [INFO] ApprovalRadar - Starting DiffCrawler Delta Sync Job...
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-12 18:13:40,938 [INFO] ApprovalRadar - ✨ [소요시간: 1.01초] 새로운 데이터가 감지되지 않았습니다. (현재 전체 데이터: 22415건)
+INFO:     127.0.0.1:52379 - "GET /api/v1/approvals/indicators HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52414 - "GET /api/v1/approvals/indicators HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-12 18:15:29,591 [INFO] ApprovalRadar - Shutting down APScheduler...
+INFO:     Application shutdown complete.
+INFO:     Finished server process [36933]

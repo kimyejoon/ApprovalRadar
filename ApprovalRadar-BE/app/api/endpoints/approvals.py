@@ -31,8 +31,8 @@ def get_approvals(
     page: int = Query(1, ge=1, description="페이지 번호"),
     size: int = Query(10, ge=1, le=100, description="페이지 당 항목 수"),
     search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
-    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)"),
+    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYYMMDD)"),
+    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYYMMDD)"),
     regions: Optional[List[str]] = Depends(parse_comma_separated_list),
     sort_by: str = Query("created_at", description="정렬 기준 컬럼"),
     sort_order: str = Query("desc", description="정렬 방향 (asc | desc)"),
@@ -57,24 +57,33 @@ def get_approvals(
 @router.get("/indicators", response_model=IndicatorsResponse)
 def get_approval_indicators(
     search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
-    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)"),
+    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYYMMDD)"),
+    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYYMMDD)"),
     regions: Optional[List[str]] = Depends(parse_comma_separated_list),
     repo: BusinessRepository = Depends(get_business_repo)
 ):
     try:
+        from datetime import datetime, timedelta
+        
+        # 파라미터가 비어있는 경우(프론트에서 안넘겨준 경우) 자동으로 최근 30일 설정
+        if not start_date and not end_date:
+            today = datetime.now()
+            start_date = (today - timedelta(days=29)).strftime('%Y%m%d')
+            end_date = today.strftime('%Y%m%d')
+
         cache_key = str((search, start_date, end_date, tuple(regions) if regions else None))
         cached = INDICATORS_CACHE.get(cache_key)
         
         if cached and time.time() - cached['time'] < CACHE_TTL:
             return cached['data']
             
-        total_approvals, status_distribution, trend_chart = repo.get_indicators(search, start_date, end_date, regions)
+        total_approvals, today_approvals, status_distribution, trend_chart = repo.get_indicators(search, start_date, end_date, regions)
             
         response_data = {
             "status": "success",
             "data": {
                 "total_approvals": total_approvals,
+                "today_approvals": today_approvals,
                 "status_distribution": status_distribution,
                 "trend_chart": trend_chart
             }
@@ -88,8 +97,10 @@ def get_approval_indicators(
 
 @router.get("/export")
 def export_approvals_excel(
-    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)")
+    search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
+    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYYMMDD)"),
+    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYYMMDD)"),
+    regions: Optional[List[str]] = Depends(parse_comma_separated_list)
 ):
     try:
         # Default to today if both are empty
@@ -102,7 +113,7 @@ def export_approvals_excel(
             end_date_db = end_date.replace('-', '') if end_date else None
 
         # Generate the excel file in a buffer
-        excel_buffer = generate_excel_export(start_date_db, end_date_db)
+        excel_buffer = generate_excel_export(start_date_db, end_date_db, search, regions)
         
         # Build filename
         date_str = ""
