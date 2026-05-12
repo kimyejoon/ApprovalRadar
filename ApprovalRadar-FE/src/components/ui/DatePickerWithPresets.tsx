@@ -13,8 +13,8 @@ import {
 } from "./popover"
 
 interface DatePickerWithPresetsProps {
-  date: { from: Date; to: Date } | undefined;
-  setDate: (date: { from: Date; to: Date } | undefined) => void;
+  date: { from?: Date; to?: Date } | undefined;
+  setDate: (date: { from?: Date; to?: Date } | undefined) => void;
 }
 
 export function DatePickerWithPresets({ date, setDate }: DatePickerWithPresetsProps) {
@@ -73,11 +73,7 @@ export function DatePickerWithPresets({ date, setDate }: DatePickerWithPresetsPr
             defaultMonth={date?.from}
             selected={{ from: date?.from, to: date?.to }}
             onSelect={(range) => {
-              if (range) {
-                setDate({ from: range.from as Date, to: range.to || (range.from as Date) });
-              } else {
-                setDate(undefined);
-              }
+              setDate(range);
             }}
             numberOfMonths={1}
             locale={ko}

@@ -13,7 +13,7 @@ export function useApprovalRadar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('전체');
   const [locationFilters, setLocationFilters] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>({
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>({
     from: startOfToday(),
     to: startOfToday()
   });
@@ -24,8 +24,8 @@ export function useApprovalRadar() {
       page: currentPage,
       size: itemsPerPage,
       search: searchQuery.trim() || undefined,
-      start_date: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined,
-      end_date: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
+      start_date: dateRange?.from ? format(dateRange.from, 'yyyyMMdd') : undefined,
+      end_date: dateRange?.to ? format(dateRange.to, 'yyyyMMdd') : undefined,
       regions: locationFilters.length > 0 ? locationFilters.join(',') : undefined,
       statuses: statusFilter !== '전체' ? statusFilter : undefined,
       sort_by: sortConfig ? (
@@ -84,7 +84,7 @@ export function useApprovalRadar() {
     setLocationFilters(locations);
     setCurrentPage(1);
   };
-  const handleDateRangeChange = (range: { from: Date; to: Date } | undefined) => {
+  const handleDateRangeChange = (range: { from?: Date; to?: Date } | undefined) => {
     setDateRange(range);
     setCurrentPage(1);
   };

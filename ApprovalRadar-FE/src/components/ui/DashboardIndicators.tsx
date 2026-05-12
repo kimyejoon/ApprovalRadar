@@ -15,7 +15,7 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
   const pieData = useMemo(() => {
     const newCount = data.filter(d => d.status.includes('정상') || d.status.includes('영업')).length || 1;
     const closedCount = data.filter(d => d.status.includes('폐업') || d.status.includes('취소')).length || 0;
-    
+
     return [
       { name: '신규/영업', value: newCount, color: '#3ecf8e' },
       { name: '폐업/취소', value: closedCount, color: '#f87171' }
@@ -69,13 +69,13 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip 
+              <Tooltip
                 formatter={(value: number) => [`${value}건`, '']}
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
               />
             </PieChart>
           </ResponsiveContainer>
-          <div className="flex flex-col justify-center ml-2 space-y-1 text-xs">
+          <div className="flex flex-col w-32 justify-center space-y-1 text-xs">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-brand"></span>
               <span className="text-text-secondary">신규/영업</span>
@@ -97,19 +97,19 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={barData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="date" 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fontSize: 10, fill: '#64748b' }} 
+              <XAxis
+                dataKey="date"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fill: '#64748b' }}
                 dy={5}
               />
-              <YAxis 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fontSize: 10, fill: '#64748b' }} 
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fill: '#64748b' }}
               />
-              <Tooltip 
+              <Tooltip
                 cursor={{ fill: '#f8fafc' }}
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
               />

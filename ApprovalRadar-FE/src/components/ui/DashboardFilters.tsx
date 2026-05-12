@@ -4,8 +4,8 @@ import { DatePickerWithPresets } from '@/components/ui/DatePickerWithPresets';
 interface DashboardFiltersProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  dateRange: { from: Date; to: Date } | undefined;
-  onDateRangeChange: (range: { from: Date; to: Date } | undefined) => void;
+  dateRange: { from?: Date; to?: Date } | undefined;
+  onDateRangeChange: (range: { from?: Date; to?: Date } | undefined) => void;
   statusFilter: string;
   onStatusReset: () => void;
   locationFilters: string[];
