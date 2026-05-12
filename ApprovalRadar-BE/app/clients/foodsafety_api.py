@@ -67,8 +67,10 @@ class ApiClient:
                     if code == "INFO-000" or code == "INFO-200":
                         return res
                     elif code in ["INFO-300", "INFO-333"] or "유효 호출건수" in msg:
-                        # 한도 초과: 키 회전 후 즉시 재시도 (백오프 적용 X)
+                        # 한도 초과: 키 회전 후 즉시 재시도 시 WAF에 걸릴 수 있으므로 짧은 대기 추가
                         self.rotate_key(api_key)
+                        logger.warning(f"키 회전 후 {settings.GAP_SECONDS}초 대기...")
+                        time.sleep(settings.GAP_SECONDS)
                         continue
                     elif code in ["ERROR-500", "ERROR-601"]:
                         # 서버 일시적 오류: 지수 백오프 적용
