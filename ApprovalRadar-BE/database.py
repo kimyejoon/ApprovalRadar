@@ -7,6 +7,11 @@ DB_FILE = "food_safety.db"
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+    
+    # SQLite 성능 최적화 (FastAPI 비동기 환경 동시성 향상)
+    cursor.execute('PRAGMA journal_mode=WAL;')
+    cursor.execute('PRAGMA synchronous=NORMAL;')
+    
     # Create businesses table with JSON columns for history
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS businesses (
@@ -25,6 +30,26 @@ def init_db():
             is_new INTEGER DEFAULT 1 -- 1 for True, 0 for False
         )
     ''')
+    
+    # 크롤러 상태 관리 테이블 (단일 행 보장)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS crawler_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            last_total_count INTEGER DEFAULT 0,
+            pivots TEXT DEFAULT '{}',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # 원시 API 데이터(JSON) 보관 테이블
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS api_raw_data (
+            license_no TEXT PRIMARY KEY,
+            raw_json TEXT,
+            fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
