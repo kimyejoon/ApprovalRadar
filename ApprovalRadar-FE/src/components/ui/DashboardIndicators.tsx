@@ -9,19 +9,16 @@ import { useIndicatorStore } from '@/store/useIndicatorStore';
 
 interface DashboardIndicatorsProps {
   searchQuery: string;
-  dateRange: { from?: Date; to?: Date } | undefined;
   locationFilters: string[];
 }
 
-export function DashboardIndicators({ searchQuery, dateRange, locationFilters }: DashboardIndicatorsProps) {
+export function DashboardIndicators({ searchQuery, locationFilters }: DashboardIndicatorsProps) {
   const setTodayNewCount = useIndicatorStore(state => state.setTodayNewCount);
 
   const { data: indicatorResponse } = useQuery({
-    queryKey: ['indicators', searchQuery, dateRange, locationFilters],
+    queryKey: ['indicators', searchQuery, locationFilters],
     queryFn: () => fetchIndicators({
       search: searchQuery.trim() || undefined,
-      start_date: dateRange?.from ? format(dateRange.from, 'yyyyMMdd') : undefined,
-      end_date: dateRange?.to ? format(dateRange.to, 'yyyyMMdd') : undefined,
       regions: locationFilters.length > 0 ? locationFilters.join(',') : undefined,
     }),
     refetchInterval: 1000 * 60 * 5, // 5 min polling
@@ -62,7 +59,7 @@ export function DashboardIndicators({ searchQuery, dateRange, locationFilters }:
           <CardTitle className="text-sm font-medium text-text-muted">금일 인허가 변동 건수</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-4xl font-bold text-text-primary">{todayChangesCount}건</div>
+          <div className="text-4xl font-bold text-text-primary">{todayChangesCount.toLocaleString()}건</div>
         </CardContent>
       </Card>
 

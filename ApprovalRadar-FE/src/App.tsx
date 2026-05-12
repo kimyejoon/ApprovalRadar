@@ -26,7 +26,7 @@ export default function App() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-sans font-medium text-text-primary tracking-tight">금일 변동 내역</h2>
-          <p className="text-text-muted mt-1 text-sm">오늘 발생한 새로운 변동: <span className="text-brand font-medium">{todayNewCount}</span>건 / 필터링된 총 {totalCount}건의 데이터가 조회되었습니다.</p>
+          <p className="text-text-muted mt-1 text-sm">오늘 발생한 새로운 변동: <span className="text-brand font-medium">{todayNewCount.toLocaleString()}</span>건 / 필터링된 총 {totalCount.toLocaleString()}건의 데이터가 조회되었습니다.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => console.log('Export Excel')} className="gap-2">
@@ -38,7 +38,6 @@ export default function App() {
 
       <DashboardIndicators 
         searchQuery={state.searchQuery}
-        dateRange={state.dateRange}
         locationFilters={state.locationFilters}
       />
 
