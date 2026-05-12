@@ -33,3 +33,4 @@
 * 프론트엔드 대시보드의 매끄러운 30일 시각화를 위해 `GET /api/v1/approvals/indicators` API를 개선함. 파라미터가 비어있을 경우 백엔드 서버에서 자동으로 오늘 기준 최근 30일(시작일, 종료일)을 주입하며, 데이터가 없는 날짜도 차트에서 누락되지 않고 0건(`count: 0`)으로 명시적 반환되도록 Zero-Padding 로직을 추가함.
 * 엑셀 다운로드 API(`/api/v1/approvals/export`) 호출 시 브라우저(프론트엔드)에서 `Content-Disposition` 헤더를 읽어 파일명을 제대로 처리할 수 있도록 `main.py`의 CORS 설정에 `expose_headers=["Content-Disposition"]`를 추가함.
 * `GET /api/v1/approvals/indicators` API의 `total_approvals` 지표가 조회 기간 전체 합계가 아닌, 조회 종료일(또는 당일) 하루의 건수만 반환하도록 수정함.
+* `GET /api/v1/approvals/indicators` API에서 30일 누적치(`total_approvals`)와 당일 변동 건수(`today_approvals`)를 모두 반환하도록 스키마 및 레포지토리 로직 분리 및 추가

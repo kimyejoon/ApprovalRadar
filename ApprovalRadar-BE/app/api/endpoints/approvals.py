@@ -77,12 +77,13 @@ def get_approval_indicators(
         if cached and time.time() - cached['time'] < CACHE_TTL:
             return cached['data']
             
-        total_approvals, status_distribution, trend_chart = repo.get_indicators(search, start_date, end_date, regions)
+        total_approvals, today_approvals, status_distribution, trend_chart = repo.get_indicators(search, start_date, end_date, regions)
             
         response_data = {
             "status": "success",
             "data": {
                 "total_approvals": total_approvals,
+                "today_approvals": today_approvals,
                 "status_distribution": status_distribution,
                 "trend_chart": trend_chart
             }

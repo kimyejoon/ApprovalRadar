@@ -43,6 +43,7 @@ class IndicatorTrendChart(BaseModel):
 
 class IndicatorsData(BaseModel):
     total_approvals: int
+    today_approvals: int
     status_distribution: List[IndicatorStatusDistribution]
     trend_chart: List[IndicatorTrendChart]
 

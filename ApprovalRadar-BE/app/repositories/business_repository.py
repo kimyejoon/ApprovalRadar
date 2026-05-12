@@ -67,12 +67,16 @@ class BusinessRepository:
                 
             return result, total_count
 
-    def get_indicators(self, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]]) -> Tuple[int, List[Dict[str, Any]], List[Dict[str, Any]]]:
+    def get_indicators(self, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]]) -> Tuple[int, int, List[Dict[str, Any]], List[Dict[str, Any]]]:
         with get_db() as conn:
             cursor = conn.cursor()
             where_clause, params = self._build_where_clause(search, start_date, end_date, regions)
             
-            # 1. Total approvals (Target Day Only)
+            # 1. Total approvals (Over the entire date range)
+            cursor.execute(f"SELECT COUNT(*) FROM businesses{where_clause}", params)
+            total_approvals = cursor.fetchone()[0]
+
+            # 1.5 Today approvals (Target Day Only)
             target_date = end_date
             if not target_date:
                 from datetime import datetime
@@ -80,7 +84,7 @@ class BusinessRepository:
                 
             today_where_clause, today_params = self._build_where_clause(search, target_date, target_date, regions)
             cursor.execute(f"SELECT COUNT(*) FROM businesses{today_where_clause}", today_params)
-            total_approvals = cursor.fetchone()[0]
+            today_approvals = cursor.fetchone()[0]
             
             # 2. Status distribution
             status_query = f"SELECT COALESCE(business_status, '상태없음') as name, COUNT(*) as value FROM businesses{where_clause} GROUP BY name"
@@ -117,7 +121,7 @@ class BusinessRepository:
             else:
                 trend_chart = [{"date": k, "count": v} for k, v in db_trend_results.items()]
             
-            return total_approvals, status_distribution, trend_chart
+            return total_approvals, today_approvals, status_distribution, trend_chart
 
     def get_business_by_license_no(self, license_no: str, conn=None) -> Optional[Dict[str, Any]]:
         query = "SELECT * FROM businesses WHERE license_no = ?"
