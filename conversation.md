@@ -12,4 +12,8 @@
 * 데이터베이스의 인허가 고유 ID가 API의 `LCNS_NO`에서 추출된 `license_no`와 동일한지(그리고 DB의 Primary Key로 쓰이는지) 확인 요청에 대해 일치함을 확인함.
 * 프론트엔드에서 상세 정보 및 상태 변동 내역(Timeline) 조회를 위해 단일 인허가 건을 가져오는 `GET /api/v1/approvals/{approval_id}` API 엔드포인트 추가 (경로 파라미터 `approval_id`는 데이터베이스의 `license_no`와 매핑됨).
 * Swagger UI를 통해 `GET /api/v1/approvals/{approval_id}` API 테스트 결과를 확인, 올바른 JSON 포맷과 200 상태 코드로 정상 작동함을 검증 완료.
-* 프런트엔드 데이터 시각화를 위한 `GET /api/v1/approvals/indicators` API 엔드포인트 추가 (상태 분포, 날짜별 트렌드 및 총 건수 반환 기능 구현).
+* 프론트엔드 대시보드 시각화를 위해 상태 분포 및 일별 트렌드 데이터를 반환하는 `GET /api/v1/approvals/indicators` API를 추가함. 기존 필터 파라미터 연동 적용 완료.
+* 사용자가 필터링된 데이터(대표자 변경분)를 엑셀 파일로 바로 다운로드할 수 있도록 `openpyxl`을 이용한 `excel_export.py`를 구현하고, 서버 저장 없이 클라이언트에 바로 스트리밍하는 `GET /api/v1/approvals/export` API 엔드포인트 추가 완료. 
+  - 파일명 형식: `대표자변경분_YYYYMMDD(시작일)-YYYYMMDD(종료일).xlsx` (파라미터 부재 시 당일 날짜 기준 적용)
+  - 10건 다운로드 제한을 해제하고 전체 건수 다운로드 허용
+  - 엑셀 다운로드 시 데이터 내용 길이에 맞춰 열 너비가 자동으로 조정되는 로직 구현

@@ -9,6 +9,9 @@ from scraper import run_scraper_job
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+import urllib.parse
+from fastapi.responses import StreamingResponse
+from excel_export import generate_excel_export
 
 # 프론트엔드 개발자가 Swagger에서 확인할 수 있는 응답 데이터 형태(Schema)를 정의합니다.
 class BusinessModel(BaseModel):
@@ -41,19 +44,22 @@ class SingleBusinessResponse(BaseModel):
     status: str
     data: BusinessModel
 
-class StatusDistribution(BaseModel):
+class IndicatorStatusDistribution(BaseModel):
     name: str
     value: int
 
-class TrendChart(BaseModel):
+class IndicatorTrendChart(BaseModel):
     date: str
     count: int
 
-class IndicatorsResponse(BaseModel):
+class IndicatorsData(BaseModel):
     total_approvals: int
-    status_distribution: List[StatusDistribution]
-    trend_chart: List[TrendChart]
+    status_distribution: List[IndicatorStatusDistribution]
+    trend_chart: List[IndicatorTrendChart]
 
+class IndicatorsResponse(BaseModel):
+    status: str
+    data: IndicatorsData
 
 def parse_comma_separated_list(regions: Optional[str] = Query(None, description="콤마(,)로 구분된 지역 목록 (예: 서울,강원,경기)")) -> Optional[List[str]]:
     if not regions:
@@ -225,34 +231,81 @@ def get_approval_indicators(
             if query_conditions:
                 where_clause = " WHERE " + " AND ".join(query_conditions)
             
-            # 1. 전체 인허가 수
-            cursor.execute(f"SELECT COUNT(*) FROM businesses{where_clause}", params)
+            # 1. Total approvals
+            count_query = f"SELECT COUNT(*) FROM businesses{where_clause}"
+            cursor.execute(count_query, params)
             total_approvals = cursor.fetchone()[0]
             
-            # 2. 상태 분포 (status_distribution)
-            cursor.execute(f"SELECT business_status, COUNT(*) FROM businesses{where_clause} GROUP BY business_status", params)
-            status_rows = cursor.fetchall()
-            status_distribution = [{"name": row[0] or "알수없음", "value": row[1]} for row in status_rows]
+            # 2. Status distribution
+            status_query = f"SELECT COALESCE(business_status, '상태없음') as name, COUNT(*) as value FROM businesses{where_clause} GROUP BY name"
+            cursor.execute(status_query, params)
+            status_distribution = [{"name": row[0], "value": row[1]} for row in cursor.fetchall()]
             
-            # 3. 트렌드 차트 (trend_chart) - last_event_date 기준 (일자별)
-            cursor.execute(f"""
-                SELECT substr(last_event_date, 1, 10) as date, COUNT(*) as count 
-                FROM businesses{where_clause} 
-                {"AND last_event_date IS NOT NULL" if where_clause else "WHERE last_event_date IS NOT NULL"}
-                GROUP BY substr(last_event_date, 1, 10) 
-                ORDER BY date ASC
-            """, params)
-            trend_rows = cursor.fetchall()
-            trend_chart = [{"date": row[0], "count": row[1]} for row in trend_rows]
-            
+            # 3. Trend chart (exclude empty dates, group by YYYY-MM-DD)
+            trend_where = where_clause + (" AND " if where_clause else " WHERE ") + "last_event_date IS NOT NULL AND last_event_date != ''"
+            trend_query = f"SELECT substr(last_event_date, 1, 10) as date, COUNT(*) as count FROM businesses{trend_where} GROUP BY date ORDER BY date ASC"
+            cursor.execute(trend_query, params)
+            trend_chart = [{"date": row[0], "count": row[1]} for row in cursor.fetchall()]
+                
         return {
-            "total_approvals": total_approvals,
-            "status_distribution": status_distribution,
-            "trend_chart": trend_chart
+            "status": "success",
+            "data": {
+                "total_approvals": total_approvals,
+                "status_distribution": status_distribution,
+                "trend_chart": trend_chart
+            }
         }
     except Exception as e:
-        print(f"Database error in indicators: {e}")
-        raise HTTPException(status_code=500, detail="데이터 통계 처리 중 오류가 발생했습니다.")
+        print(f"Database error: {e}")
+        raise HTTPException(status_code=500, detail="내부 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
+
+@app.get("/api/v1/approvals/export")
+def export_approvals_excel(
+    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)")
+):
+    try:
+        # Default to today if both are empty
+        if not start_date and not end_date:
+            today_str = datetime.now().strftime('%Y%m%d')
+            start_date_db = today_str
+            end_date_db = today_str
+        else:
+            start_date_db = start_date.replace('-', '') if start_date else None
+            end_date_db = end_date.replace('-', '') if end_date else None
+
+        # Generate the excel file in a buffer
+        excel_buffer = generate_excel_export(start_date_db, end_date_db)
+        
+        # Build filename
+        date_str = ""
+        if start_date_db and end_date_db:
+            if start_date_db == end_date_db:
+                date_str = f"_{start_date_db}"
+            else:
+                date_str = f"_{start_date_db}-{end_date_db}"
+        elif start_date_db:
+            date_str = f"_{start_date_db}"
+        elif end_date_db:
+            date_str = f"_{end_date_db}"
+            
+        filename = f"대표자변경분{date_str}.xlsx"
+
+        
+        # URL encode filename for Content-Disposition header
+        encoded_filename = urllib.parse.quote(filename)
+        headers = {
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+        }
+        
+        return StreamingResponse(
+            excel_buffer, 
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers=headers
+        )
+    except Exception as e:
+        print(f"Excel export error: {e}")
+        raise HTTPException(status_code=500, detail="엑셀 생성 중 서버 오류가 발생했습니다.")
 
 @app.get("/api/v1/approvals/{approval_id}", response_model=SingleBusinessResponse)
 def get_approval_detail(approval_id: str):
