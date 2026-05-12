@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -43,7 +42,7 @@ export function DashboardIndicators({ searchQuery, locationFilters }: DashboardI
       value: d.value,
       color: d.name.includes('정상') || d.name.includes('영업') ? '#3ecf8e' : '#f87171'
     }));
-  }, [data?.status_distribution]);
+  }, [data]);
 
   // 트렌드 차트 데이터 (Bar Chart)
   const barData = useMemo(() => {
@@ -65,7 +64,7 @@ export function DashboardIndicators({ searchQuery, locationFilters }: DashboardI
         date: formattedDate
       };
     });
-  }, [data?.trend_chart]);
+  }, [data]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
