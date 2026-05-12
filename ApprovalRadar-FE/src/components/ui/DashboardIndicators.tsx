@@ -71,7 +71,8 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
               </Pie>
               <Tooltip
                 formatter={(value: number) => [`${value}건`, '']}
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                contentStyle={{ borderRadius: '8px', border: '1px solid var(--color-border-standard)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', fontSize: '12px' }}
+                itemStyle={{ color: 'var(--color-text-primary)' }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -96,24 +97,25 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
         <CardContent className="h-[140px] pb-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={barData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-subtle)" />
               <XAxis
                 dataKey="date"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 10, fill: '#64748b' }}
+                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
                 dy={5}
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 10, fill: '#64748b' }}
+                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
               />
               <Tooltip
-                cursor={{ fill: '#f8fafc' }}
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                cursor={{ fill: 'var(--color-accent)' }}
+                contentStyle={{ borderRadius: '8px', border: '1px solid var(--color-border-standard)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', fontSize: '12px' }}
+                itemStyle={{ color: 'var(--color-text-primary)' }}
               />
-              <Bar dataKey="count" fill="#3ecf8e" radius={[4, 4, 0, 0]} maxBarSize={30} />
+              <Bar dataKey="count" fill="var(--color-brand)" radius={[4, 4, 0, 0]} maxBarSize={30} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
