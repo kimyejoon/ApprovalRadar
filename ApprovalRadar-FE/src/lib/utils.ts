@@ -8,14 +8,22 @@ export function cn(...inputs: ClassValue[]) {
 export function formatApprovalDate(dateStr: string) {
   if (!dateStr) return '-';
   
+  // YYYYMMDD 형식 처리
+  if (/^\d{8}$/.test(dateStr)) {
+    const y = dateStr.slice(0, 4);
+    const m = parseInt(dateStr.slice(4, 6), 10);
+    const d = parseInt(dateStr.slice(6, 8), 10);
+    return `${y}년 ${m}월 ${d}일`;
+  }
+
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return dateStr;
 
   const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  const h = String(date.getHours()).padStart(2, '0');
-  const min = String(date.getMinutes()).padStart(2, '0');
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const h = date.getHours();
+  const min = date.getMinutes();
 
   const hasTime = dateStr.includes('T') || /\s\d{2}:/.test(dateStr);
   

@@ -3,18 +3,18 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfToday 
 import { ko } from "date-fns/locale"
 import { Calendar as CalendarIcon } from "lucide-react"
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import { cn } from "../../lib/utils"
+import { Button } from "./button"
+import { Calendar } from "./calendar"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "./popover"
 
 interface DatePickerWithPresetsProps {
-  date: { from: Date; to: Date } | undefined;
-  setDate: (date: { from: Date; to: Date } | undefined) => void;
+  date: { from?: Date; to?: Date } | undefined;
+  setDate: (date: { from?: Date; to?: Date } | undefined) => void;
 }
 
 export function DatePickerWithPresets({ date, setDate }: DatePickerWithPresetsProps) {
@@ -73,14 +73,13 @@ export function DatePickerWithPresets({ date, setDate }: DatePickerWithPresetsPr
             defaultMonth={date?.from}
             selected={{ from: date?.from, to: date?.to }}
             onSelect={(range) => {
-              if (range) {
-                setDate({ from: range.from as Date, to: range.to || (range.from as Date) });
-              } else {
-                setDate(undefined);
-              }
+              setDate(range);
             }}
             numberOfMonths={1}
             locale={ko}
+            captionLayout="dropdown"
+            startMonth={new Date(2000, 0)}
+            endMonth={new Date(2050, 11)}
           />
         </div>
       </PopoverContent>
