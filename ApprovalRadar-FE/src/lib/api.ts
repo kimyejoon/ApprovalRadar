@@ -74,3 +74,53 @@ export async function fetchApprovals(params: FetchApprovalsParams): Promise<Appr
 
   return response.json();
 }
+
+export interface FetchIndicatorsParams {
+  search?: string;
+  start_date?: string;
+  end_date?: string;
+  regions?: string;
+}
+
+export interface StatusDistribution {
+  name: string;
+  value: number;
+}
+
+export interface TrendChart {
+  date: string;
+  count: number;
+}
+
+export interface IndicatorData {
+  total_approvals: number;
+  status_distribution: StatusDistribution[];
+  trend_chart: TrendChart[];
+}
+
+export interface IndicatorResponse {
+  status: string;
+  data: IndicatorData;
+}
+
+export async function fetchIndicators(params: FetchIndicatorsParams): Promise<IndicatorResponse> {
+  const url = new URL(`${API_BASE_URL}/api/v1/approvals/indicators`);
+  
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.append(key, String(value));
+    }
+  });
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch indicators');
+  }
+
+  return response.json();
+}

@@ -9,9 +9,11 @@ import { ApprovalDetailModal } from '@/components/features/ApprovalDetailModal';
 import { StatusFilterModal } from '@/components/features/StatusFilterModal';
 import { LocationFilterModal } from '@/components/features/LocationFilterModal';
 import { useApprovalRadar } from '@/hooks/useApprovalRadar';
+import { useIndicatorStore } from '@/store/useIndicatorStore';
 
 export default function App() {
   const { state, actions, api } = useApprovalRadar();
+  const todayNewCount = useIndicatorStore(s => s.todayNewCount);
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [isLocationFilterOpen, setIsLocationFilterOpen] = useState(false);
 
@@ -24,7 +26,7 @@ export default function App() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-sans font-medium text-text-primary tracking-tight">금일 변동 내역</h2>
-          <p className="text-text-muted mt-1 text-sm">총 {totalCount}건의 인허가 변동 데이터가 실시간으로 수집되고 있습니다.</p>
+          <p className="text-text-muted mt-1 text-sm">오늘 발생한 새로운 변동: <span className="text-brand font-medium">{todayNewCount}</span>건 / 필터링된 총 {totalCount}건의 데이터가 조회되었습니다.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => console.log('Export Excel')} className="gap-2">
@@ -34,7 +36,11 @@ export default function App() {
         </div>
       </div>
 
-      <DashboardIndicators data={api.data} />
+      <DashboardIndicators 
+        searchQuery={state.searchQuery}
+        dateRange={state.dateRange}
+        locationFilters={state.locationFilters}
+      />
 
       <DashboardFilters 
         searchQuery={state.searchQuery}

@@ -1,39 +1,58 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import type { ApprovalMappedItem } from '@/lib/api';
+import { fetchIndicators } from '@/lib/api';
+import { useIndicatorStore } from '@/store/useIndicatorStore';
 
 interface DashboardIndicatorsProps {
-  data: ApprovalMappedItem[];
+  searchQuery: string;
+  dateRange: { from?: Date; to?: Date } | undefined;
+  locationFilters: string[];
 }
 
-export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
-  const todayChangesCount = data.length;
+export function DashboardIndicators({ searchQuery, dateRange, locationFilters }: DashboardIndicatorsProps) {
+  const setTodayNewCount = useIndicatorStore(state => state.setTodayNewCount);
+
+  const { data: indicatorResponse } = useQuery({
+    queryKey: ['indicators', searchQuery, dateRange, locationFilters],
+    queryFn: () => fetchIndicators({
+      search: searchQuery.trim() || undefined,
+      start_date: dateRange?.from ? format(dateRange.from, 'yyyyMMdd') : undefined,
+      end_date: dateRange?.to ? format(dateRange.to, 'yyyyMMdd') : undefined,
+      regions: locationFilters.length > 0 ? locationFilters.join(',') : undefined,
+    }),
+    refetchInterval: 1000 * 60 * 5, // 5 min polling
+    refetchOnWindowFocus: true,
+  });
+
+  const data = indicatorResponse?.data;
+
+  useEffect(() => {
+    if (data?.total_approvals !== undefined) {
+      setTodayNewCount(data.total_approvals);
+    }
+  }, [data?.total_approvals, setTodayNewCount]);
+
+  const todayChangesCount = data?.total_approvals || 0;
 
   // 신규 인허가 비율 (Pie Chart)
   const pieData = useMemo(() => {
-    const newCount = data.filter(d => d.status.includes('정상') || d.status.includes('영업')).length || 1;
-    const closedCount = data.filter(d => d.status.includes('폐업') || d.status.includes('취소')).length || 0;
+    if (!data?.status_distribution) return [];
+    return data.status_distribution.map(d => ({
+      name: d.name,
+      value: d.value,
+      color: d.name.includes('정상') || d.name.includes('영업') ? '#3ecf8e' : '#f87171'
+    }));
+  }, [data?.status_distribution]);
 
-    return [
-      { name: '신규/영업', value: newCount, color: '#3ecf8e' },
-      { name: '폐업/취소', value: closedCount, color: '#f87171' }
-    ];
-  }, [data]);
-
-  // 트렌드 차트 데이터 (Bar Chart - 하드코딩 유지하되 추후 API 연동 용이하도록 구조화)
+  // 트렌드 차트 데이터 (Bar Chart)
   const barData = useMemo(() => {
-    return [
-      { date: '5.05', count: 12 },
-      { date: '5.06', count: 8 },
-      { date: '5.07', count: 15 },
-      { date: '5.08', count: 10 },
-      { date: '5.09', count: 22 },
-      { date: '5.10', count: 18 },
-      { date: '5.11', count: 9 }, // 오늘
-    ];
-  }, []);
+    if (!data?.trend_chart) return [];
+    return data.trend_chart;
+  }, [data?.trend_chart]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
