@@ -1,2 +1,11 @@
 2026-05-12 15:53:11,782 [INFO] ApprovalRadar - [Bootstrapper] True Tail(실제 마지막 데이터) 찾는 중...
 2026-05-12 15:53:29,682 [INFO] ApprovalRadar - [Bootstrapper] 전체 데이터 건수 확인 완료: 22415건
+2026-05-12 16:02:45,640 [INFO] ApprovalRadar - 
+--- API 키 상태 점검 시작 (총 5개) ---
+2026-05-12 16:02:46,606 [INFO] ApprovalRadar - Key 1 (eb5ae***223): [bold green]정상 동작 (Active)[/bold green]
+2026-05-12 16:02:48,056 [INFO] ApprovalRadar - Key 2 (f1282***819): [bold green]정상 동작 (Active)[/bold green]
+2026-05-12 16:02:49,488 [INFO] ApprovalRadar - Key 3 (ba698***a3e): [bold green]정상 동작 (Active)[/bold green]
+2026-05-12 16:02:50,945 [INFO] ApprovalRadar - Key 4 (67f07***ed9): [bold green]정상 동작 (Active)[/bold green]
+2026-05-12 16:02:52,446 [INFO] ApprovalRadar - Key 5 (e7b3f***785): [bold green]정상 동작 (Active)[/bold green]
+2026-05-12 16:02:52,946 [INFO] ApprovalRadar - --- 점검 완료 ---
+

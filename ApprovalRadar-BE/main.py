@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import math
-from database import init_db
+from database import init_db, vacuum_db
 from apscheduler.schedulers.background import BackgroundScheduler
 from scraper import run_scraper_job
 from pydantic import BaseModel
@@ -17,6 +17,7 @@ from app.repositories.business_repository import BusinessRepository
 from app.core.logger import logger
 
 # 프론트엔드 개발자가 Swagger에서 확인할 수 있는 응답 데이터 형태(Schema)를 정의합니다.
+# ... (생략된 기존 코드가 있으면 교체시 주의. StartLine/EndLine에 맞춰 정확히 작성) ...
 class BusinessModel(BaseModel):
     license_no: str
     business_name: Optional[str] = None
@@ -81,6 +82,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting APScheduler for 10-minute scraping intervals...")
     scheduler = BackgroundScheduler()
     scheduler.add_job(run_scraper_job, 'interval', minutes=10)
+    scheduler.add_job(vacuum_db, 'cron', day_of_week='sun', hour=3, minute=0)
     scheduler.start()
     
     # Run once on startup to catch up

@@ -13,27 +13,15 @@ class DiffCrawlerEngine:
 
     def _fetch_single(self, idx: int):
         """특정 인덱스 1건 조회. INFO-200(데이터 없음)이면 None 반환"""
-        max_retries = len(settings.API_KEYS)
-        retries = 0
-        
-        while retries <= max_retries:
-            res, used_key = self.api_client.fetch_data(idx, idx)
-            if settings.SERVICE_ID in res:
-                code = res[settings.SERVICE_ID]['RESULT']['CODE']
-                if code == "INFO-000":
-                    return res[settings.SERVICE_ID]['row'][0]
-                elif code == "INFO-200":
-                    return None
-                else:
-                    # 에러(한도 초과 등) 시 재시도
-                    msg = res[settings.SERVICE_ID]['RESULT']['MSG']
-                    if "유효 호출건수" in msg or code in ["INFO-300", "INFO-333"]:
-                        self.api_client.rotate_key(used_key)
-                        time.sleep(1)
-                        retries += 1
-                        continue
-            break # 정상적인 포맷이 아니거나 다른 알 수 없는 에러면 탈출
+        res = self.api_client.fetch_data(idx, idx)
+        if not res or settings.SERVICE_ID not in res:
+            return None
             
+        code = res[settings.SERVICE_ID]['RESULT']['CODE']
+        if code == "INFO-000":
+            return res[settings.SERVICE_ID]['row'][0]
+        elif code == "INFO-200":
+            return None
         return None
 
     def find_true_tail(self) -> int:
@@ -177,25 +165,14 @@ class DiffCrawlerEngine:
             current_start = new_start
             while current_start <= new_end:
                 current_end = min(current_start + 999, new_end)
-                max_retries = len(settings.API_KEYS)
-                retries = 0
-                while retries <= max_retries:
-                    res, used_key = self.api_client.fetch_data(current_start, current_end)
-                    if settings.SERVICE_ID in res:
-                        code = res[settings.SERVICE_ID]['RESULT']['CODE']
-                        if code == "INFO-000":
-                            rows = res[settings.SERVICE_ID]['row']
-                            fetched_rows.extend(rows)
-                            break
-                        elif code in ["INFO-300", "INFO-333"] or "유효 호출건수" in res[settings.SERVICE_ID]['RESULT'].get('MSG', ''):
-                            self.api_client.rotate_key(used_key)
-                            time.sleep(1)
-                            retries += 1
-                            continue
-                        else:
-                            break
-                    else:
-                        break
+                res = self.api_client.fetch_data(current_start, current_end)
+                
+                if res and settings.SERVICE_ID in res:
+                    code = res[settings.SERVICE_ID]['RESULT']['CODE']
+                    if code == "INFO-000":
+                        rows = res[settings.SERVICE_ID]['row']
+                        fetched_rows.extend(rows)
+                
                 current_start += 1000
                 
             if fetched_rows:

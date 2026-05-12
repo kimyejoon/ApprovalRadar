@@ -62,6 +62,17 @@ def get_db():
     finally:
         conn.close()
 
+def vacuum_db():
+    from app.core.logger import logger
+    logger.info("Starting SQLite DB VACUUM (Optimization)...")
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.execute("VACUUM;")
+        conn.close()
+        logger.info("SQLite DB VACUUM completed successfully.")
+    except Exception as e:
+        logger.error(f"Failed to VACUUM DB: {e}")
+
 if __name__ == "__main__":
     init_db()
     print("Database initialized successfully.")
