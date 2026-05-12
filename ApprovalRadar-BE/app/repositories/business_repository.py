@@ -95,44 +95,63 @@ class BusinessRepository:
             
             return total_approvals, status_distribution, trend_chart
 
-    def get_business_by_license_no(self, license_no: str) -> Optional[Dict[str, Any]]:
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM businesses WHERE license_no = ?", (license_no,))
+    def get_business_by_license_no(self, license_no: str, conn=None) -> Optional[Dict[str, Any]]:
+        query = "SELECT * FROM businesses WHERE license_no = ?"
+        params = (license_no,)
+        
+        if conn:
+            cursor = conn.execute(query, params)
             row = cursor.fetchone()
             if row:
                 return dict(row)
             return None
+        else:
+            with get_db() as c:
+                cursor = c.execute(query, params)
+                row = cursor.fetchone()
+                if row:
+                    return dict(row)
+                return None
 
-    def insert_business(self, record: dict):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO businesses 
-                (license_no, business_name, address, representative_name, business_status, license_date, phone_number, last_event_date, is_new)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-            ''', (
-                record["license_no"], record["business_name"], record["address"], 
-                record["representative_name"], record["business_status"], 
-                record["license_date"], record["phone_number"], record["last_event_date"]
-            ))
-            conn.commit()
+    def insert_business(self, record: dict, conn=None):
+        query = '''
+            INSERT INTO businesses 
+            (license_no, business_name, address, representative_name, business_status, license_date, phone_number, last_event_date, is_new)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+        '''
+        params = (
+            record["license_no"], record["business_name"], record["address"], 
+            record["representative_name"], record["business_status"], 
+            record["license_date"], record["phone_number"], record["last_event_date"]
+        )
+        
+        if conn:
+            conn.execute(query, params)
+        else:
+            with get_db() as c:
+                c.execute(query, params)
+                c.commit()
 
-    def update_business(self, license_no: str, updates: dict):
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE businesses 
-                SET business_name = ?, address = ?, representative_name = ?, 
-                    business_status = ?, phone_number = ?,
-                    representative_history = ?, licensing_history = ?,
-                    last_event_date = ?,
-                    updated_at = ?, is_new = 1
-                WHERE license_no = ?
-            ''', (
-                updates["business_name"], updates["address"], updates["representative_name"], 
-                updates["business_status"], updates["phone_number"],
-                updates["representative_history"], updates["licensing_history"],
-                updates["last_event_date"], updates["updated_at"], license_no
-            ))
-            conn.commit()
+    def update_business(self, license_no: str, updates: dict, conn=None):
+        query = '''
+            UPDATE businesses 
+            SET business_name = ?, address = ?, representative_name = ?, 
+                business_status = ?, phone_number = ?,
+                representative_history = ?, licensing_history = ?,
+                last_event_date = ?,
+                updated_at = ?, is_new = 1
+            WHERE license_no = ?
+        '''
+        params = (
+            updates["business_name"], updates["address"], updates["representative_name"], 
+            updates["business_status"], updates["phone_number"],
+            updates["representative_history"], updates["licensing_history"],
+            updates["last_event_date"], updates["updated_at"], license_no
+        )
+        
+        if conn:
+            conn.execute(query, params)
+        else:
+            with get_db() as c:
+                c.execute(query, params)
+                c.commit()
