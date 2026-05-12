@@ -63,7 +63,6 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
           
           <div className="pt-6 border-t border-border-standard flex justify-end gap-3">
             <Button variant="ghost" onClick={onClose}>닫기</Button>
-            <Button variant="default">추가 작업</Button>
           </div>
         </div>
       )}

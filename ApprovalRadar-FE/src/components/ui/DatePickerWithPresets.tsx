@@ -81,6 +81,9 @@ export function DatePickerWithPresets({ date, setDate }: DatePickerWithPresetsPr
             }}
             numberOfMonths={1}
             locale={ko}
+            captionLayout="dropdown"
+            startMonth={new Date(2000, 0)}
+            endMonth={new Date(2050, 11)}
           />
         </div>
       </PopoverContent>
