@@ -57,12 +57,15 @@ def fill_missing_industry_types():
                             business_repo.update_industry_type(lcns_no, industry_type)
                             with lock:
                                 success_count += 1
+                            logger.info(f"✅ {lcns_no} -> {industry_type} 업데이트 완료")
                         else:
                             with lock:
                                 fail_count += 1
+                            logger.info(f"⚠️ {lcns_no} -> 데이터는 있으나 세부업종 필드(INDUTY_CD_NM)가 비어있음")
                     else:
                         with lock:
                             fail_count += 1
+                        logger.info(f"⚠️ {lcns_no} -> API 응답에 해당 데이터 없음")
                 else:
                     with lock:
                         fail_count += 1
