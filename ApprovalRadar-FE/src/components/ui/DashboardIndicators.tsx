@@ -47,7 +47,9 @@ export function DashboardIndicators({ searchQuery, locationFilters }: DashboardI
   // 트렌드 차트 데이터 (Bar Chart)
   const barData = useMemo(() => {
     if (!data?.trend_chart) return [];
-    return data.trend_chart.map(item => {
+    // 최근 7일 데이터만 가져오기
+    const recent7DaysData = data.trend_chart.slice(-7);
+    return recent7DaysData.map(item => {
       let formattedDate = item.date;
       if (item.date && item.date.length === 8 && !item.date.includes('-')) {
         const month = parseInt(item.date.substring(4, 6), 10);
