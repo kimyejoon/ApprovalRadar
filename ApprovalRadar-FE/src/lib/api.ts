@@ -124,3 +124,51 @@ export async function fetchIndicators(params: FetchIndicatorsParams): Promise<In
 
   return response.json();
 }
+
+export interface ExportApprovalsParams {
+  start_date?: string;
+  end_date?: string;
+}
+
+export async function exportApprovalsExcel(params: ExportApprovalsParams): Promise<void> {
+  const url = new URL(`${API_BASE_URL}/api/v1/approvals/export`);
+  
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.append(key, String(value));
+    }
+  });
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to export excel');
+  }
+
+  // Extract filename from Content-Disposition header if possible
+  let filename = 'approvals_export.xlsx';
+  const disposition = response.headers.get('content-disposition');
+  if (disposition && disposition.includes('filename*=')) {
+    const filenameMatch = disposition.split("filename*=UTF-8''")[1];
+    if (filenameMatch) {
+      filename = decodeURIComponent(filenameMatch);
+    }
+  } else if (disposition && disposition.includes('filename=')) {
+    const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+    if (filenameMatch && filenameMatch.length > 1) {
+      filename = filenameMatch[1];
+    }
+  }
+
+  const blob = await response.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(downloadUrl);
+}

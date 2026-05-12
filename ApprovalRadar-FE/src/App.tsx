@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { DownloadSimple, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { format } from 'date-fns';
+import { DownloadSimple, CaretLeft, CaretRight, CircleNotch } from '@phosphor-icons/react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { DashboardIndicators } from '@/components/ui/DashboardIndicators';
@@ -10,16 +11,33 @@ import { StatusFilterModal } from '@/components/features/StatusFilterModal';
 import { LocationFilterModal } from '@/components/features/LocationFilterModal';
 import { useApprovalRadar } from '@/hooks/useApprovalRadar';
 import { useIndicatorStore } from '@/store/useIndicatorStore';
+import { exportApprovalsExcel } from '@/lib/api';
 
 export default function App() {
   const { state, actions, api } = useApprovalRadar();
   const todayNewCount = useIndicatorStore(s => s.todayNewCount);
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [isLocationFilterOpen, setIsLocationFilterOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const totalPages = api.meta?.total_pages || 1;
   const totalCount = api.meta?.total_count || 0;
   const startIndex = (state.currentPage - 1) * state.itemsPerPage;
+
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      const start_date = state.dateRange?.from ? format(state.dateRange.from, 'yyyy-MM-dd') : undefined;
+      const end_date = state.dateRange?.to ? format(state.dateRange.to, 'yyyy-MM-dd') : undefined;
+      
+      await exportApprovalsExcel({ start_date, end_date });
+    } catch (error) {
+      console.error('Excel export failed:', error);
+      alert('엑셀 다운로드 중 오류가 발생했습니다.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -29,8 +47,8 @@ export default function App() {
           <p className="text-text-muted mt-1 text-sm">오늘 발생한 새로운 변동: <span className="text-brand font-medium">{todayNewCount.toLocaleString()}</span>건 / 필터링된 총 {totalCount.toLocaleString()}건의 데이터가 조회되었습니다.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => console.log('Export Excel')} className="gap-2">
-            <DownloadSimple weight="bold" className="w-4 h-4" />
+          <Button variant="secondary" onClick={handleExportExcel} disabled={isExporting} className="gap-2">
+            {isExporting ? <CircleNotch weight="bold" className="w-4 h-4 animate-spin" /> : <DownloadSimple weight="bold" className="w-4 h-4" />}
             엑셀 내보내기
           </Button>
         </div>
