@@ -1,0 +1,83 @@
+import { useState } from 'react';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { DashboardHeader } from '@/components/ui/DashboardHeader';
+import { DashboardIndicators } from '@/components/ui/DashboardIndicators';
+import { DashboardFilters } from '@/components/ui/DashboardFilters';
+import { ApprovalTable } from '@/components/ui/ApprovalTable';
+import { DataTablePagination } from '@/components/ui/DataTablePagination';
+import { ApprovalDetailModal } from '@/components/features/ApprovalDetailModal';
+import { StatusFilterModal } from '@/components/features/StatusFilterModal';
+import { LocationFilterModal } from '@/components/features/LocationFilterModal';
+import { useApprovalRadar } from '@/hooks/useApprovalRadar';
+
+export function DashboardPage() {
+  const { state, actions, api } = useApprovalRadar();
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
+  const [isLocationFilterOpen, setIsLocationFilterOpen] = useState(false);
+
+  const totalPages = api.meta?.total_pages || 1;
+  const totalCount = api.meta?.total_count || 0;
+
+  return (
+    <DashboardLayout>
+      <DashboardHeader totalCount={totalCount} dateRange={state.dateRange} />
+
+      <DashboardIndicators 
+        searchQuery={state.searchQuery}
+        locationFilters={state.locationFilters}
+      />
+
+      <DashboardFilters 
+        searchQuery={state.searchQuery}
+        onSearchChange={actions.handleSearch}
+        dateRange={state.dateRange}
+        onDateRangeChange={actions.handleDateRangeChange}
+        statusFilter={state.statusFilter}
+        onStatusReset={() => actions.handleStatusFilterChange('전체')}
+        locationFilters={state.locationFilters}
+        onLocationRemove={(loc) => actions.handleLocationFiltersChange(state.locationFilters.filter(l => l !== loc))}
+      />
+
+      <ApprovalTable 
+        data={api.data}
+        isLoading={api.isLoading}
+        isError={api.isError}
+        sortConfig={state.sortConfig}
+        onSort={actions.handleSort}
+        onRowClick={actions.setSelectedItem}
+        onLocationClick={() => setIsLocationFilterOpen(true)}
+        onStatusClick={() => setIsStatusFilterOpen(true)}
+      />
+
+      <DataTablePagination 
+        itemsPerPage={state.itemsPerPage}
+        totalCount={totalCount}
+        currentPage={state.currentPage}
+        totalPages={totalPages}
+        onItemsPerPageChange={actions.handleItemsPerPageChange}
+        onPageChange={actions.handlePageChange}
+      />
+
+      <ApprovalDetailModal 
+        isOpen={!!state.selectedItem} 
+        onClose={() => actions.setSelectedItem(null)} 
+        selectedItem={state.selectedItem} 
+      />
+
+      <StatusFilterModal 
+        isOpen={isStatusFilterOpen} 
+        onClose={() => setIsStatusFilterOpen(false)} 
+        statusFilter={state.statusFilter} 
+        setStatusFilter={actions.handleStatusFilterChange} 
+        onFilterChange={() => actions.handlePageChange(1)} 
+      />
+
+      <LocationFilterModal 
+        isOpen={isLocationFilterOpen} 
+        onClose={() => setIsLocationFilterOpen(false)} 
+        initialLocations={state.locationFilters} 
+        onApply={actions.handleLocationFiltersChange} 
+      />
+    </DashboardLayout>
+  );
+}
