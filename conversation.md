@@ -12,3 +12,4 @@
 * 데이터베이스의 인허가 고유 ID가 API의 `LCNS_NO`에서 추출된 `license_no`와 동일한지(그리고 DB의 Primary Key로 쓰이는지) 확인 요청에 대해 일치함을 확인함.
 * 프론트엔드에서 상세 정보 및 상태 변동 내역(Timeline) 조회를 위해 단일 인허가 건을 가져오는 `GET /api/v1/approvals/{approval_id}` API 엔드포인트 추가 (경로 파라미터 `approval_id`는 데이터베이스의 `license_no`와 매핑됨).
 * Swagger UI를 통해 `GET /api/v1/approvals/{approval_id}` API 테스트 결과를 확인, 올바른 JSON 포맷과 200 상태 코드로 정상 작동함을 검증 완료.
+* 프런트엔드 데이터 시각화를 위한 `GET /api/v1/approvals/indicators` API 엔드포인트 추가 (상태 분포, 날짜별 트렌드 및 총 건수 반환 기능 구현).

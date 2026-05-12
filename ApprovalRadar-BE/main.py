@@ -41,6 +41,20 @@ class SingleBusinessResponse(BaseModel):
     status: str
     data: BusinessModel
 
+class StatusDistribution(BaseModel):
+    name: str
+    value: int
+
+class TrendChart(BaseModel):
+    date: str
+    count: int
+
+class IndicatorsResponse(BaseModel):
+    total_approvals: int
+    status_distribution: List[StatusDistribution]
+    trend_chart: List[TrendChart]
+
+
 def parse_comma_separated_list(regions: Optional[str] = Query(None, description="콤마(,)로 구분된 지역 목록 (예: 서울,강원,경기)")) -> Optional[List[str]]:
     if not regions:
         return None
@@ -171,6 +185,74 @@ def get_approvals(
         # DB Error handling, returns a user-friendly message as required
         print(f"Database error: {e}")
         raise HTTPException(status_code=500, detail="데이터 제공처의 응답이 지연되고 있거나 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
+
+@app.get("/api/v1/approvals/indicators", response_model=IndicatorsResponse)
+def get_approval_indicators(
+    search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
+    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)"),
+    regions: Optional[List[str]] = Depends(parse_comma_separated_list)
+):
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            
+            query_conditions = []
+            params = []
+            
+            if search:
+                query_conditions.append("(business_name LIKE ? OR license_no LIKE ?)")
+                search_term = f"%{search}%"
+                params.extend([search_term, search_term])
+                
+            if start_date:
+                query_conditions.append("last_event_date >= ?")
+                params.append(start_date)
+                
+            if end_date:
+                query_conditions.append("last_event_date <= ?")
+                params.append(end_date)
+                
+            if regions:
+                region_conditions = []
+                for r in regions:
+                    region_conditions.append("address LIKE ?")
+                    params.append(f"%{r}%")
+                if region_conditions:
+                    query_conditions.append(f"({' OR '.join(region_conditions)})")
+            
+            where_clause = ""
+            if query_conditions:
+                where_clause = " WHERE " + " AND ".join(query_conditions)
+            
+            # 1. 전체 인허가 수
+            cursor.execute(f"SELECT COUNT(*) FROM businesses{where_clause}", params)
+            total_approvals = cursor.fetchone()[0]
+            
+            # 2. 상태 분포 (status_distribution)
+            cursor.execute(f"SELECT business_status, COUNT(*) FROM businesses{where_clause} GROUP BY business_status", params)
+            status_rows = cursor.fetchall()
+            status_distribution = [{"name": row[0] or "알수없음", "value": row[1]} for row in status_rows]
+            
+            # 3. 트렌드 차트 (trend_chart) - last_event_date 기준 (일자별)
+            cursor.execute(f"""
+                SELECT substr(last_event_date, 1, 10) as date, COUNT(*) as count 
+                FROM businesses{where_clause} 
+                {"AND last_event_date IS NOT NULL" if where_clause else "WHERE last_event_date IS NOT NULL"}
+                GROUP BY substr(last_event_date, 1, 10) 
+                ORDER BY date ASC
+            """, params)
+            trend_rows = cursor.fetchall()
+            trend_chart = [{"date": row[0], "count": row[1]} for row in trend_rows]
+            
+        return {
+            "total_approvals": total_approvals,
+            "status_distribution": status_distribution,
+            "trend_chart": trend_chart
+        }
+    except Exception as e:
+        print(f"Database error in indicators: {e}")
+        raise HTTPException(status_code=500, detail="데이터 통계 처리 중 오류가 발생했습니다.")
 
 @app.get("/api/v1/approvals/{approval_id}", response_model=SingleBusinessResponse)
 def get_approval_detail(approval_id: str):
