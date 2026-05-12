@@ -82,14 +82,14 @@ class ApiClient:
                     backoff *= 2
                     attempt += 1
                     
-            except requests.exceptions.RequestException as e:
-                logger.warning(f"[네트워크 오류] {str(e)}. {backoff}초 후 재시도합니다...")
+            except (requests.exceptions.RequestException, ValueError) as e:
+                logger.warning(f"[네트워크/응답 오류] {str(e)}. {backoff}초 후 재시도합니다...")
                 time.sleep(backoff)
                 backoff *= 2
                 attempt += 1
                 
-        logger.error(f"최대 재시도 횟수({max_retries}) 초과. API 요청 실패: {start_idx}~{end_idx}")
-        return {}
+        logger.error(f"❌ 최대 재시도 횟수({max_retries}) 초과. API 요청 완전 실패: {start_idx}~{end_idx}")
+        raise Exception(f"식품나라 API 서버 통신 실패 (최대 재시도 초과): {start_idx}~{end_idx}")
 
     def check_keys_status(self):
         """모든 로드된 API 키의 상태를 테스트하여 출력합니다."""

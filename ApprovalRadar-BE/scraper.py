@@ -35,10 +35,10 @@ def run_scraper_job():
     try:
         new_data_rows = crawler.scan_for_updates()
         if not new_data_rows:
-            logger.info("No new updates found.")
+            logger.info("✨ 새로운 인허가 변경분이 감지되지 않았습니다.")
             return
             
-        logger.info(f"Processing {len(new_data_rows)} new/updated records...")
+        logger.info(f"🚀 {len(new_data_rows)}건의 새로운 인허가 변경분이 감지되었습니다. DB 업데이트를 시작합니다...")
         now = datetime.datetime.now().isoformat()
         
         from database import get_db
@@ -127,10 +127,10 @@ def run_scraper_job():
             # 모든 처리가 끝난 후 커밋
             conn.commit()
         
-        logger.info("Processing complete and committed to DB.")
+        logger.info("✅ 모든 변경분의 DB 업데이트 및 커밋이 완료되었습니다.")
             
     except Exception as e:
-        logger.error(f"Error during scraper job: {e}")
+        logger.error(f"❌ 크롤러 스케줄 작업 중 치명적인 오류 발생: {e}")
 
 if __name__ == "__main__":
     run_scraper_job()
