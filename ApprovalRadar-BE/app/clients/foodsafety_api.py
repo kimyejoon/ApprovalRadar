@@ -37,7 +37,7 @@ class ApiClient:
             new_key = self.api_keys[self.current_key_idx]
             logger.info(f"[키 회전] API 한도 초과! 새로운 키로 교체: {new_key[:5]}***")
                 
-    def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5) -> dict:
+    def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5, **kwargs) -> dict:
         """
         주어진 구간의 데이터를 조회합니다.
         - 한도 초과(INFO-300 등) 시 자동으로 키를 회전하고 재시도합니다.
@@ -49,6 +49,11 @@ class ApiClient:
         while attempt < max_retries:
             api_key = self.get_current_key()
             url = f"{settings.BASE_URL}/{api_key}/{service_id}/{settings.DATA_TYPE}/{start_idx}/{end_idx}"
+            
+            if kwargs:
+                # kwargs에 담긴 추가 조건을 변수명=값 형태로 URL에 조합 (예: /LCNS_NO=20240714123)
+                params = "&".join(f"{k}={v}" for k, v in kwargs.items())
+                url += f"/{params}"
             
             try:
                 response = requests.get(url, timeout=10)

@@ -22,6 +22,7 @@ def init_db():
             business_status TEXT,
             license_date TEXT,
             phone_number TEXT,
+            industry_type TEXT,
             representative_history TEXT DEFAULT '[]', -- JSON array
             licensing_history TEXT DEFAULT '[]', -- JSON array
             last_event_date TEXT,
@@ -34,6 +35,12 @@ def init_db():
     # 기존 테이블 구조 확인 및 마이그레이션
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='crawler_state'")
     has_crawler_state = cursor.fetchone() is not None
+
+    # Check if businesses table has industry_type column
+    cursor.execute("PRAGMA table_info(businesses)")
+    biz_columns = [row[1] for row in cursor.fetchall()]
+    if "industry_type" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN industry_type TEXT")
 
     if has_crawler_state:
         cursor.execute("PRAGMA table_info(crawler_state)")

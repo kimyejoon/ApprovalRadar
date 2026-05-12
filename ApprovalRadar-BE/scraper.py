@@ -64,6 +64,7 @@ def run_scraper_for_service(service_id: str):
                     last_updt = row.get("LAST_UPDT_DTM", "")
                     cret_dtm = row.get("CRET_DTM", "")
                     event_date = last_updt if last_updt else (cret_dtm if cret_dtm else license_date)
+                    industry_type = row.get("INDUTY_CD_NM", "")
                 elif service_id == "I2500":
                     bssh_nm = row.get("BSSH_NM", "")
                     addr = row.get("SITE_ADDR") or row.get("ADDR", "")
@@ -72,6 +73,7 @@ def run_scraper_for_service(service_id: str):
                     license_date = row.get("PRMS_DT", "")
                     phone_number = row.get("TELNO", "")
                     event_date = row.get("CHNG_DT", "") or license_date
+                    industry_type = row.get("INDUTY_CD_NM", "")
                 else:
                     logger.warning(f"Unknown service_id: {service_id}. Skipping row mapping.")
                     continue
@@ -91,6 +93,7 @@ def run_scraper_for_service(service_id: str):
                         "business_status": business_status,
                         "license_date": license_date,
                         "phone_number": phone_number,
+                        "industry_type": industry_type,
                         "last_event_date": event_date
                     }
                     business_repo.insert_business(record, conn=conn)
@@ -124,13 +127,14 @@ def run_scraper_for_service(service_id: str):
                         })
                         is_updated = True
                         
-                    if is_updated:
+                    if is_updated or (industry_type and not db_record.get("industry_type")):
                         updates = {
                             "business_name": bssh_nm,
                             "address": addr,
                             "representative_name": rep_name,
                             "business_status": business_status if business_status is not None else prev_status,
                             "phone_number": phone_number,
+                            "industry_type": industry_type if industry_type else db_record.get("industry_type"),
                             "representative_history": json.dumps(rep_history, ensure_ascii=False),
                             "licensing_history": json.dumps(lic_history, ensure_ascii=False),
                             "last_event_date": event_date,
