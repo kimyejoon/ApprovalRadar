@@ -2,7 +2,8 @@ from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import math
-from database import init_db, vacuum_db
+import time
+from database import init_db, vacuum_db, backup_db
 from apscheduler.schedulers.background import BackgroundScheduler
 from scraper import run_scraper_job
 from pydantic import BaseModel
@@ -83,6 +84,7 @@ async def lifespan(app: FastAPI):
     scheduler = BackgroundScheduler()
     scheduler.add_job(run_scraper_job, 'interval', minutes=10)
     scheduler.add_job(vacuum_db, 'cron', day_of_week='sun', hour=3, minute=0)
+    scheduler.add_job(backup_db, 'cron', hour=4, minute=0)
     scheduler.start()
     
     # Run once on startup to catch up
@@ -137,6 +139,9 @@ def get_approvals(
         logger.error(f"Database error in get_approvals: {e}")
         raise HTTPException(status_code=500, detail="데이터 제공처의 응답이 지연되고 있거나 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
 
+INDICATORS_CACHE = {}
+CACHE_TTL = 600  # 10 minutes
+
 @app.get("/api/v1/approvals/indicators", response_model=IndicatorsResponse)
 def get_approval_indicators(
     search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
@@ -146,9 +151,15 @@ def get_approval_indicators(
     repo: BusinessRepository = Depends(get_business_repo)
 ):
     try:
+        cache_key = str((search, start_date, end_date, tuple(regions) if regions else None))
+        cached = INDICATORS_CACHE.get(cache_key)
+        
+        if cached and time.time() - cached['time'] < CACHE_TTL:
+            return cached['data']
+            
         total_approvals, status_distribution, trend_chart = repo.get_indicators(search, start_date, end_date, regions)
             
-        return {
+        response_data = {
             "status": "success",
             "data": {
                 "total_approvals": total_approvals,
@@ -156,9 +167,30 @@ def get_approval_indicators(
                 "trend_chart": trend_chart
             }
         }
+        
+        INDICATORS_CACHE[cache_key] = {"time": time.time(), "data": response_data}
+        return response_data
     except Exception as e:
         logger.error(f"Database error in get_approval_indicators: {e}")
         raise HTTPException(status_code=500, detail="내부 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
+
+@app.get("/health")
+def health_check():
+    import sqlite3
+    from database import DB_FILE
+    db_status = "ok"
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.execute("SELECT 1")
+        conn.close()
+    except Exception:
+        db_status = "error"
+        
+    return {
+        "status": "ok",
+        "db_connection": db_status,
+        "timestamp": datetime.now().isoformat()
+    }
 
 @app.get("/api/v1/approvals/export")
 def export_approvals_excel(
