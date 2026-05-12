@@ -50,10 +50,23 @@ def init_db():
         )
     ''')
     
+    # 시스템 로깅 테이블 (DB 로깅용)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS system_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            level TEXT,
+            module TEXT,
+            message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     # 성능 최적화를 위한 인덱스 생성
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_businesses_last_event_date ON businesses (last_event_date);')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_businesses_created_at ON businesses (created_at);')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_businesses_business_name ON businesses (business_name);')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs (level);')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs (created_at);')
     
     conn.commit()
     conn.close()
