@@ -7,6 +7,7 @@ class Settings:
     # Food Safety OpenAPI
     BASE_URL = "http://openapi.foodsafetykorea.go.kr/api"
     SERVICE_ID = "I2859"
+    SERVICES = ["I2859", "I2500"]
     DATA_TYPE = "json"
     
     # Crawler Settings

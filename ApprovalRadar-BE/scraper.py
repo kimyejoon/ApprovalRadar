@@ -21,16 +21,16 @@ def parse_representatives(rep_str: str) -> List[str]:
     parts = re.split(r'[,/&]|및', rep_str)
     return [p.strip() for p in parts if p.strip()]
 
-def run_scraper_job():
+def run_scraper_for_service(service_id: str):
     import time
     start_time = time.time()
-    logger.info("Starting DiffCrawler Delta Sync Job...")
+    logger.info(f"Starting DiffCrawler Delta Sync Job for {service_id}...")
     
     # DB 초기화 (테이블 없으면 생성, WAL 모드 적용 등)
     init_db()
     
     api_client = ApiClient()
-    crawler = DiffCrawlerEngine(api_client=api_client)
+    crawler = DiffCrawlerEngine(api_client=api_client, service_id=service_id)
     business_repo = BusinessRepository()
     raw_repo = RawDataRepository()
     
@@ -40,7 +40,7 @@ def run_scraper_job():
             # 이미 crawler 내부에서 소요시간이 찍히므로 여기선 중복 메시지 생략 또는 최소화
             return
             
-        logger.info(f"🚀 {len(new_data_rows)}건의 새로운 인허가 변경분이 감지되었습니다. DB 업데이트를 시작합니다...")
+        logger.info(f"🚀 {len(new_data_rows)}건의 새로운 인허가 변경분이 {service_id}에서 감지되었습니다. DB 업데이트를 시작합니다...")
         now = datetime.datetime.now().isoformat()
         
         from database import get_db
@@ -54,16 +54,28 @@ def run_scraper_job():
                 raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
                 
                 # 2. Main 테이블(businesses) 파싱 준비
-                bssh_nm = row.get("BSSH_NM", "")
-                addr = row.get("LOCP_ADDR", "")
-                rep_name = row.get("PRSDNT_NM", "")
-                business_status = row.get("BSN_STATE_NM", "")
-                license_date = row.get("PRMS_DT", "")
-                phone_number = row.get("TELNO", "")
-                last_updt = row.get("LAST_UPDT_DTM", "")
-                cret_dtm = row.get("CRET_DTM", "")
-                
-                event_date = last_updt if last_updt else (cret_dtm if cret_dtm else license_date)
+                if service_id == "I2859":
+                    bssh_nm = row.get("BSSH_NM", "")
+                    addr = row.get("LOCP_ADDR", "")
+                    rep_name = row.get("PRSDNT_NM", "")
+                    business_status = row.get("BSN_STATE_NM", "")
+                    license_date = row.get("PRMS_DT", "")
+                    phone_number = row.get("TELNO", "")
+                    last_updt = row.get("LAST_UPDT_DTM", "")
+                    cret_dtm = row.get("CRET_DTM", "")
+                    event_date = last_updt if last_updt else (cret_dtm if cret_dtm else license_date)
+                elif service_id == "I2500":
+                    bssh_nm = row.get("BSSH_NM", "")
+                    addr = row.get("SITE_ADDR") or row.get("ADDR", "")
+                    rep_name = row.get("PRSDNT_NM", "")
+                    business_status = None # 데이터 무결성을 위해 비워둠
+                    license_date = row.get("PRMS_DT", "")
+                    phone_number = row.get("TELNO", "")
+                    event_date = row.get("CHNG_DT", "") or license_date
+                else:
+                    logger.warning(f"Unknown service_id: {service_id}. Skipping row mapping.")
+                    continue
+
                 if event_date and len(event_date) > 8:
                     event_date = event_date[:8]
                     
@@ -94,7 +106,7 @@ def run_scraper_job():
                     old_reps = parse_representatives(prev_rep)
                     new_reps = parse_representatives(rep_name)
                     
-                    if set(old_reps) != set(new_reps):
+                    if rep_name and set(old_reps) != set(new_reps):
                         rep_history.append({
                             "date": now,
                             "prev": prev_rep,
@@ -103,7 +115,7 @@ def run_scraper_job():
                         is_updated = True
                         
                     # 영업 상태 변경 감지
-                    if prev_status != business_status:
+                    if business_status is not None and prev_status != business_status:
                         lic_history.append({
                             "date": now,
                             "type": "상태변경",
@@ -117,7 +129,7 @@ def run_scraper_job():
                             "business_name": bssh_nm,
                             "address": addr,
                             "representative_name": rep_name,
-                            "business_status": business_status,
+                            "business_status": business_status if business_status is not None else prev_status,
                             "phone_number": phone_number,
                             "representative_history": json.dumps(rep_history, ensure_ascii=False),
                             "licensing_history": json.dumps(lic_history, ensure_ascii=False),
@@ -130,10 +142,16 @@ def run_scraper_job():
             conn.commit()
         
         total_elapsed = time.time() - start_time
-        logger.info(f"✅ [총 소요시간: {total_elapsed:.2f}초] 모든 변경분({len(new_data_rows)}건)의 DB 업데이트 및 커밋 완료.")
+        logger.info(f"✅ [{service_id} 총 소요시간: {total_elapsed:.2f}초] 모든 변경분({len(new_data_rows)}건)의 DB 업데이트 및 커밋 완료.")
             
     except Exception as e:
-        logger.error(f"❌ 크롤러 스케줄 작업 중 치명적인 오류 발생: {e}")
+        logger.error(f"❌ {service_id} 크롤러 스케줄 작업 중 치명적인 오류 발생: {e}")
+
+def run_all_scrapers():
+    from app.core.config import settings
+    services = getattr(settings, "SERVICES", ["I2859", "I2500"])
+    for svc in services:
+        run_scraper_for_service(svc)
 
 if __name__ == "__main__":
-    run_scraper_job()
+    run_all_scrapers()

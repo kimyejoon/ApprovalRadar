@@ -37,7 +37,7 @@ class ApiClient:
             new_key = self.api_keys[self.current_key_idx]
             logger.info(f"[키 회전] API 한도 초과! 새로운 키로 교체: {new_key[:5]}***")
                 
-    def fetch_data(self, start_idx: int, end_idx: int, max_retries: int = 5) -> dict:
+    def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5) -> dict:
         """
         주어진 구간의 데이터를 조회합니다.
         - 한도 초과(INFO-300 등) 시 자동으로 키를 회전하고 재시도합니다.
@@ -48,16 +48,16 @@ class ApiClient:
         
         while attempt < max_retries:
             api_key = self.get_current_key()
-            url = f"{settings.BASE_URL}/{api_key}/{settings.SERVICE_ID}/{settings.DATA_TYPE}/{start_idx}/{end_idx}"
+            url = f"{settings.BASE_URL}/{api_key}/{service_id}/{settings.DATA_TYPE}/{start_idx}/{end_idx}"
             
             try:
                 response = requests.get(url, timeout=10)
                 response.raise_for_status()
                 res = response.json()
                 
-                if settings.SERVICE_ID in res:
-                    code = res[settings.SERVICE_ID]['RESULT']['CODE']
-                    msg = res[settings.SERVICE_ID]['RESULT']['MSG']
+                if service_id in res:
+                    code = res[service_id]['RESULT']['CODE']
+                    msg = res[service_id]['RESULT']['MSG']
                     
                     if code == "INFO-000" or code == "INFO-200":
                         return res
@@ -91,19 +91,19 @@ class ApiClient:
         logger.error(f"❌ 최대 재시도 횟수({max_retries}) 초과. API 요청 완전 실패: {start_idx}~{end_idx}")
         raise Exception(f"식품나라 API 서버 통신 실패 (최대 재시도 초과): {start_idx}~{end_idx}")
 
-    def check_keys_status(self):
+    def check_keys_status(self, service_id: str = "I2859"):
         """모든 로드된 API 키의 상태를 테스트하여 출력합니다."""
         logger.info(f"\n--- API 키 상태 점검 시작 (총 {len(self.api_keys)}개) ---")
         
         for idx, key in enumerate(self.api_keys):
             masked_key = f"{key[:5]}***{key[-3:]}" if len(key) > 8 else "***"
-            url = f"{settings.BASE_URL}/{key}/{settings.SERVICE_ID}/{settings.DATA_TYPE}/1/1"
+            url = f"{settings.BASE_URL}/{key}/{service_id}/{settings.DATA_TYPE}/1/1"
             
             try:
                 res = requests.get(url, timeout=5).json()
-                if settings.SERVICE_ID in res:
-                    code = res[settings.SERVICE_ID]['RESULT']['CODE']
-                    msg = res[settings.SERVICE_ID]['RESULT']['MSG']
+                if service_id in res:
+                    code = res[service_id]['RESULT']['CODE']
+                    msg = res[service_id]['RESULT']['MSG']
                     
                     if code == "INFO-000":
                         status = "[bold green]정상 동작 (Active)[/bold green]"

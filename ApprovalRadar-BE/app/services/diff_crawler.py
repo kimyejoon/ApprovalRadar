@@ -7,19 +7,20 @@ from app.repositories.state_repository import StateRepository
 from app.core.logger import logger
 
 class DiffCrawlerEngine:
-    def __init__(self, api_client: ApiClient):
+    def __init__(self, api_client: ApiClient, service_id: str):
         self.api_client = api_client
+        self.service_id = service_id
         self.state_repo = StateRepository()
 
     def _fetch_single(self, idx: int):
         """특정 인덱스 1건 조회. INFO-200(데이터 없음)이면 None 반환"""
-        res = self.api_client.fetch_data(idx, idx)
-        if not res or settings.SERVICE_ID not in res:
+        res = self.api_client.fetch_data(self.service_id, idx, idx)
+        if not res or self.service_id not in res:
             return None
             
-        code = res[settings.SERVICE_ID]['RESULT']['CODE']
+        code = res[self.service_id]['RESULT']['CODE']
         if code == "INFO-000":
-            return res[settings.SERVICE_ID]['row'][0]
+            return res[self.service_id]['row'][0]
         elif code == "INFO-200":
             return None
         return None
@@ -66,14 +67,14 @@ class DiffCrawlerEngine:
             "last_total_count": total_count,
             "pivots": pivots
         }
-        self.state_repo.save_state(state)
+        self.state_repo.save_state(self.service_id, state)
         logger.info(f"[Bootstrapper] 부트스트랩 완료! 총 {len(pivots)}개의 피벗 색인 생성됨.")
         return state
 
     def scan_for_updates(self):
         """주기적으로 실행되어 차분(Delta)을 감지합니다."""
         start_time = time.time()
-        state = self.state_repo.load_state()
+        state = self.state_repo.load_state(self.service_id)
         if state["last_total_count"] == 0:
             logger.info("최초 실행: 베이스라인 부트스트랩을 시작합니다...")
             state = self.bootstrap()
@@ -167,12 +168,12 @@ class DiffCrawlerEngine:
             current_start = new_start
             while current_start <= new_end:
                 current_end = min(current_start + 999, new_end)
-                res = self.api_client.fetch_data(current_start, current_end)
+                res = self.api_client.fetch_data(self.service_id, current_start, current_end)
                 
-                if res and settings.SERVICE_ID in res:
-                    code = res[settings.SERVICE_ID]['RESULT']['CODE']
+                if res and self.service_id in res:
+                    code = res[self.service_id]['RESULT']['CODE']
                     if code == "INFO-000":
-                        rows = res[settings.SERVICE_ID]['row']
+                        rows = res[self.service_id]['row']
                         fetched_rows.extend(rows)
                 
                 current_start += 1000
@@ -207,6 +208,6 @@ class DiffCrawlerEngine:
             
         state["last_total_count"] = new_tail
         state["pivots"] = new_pivots
-        self.state_repo.save_state(state)
+        self.state_repo.save_state(self.service_id, state)
         
         return new_data_rows
