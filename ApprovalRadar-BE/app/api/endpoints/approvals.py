@@ -97,8 +97,10 @@ def get_approval_indicators(
 
 @router.get("/export")
 def export_approvals_excel(
+    search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
     start_date: Optional[str] = Query(None, description="조회 시작일 (YYYYMMDD)"),
-    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYYMMDD)")
+    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYYMMDD)"),
+    regions: Optional[List[str]] = Depends(parse_comma_separated_list)
 ):
     try:
         # Default to today if both are empty
@@ -111,7 +113,7 @@ def export_approvals_excel(
             end_date_db = end_date.replace('-', '') if end_date else None
 
         # Generate the excel file in a buffer
-        excel_buffer = generate_excel_export(start_date_db, end_date_db)
+        excel_buffer = generate_excel_export(start_date_db, end_date_db, search, regions)
         
         # Build filename
         date_str = ""

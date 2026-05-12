@@ -4,28 +4,18 @@ from openpyxl.styles import Font, Alignment
 from database import get_db
 from typing import Optional
 
-def generate_excel_export(start_date: Optional[str], end_date: Optional[str]) -> io.BytesIO:
+def generate_excel_export(start_date: Optional[str], end_date: Optional[str], search: Optional[str] = None, regions: Optional[list] = None) -> io.BytesIO:
     """
-    주어진 날짜 조건에 맞춰 데이터를 조회한 후,
+    주어진 조건에 맞춰 데이터를 조회한 후,
     엑셀 파일 데이터(io.BytesIO)로 반환합니다.
     """
+    from app.repositories.business_repository import BusinessRepository
+    
     with get_db() as conn:
         cursor = conn.cursor()
         
-        query_conditions = []
-        params = []
-        
-        if start_date:
-            query_conditions.append("last_event_date >= ?")
-            params.append(start_date)
-            
-        if end_date:
-            query_conditions.append("last_event_date <= ?")
-            params.append(end_date)
-            
-        where_clause = ""
-        if query_conditions:
-            where_clause = " WHERE " + " AND ".join(query_conditions)
+        repo = BusinessRepository()
+        where_clause, params = repo._build_where_clause(search, start_date, end_date, regions)
             
         # 데이터 조회 (last_event_date 또는 created_at 기준 내림차순)
         query = f"SELECT * FROM businesses{where_clause} ORDER BY last_event_date DESC, created_at DESC"
@@ -54,13 +44,19 @@ def generate_excel_export(start_date: Optional[str], end_date: Optional[str]) ->
     # 데이터 입력
     for row in rows:
         record = dict(row)
+        
+        # Format dates if necessary, or just return as is
+        last_event_date = record.get("last_event_date", "")
+        if last_event_date and len(last_event_date) == 8:
+            last_event_date = f"{last_event_date[:4]}-{last_event_date[4:6]}-{last_event_date[6:]}"
+            
         ws.append([
             record.get("business_name", ""),
             record.get("address", ""),
             record.get("license_no", ""),
             record.get("representative_name", ""),
             record.get("business_status", ""),
-            record.get("license_date", ""),
+            last_event_date,
             record.get("phone_number", "")
         ])
 

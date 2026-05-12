@@ -34,3 +34,7 @@
 * 엑셀 다운로드 API(`/api/v1/approvals/export`) 호출 시 브라우저(프론트엔드)에서 `Content-Disposition` 헤더를 읽어 파일명을 제대로 처리할 수 있도록 `main.py`의 CORS 설정에 `expose_headers=["Content-Disposition"]`를 추가함.
 * `GET /api/v1/approvals/indicators` API의 `total_approvals` 지표가 조회 기간 전체 합계가 아닌, 조회 종료일(또는 당일) 하루의 건수만 반환하도록 수정함.
 * `GET /api/v1/approvals/indicators` API에서 30일 누적치(`total_approvals`)와 당일 변동 건수(`today_approvals`)를 모두 반환하도록 스키마 및 레포지토리 로직 분리 및 추가
+* 포스트맨(Postman) 컬렉션에 없는 `/api/v1/approvals/export` API를 테스트하기 위해, 수동으로 새 GET Request를 추가하거나 cURL 명령어를 임포트하여 다운로드(Send and Download)하는 방법을 안내함.
+* 엑셀 다운로드 API(`/api/v1/approvals/export`) 호출 시 필터링은 정상 동작(last_event_date 기준)하고 있었으나, 다운로드된 엑셀 파일 내의 '인허가시각'이 DB의 최초 인허가일(`license_date`)과 매핑되어 있어 날짜가 맞지 않는 것처럼 보이는 오류를 수정함.
+* 사용자의 요청에 따라 엑셀의 '인허가시각' 항목이 DB의 `last_event_date`(최종변경일자)와 매핑되도록 연결값을 수정하여, 파라미터 필터 조건과 엑셀 결과값이 일치하도록 조치함.
+* 대시보드와 동일한 데이터가 추출되도록 `/export` API 엔드포인트와 내부 엑셀 생성 로직(`generate_excel_export`)에 `search` (검색 키워드) 및 `regions` (지역) 파라미터 연동을 추가함.
