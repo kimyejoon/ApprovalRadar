@@ -22,12 +22,14 @@ def init_db():
             business_status TEXT,
             license_date TEXT,
             phone_number TEXT,
-            representative_history TEXT DEFAULT '[]', -- JSON array
-            licensing_history TEXT DEFAULT '[]', -- JSON array
             last_event_date TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_new INTEGER DEFAULT 1 -- 1 for True, 0 for False
+            is_new INTEGER DEFAULT 1,
+            update_type TEXT,
+            prev_business_status TEXT,
+            prev_representative_name TEXT,
+            prev_business_name TEXT
         )
     ''')
     

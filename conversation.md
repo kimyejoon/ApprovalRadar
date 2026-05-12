@@ -20,3 +20,13 @@
 * 전역 파이썬(global python)으로 서버를 실행하여 발생한 FastAPI 모듈 인식 오류 해결. 프로젝트의 가상환경(.venv)을 활성화하여 실행하도록 안내함.
 * `git pull origin dev` 명령어 실행 중 발생한 "divergent branches" 오류 해결을 위해 `git config pull.rebase false` (Merge 방식) 설정 후 성공적으로 병합을 완료함.
 * 새 터미널 창에서 가상환경 미활성화 및 경로 문제로 발생한 `uvicorn: command not found` 에러 해결을 위해 올바른 경로 이동(`ApprovalRadar-BE`) 및 `.venv` 활성화 방법을 안내함.
+* `/api/v1/approvals` 관련 API 엔드포인트(`get_approvals`, `get_approval_indicators`, `export_approvals_excel`)의 날짜 파라미터 Swagger 문서 설명을 `(YYYY-MM-DD)`에서 실제 동작과 일치하도록 `(YYYYMMDD)`로 수정함.
+* DB `licensing_history` JSON 데이터 구조 변경(type 내용만 남기기) 시 발생할 수 있는 백엔드 API 스키마(`BusinessModel`) 및 프론트엔드 연동 부분의 구조적 변경 가능성을 분석하여 안내함.
+* 기존 JSON 형태의 컬럼을 제거하고 필요한 내용만 추출하여 단일 문자열(String)로 저장하는 방안의 영향도(데이터베이스, 스크래퍼, 레포지토리, 스키마, 프론트엔드 변경점)를 안내함.
+* 프론트엔드 소스코드 분석 결과, 현재 `licensing_history`나 `representative_history` 컬럼은 데이터만 받아올 뿐 UI(상세 모달 등)에 전혀 노출 및 사용되지 않고 있음을 확인하여, 단일 문자열로 변경해도 프론트엔드 화면이 깨지는 부작용이 없음을 안내함.
+* 기존 JSON 형태의 변경 이력(licensing_history, representative_history) 컬럼을 삭제하고, 변경 타입(update_type) 및 이전 상태값(prev_business_status, prev_representative_name, prev_business_name)을 담는 플랫(flat)한 문자열 컬럼들로 데이터베이스 구조를 최적화(정규화)함.
+* 기존 JSON 데이터를 파싱하여 새 컬럼 구조에 맞게 데이터를 마이그레이션하는 스크립트 작성 및 실행 완료.
+* 백엔드 API 스키마() 및 데이터 수집기()에서 JSON 업데이트 로직을 제거하고 새 컬럼 기반으로 즉시 업데이트되도록 로직 간소화 적용 완료.
+* 기존 JSON 형태의 변경 이력(licensing_history, representative_history) 컬럼을 삭제하고, 변경 타입(update_type) 및 이전 상태값(prev_business_status, prev_representative_name, prev_business_name)을 담는 플랫(flat)한 문자열 컬럼들로 데이터베이스 구조를 최적화(정규화)함.
+* 기존 JSON 데이터를 파싱하여 새 컬럼 구조에 맞게 데이터를 마이그레이션하는 스크립트 작성 및 실행 완료.
+* 백엔드 API 스키마(BusinessModel) 및 데이터 수집기(scraper.py)에서 JSON 업데이트 로직을 제거하고 새 컬럼 기반으로 즉시 업데이트되도록 로직 간소화 적용 완료.

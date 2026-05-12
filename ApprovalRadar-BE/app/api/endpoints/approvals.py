@@ -31,8 +31,8 @@ def get_approvals(
     page: int = Query(1, ge=1, description="페이지 번호"),
     size: int = Query(10, ge=1, le=100, description="페이지 당 항목 수"),
     search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
-    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)"),
+    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYYMMDD)"),
+    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYYMMDD)"),
     regions: Optional[List[str]] = Depends(parse_comma_separated_list),
     sort_by: str = Query("created_at", description="정렬 기준 컬럼"),
     sort_order: str = Query("desc", description="정렬 방향 (asc | desc)"),
@@ -57,8 +57,8 @@ def get_approvals(
 @router.get("/indicators", response_model=IndicatorsResponse)
 def get_approval_indicators(
     search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
-    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)"),
+    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYYMMDD)"),
+    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYYMMDD)"),
     regions: Optional[List[str]] = Depends(parse_comma_separated_list),
     repo: BusinessRepository = Depends(get_business_repo)
 ):
@@ -88,8 +88,8 @@ def get_approval_indicators(
 
 @router.get("/export")
 def export_approvals_excel(
-    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)")
+    start_date: Optional[str] = Query(None, description="조회 시작일 (YYYYMMDD)"),
+    end_date: Optional[str] = Query(None, description="조회 종료일 (YYYYMMDD)")
 ):
     try:
         # Default to today if both are empty

@@ -85,31 +85,34 @@ def run_scraper_job():
                 else:
                     prev_rep = db_record.get("representative_name", "")
                     prev_status = db_record.get("business_status", "")
-                    rep_history = json.loads(db_record.get("representative_history") or "[]")
-                    lic_history = json.loads(db_record.get("licensing_history") or "[]")
+                    prev_name = db_record.get("business_name", "")
                     
                     is_updated = False
+                    
+                    update_type = None
+                    prev_business_status_val = None
+                    prev_representative_name_val = None
+                    prev_business_name_val = None
                     
                     # 대표자 변경 감지
                     old_reps = parse_representatives(prev_rep)
                     new_reps = parse_representatives(rep_name)
                     
                     if set(old_reps) != set(new_reps):
-                        rep_history.append({
-                            "date": now,
-                            "prev": prev_rep,
-                            "new": rep_name
-                        })
+                        update_type = "대표자변경"
+                        prev_representative_name_val = prev_rep
                         is_updated = True
                         
                     # 영업 상태 변경 감지
                     if prev_status != business_status:
-                        lic_history.append({
-                            "date": now,
-                            "type": "상태변경",
-                            "prev": prev_status,
-                            "new": business_status
-                        })
+                        update_type = "상태변경"
+                        prev_business_status_val = prev_status
+                        is_updated = True
+                        
+                    # 업소명 변경 감지 (API에 명칭 변경이 있는 경우 등)
+                    if prev_name != bssh_nm:
+                        update_type = "명칭변경"
+                        prev_business_name_val = prev_name
                         is_updated = True
                         
                     if is_updated:
@@ -119,8 +122,10 @@ def run_scraper_job():
                             "representative_name": rep_name,
                             "business_status": business_status,
                             "phone_number": phone_number,
-                            "representative_history": json.dumps(rep_history, ensure_ascii=False),
-                            "licensing_history": json.dumps(lic_history, ensure_ascii=False),
+                            "update_type": update_type,
+                            "prev_business_status": prev_business_status_val,
+                            "prev_representative_name": prev_representative_name_val,
+                            "prev_business_name": prev_business_name_val,
                             "last_event_date": event_date,
                             "updated_at": now
                         }
