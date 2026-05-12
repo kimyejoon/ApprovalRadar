@@ -22,7 +22,7 @@
   --color-card-foreground: var(--text-primary);
   --color-popover: var(--surface);
   --color-popover-foreground: var(--text-primary);
-  --color-primary: var(--brand);
+  --color-primary: var(--color-brand);
   --color-primary-foreground: #ffffff;
   --color-secondary: var(--bg);
   --color-secondary-foreground: var(--text-secondary);
@@ -34,7 +34,7 @@
   --color-destructive-foreground: #ffffff;
   --color-border: var(--border-standard);
   --color-input: var(--border-standard);
-  --color-ring: var(--brand);
+  --color-ring: var(--color-brand);
 
   --font-sans: 'Pretendard', 'Circular', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-mono: 'Source Code Pro', 'Office Code Pro', Menlo, monospace;
