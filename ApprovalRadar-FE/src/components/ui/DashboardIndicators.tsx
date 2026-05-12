@@ -48,7 +48,23 @@ export function DashboardIndicators({ searchQuery, locationFilters }: DashboardI
   // 트렌드 차트 데이터 (Bar Chart)
   const barData = useMemo(() => {
     if (!data?.trend_chart) return [];
-    return data.trend_chart;
+    return data.trend_chart.map(item => {
+      let formattedDate = item.date;
+      if (item.date && item.date.length === 8 && !item.date.includes('-')) {
+        const month = parseInt(item.date.substring(4, 6), 10);
+        const day = parseInt(item.date.substring(6, 8), 10);
+        formattedDate = `${month}월 ${day}일`;
+      } else if (item.date && item.date.includes('-')) {
+        const parts = item.date.split('-');
+        if (parts.length === 3) {
+          formattedDate = `${parseInt(parts[1], 10)}월 ${parseInt(parts[2], 10)}일`;
+        }
+      }
+      return {
+        ...item,
+        date: formattedDate
+      };
+    });
   }, [data?.trend_chart]);
 
   return (
