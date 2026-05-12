@@ -92,6 +92,13 @@ class ApiClient:
             except (requests.exceptions.RequestException, ValueError) as e:
                 logger.warning(f"[네트워크/응답 오류] {str(e)}. {backoff}초 후 재시도합니다...")
                 time.sleep(backoff)
+                
+                # 2회 이상 연속으로 파싱 에러(WAF 차단 등)가 나면, IP 차단이 아니라 키 단위 차단일 수 있으므로 키를 회전합니다.
+                if attempt >= 2:
+                    logger.warning("연속적인 응답 오류 발생! 해당 키가 WAF에 의해 임시 차단된 것으로 의심되어 키를 회전합니다.")
+                    self.rotate_key(api_key)
+                    time.sleep(settings.GAP_SECONDS)
+                    
                 backoff *= 2
                 attempt += 1
                 
