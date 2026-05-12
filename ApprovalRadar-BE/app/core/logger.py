@@ -11,6 +11,26 @@ class SQLiteHandler(logging.Handler):
     def __init__(self, db_file: str):
         super().__init__()
         self.db_file = db_file
+        self._create_table_if_not_exists()
+        
+    def _create_table_if_not_exists(self):
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    level TEXT,
+                    module TEXT,
+                    message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            # 로거 초기화 중 에러는 print로 대체 (무한루프 방지)
+            print(f"Failed to create system_logs table: {e}")
 
     def emit(self, record):
         try:
