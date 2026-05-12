@@ -7,6 +7,7 @@ import threading
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from database import init_db, get_db
 from app.clients.foodsafety_api import ApiClient
+from app.core.config import settings
 from app.core.logger import logger
 from app.repositories.business_repository import BusinessRepository
 
@@ -81,11 +82,11 @@ def fill_missing_industry_types():
         
         # Rate Limiting (WAF 차단 방지)
         # 공공데이터포털/식품안전나라는 짧은 순간의 동시 요청(Burst)에 매우 민감하여 IP를 차단합니다.
-        # 따라서 안전하게 0.5초 대기를 주고 워커 1개로 순차 처리합니다.
-        time.sleep(0.5)
+        # 기존 워커 간 gap 시간인 settings.GAP_SECONDS(예: 3초)를 활용하여 순차 처리합니다.
+        time.sleep(settings.GAP_SECONDS)
 
     # 안전성을 최우선으로 하여 순차적(단일 워커)으로 백필을 수행합니다.
-    # 0.5초 간격으로 진행하므로 WAF 차단을 완벽히 회피할 수 있습니다.
+    # GAP_SECONDS 간격으로 진행하므로 WAF 차단을 완벽히 회피할 수 있습니다.
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         executor.map(process_license, missing_licenses)
         
