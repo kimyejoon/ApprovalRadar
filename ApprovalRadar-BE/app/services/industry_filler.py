@@ -80,11 +80,13 @@ def fill_missing_industry_types():
                 logger.info(f"[진척도] {processed_count}/{total_missing} 처리 완료 (성공: {success_count}, 실패: {fail_count})")
         
         # Rate Limiting (WAF 차단 방지)
-        time.sleep(0.1)
+        # 공공데이터포털/식품안전나라는 짧은 순간의 동시 요청(Burst)에 매우 민감하여 IP를 차단합니다.
+        # 따라서 안전하게 0.5초 대기를 주고 워커 1개로 순차 처리합니다.
+        time.sleep(0.5)
 
-    # 동시 워커 수를 3개로 제한하여 차단을 회피
-    # 3 * 0.1s delay = 약 10~15 req/sec
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+    # 안전성을 최우선으로 하여 순차적(단일 워커)으로 백필을 수행합니다.
+    # 0.5초 간격으로 진행하므로 WAF 차단을 완벽히 회피할 수 있습니다.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         executor.map(process_license, missing_licenses)
         
     logger.info(f"🎉 백필 작업 완료! 총 {processed_count}건 중 {success_count}건 성공, {fail_count}건 실패.")
