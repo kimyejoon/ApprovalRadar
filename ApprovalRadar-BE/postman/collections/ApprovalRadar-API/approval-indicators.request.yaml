@@ -1,0 +1,46 @@
+$kind: http-request
+name: GET Approval Indicators
+method: GET
+url: 'http://192.168.10.235:8000/api/v1/approvals/indicators'
+order: 3000
+queryParams:
+  - key: search
+    value: ''
+    disabled: true
+  - key: start_date
+    value: ''
+    disabled: true
+  - key: end_date
+    value: ''
+    disabled: true
+  - key: regions
+    value: ''
+    disabled: true
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Response has status field", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("status");
+          pm.expect(json.status).to.eql("success");
+      });
+      pm.test("Response has total_approvals", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("data");
+          pm.expect(json.data).to.have.property("total_approvals");
+          pm.expect(json.data.total_approvals).to.be.a("number");
+      });
+      pm.test("Response has status_distribution array", function () {
+          const json = pm.response.json();
+          pm.expect(json.data).to.have.property("status_distribution");
+          pm.expect(json.data.status_distribution).to.be.an("array");
+      });
+      pm.test("Response has trend_chart array", function () {
+          const json = pm.response.json();
+          pm.expect(json.data).to.have.property("trend_chart");
+          pm.expect(json.data.trend_chart).to.be.an("array");
+      });

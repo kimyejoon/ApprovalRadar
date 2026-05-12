@@ -1,0 +1,30 @@
+$kind: http-request
+name: GET Single Approval
+method: GET
+url: 'http://192.168.10.235:8000/api/v1/approvals/{{approval_id}}'
+order: 4000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Response has status field", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("status");
+          pm.expect(json.status).to.eql("success");
+      });
+      pm.test("Response has data object", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("data");
+          pm.expect(json.data).to.be.an("object");
+      });
+      pm.test("Data has license_no field", function () {
+          const json = pm.response.json();
+          pm.expect(json.data).to.have.property("license_no");
+      });
+      pm.test("Data has business_name field", function () {
+          const json = pm.response.json();
+          pm.expect(json.data).to.have.property("business_name");
+      });

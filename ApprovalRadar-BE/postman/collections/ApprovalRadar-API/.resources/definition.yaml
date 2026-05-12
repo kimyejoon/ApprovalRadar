@@ -1,0 +1,7 @@
+$kind: collection
+name: ApprovalRadar API
+variables:
+  - key: baseUrl
+    value: 'http://192.168.10.235:8000/'
+  - key: approval_id
+    value: ''

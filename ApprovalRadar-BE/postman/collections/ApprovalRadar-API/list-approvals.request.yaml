@@ -1,0 +1,57 @@
+$kind: http-request
+name: GET List Approvals
+method: GET
+url: 'http://192.168.10.235:8000/api/v1/approvals'
+order: 2000
+queryParams:
+  - key: page
+    value: '1'
+  - key: size
+    value: '20'
+  - key: search
+    value: ''
+    disabled: true
+  - key: start_date
+    value: ''
+    disabled: true
+  - key: end_date
+    value: ''
+    disabled: true
+  - key: regions
+    value: ''
+    disabled: true
+  - key: sort_by
+    value: license_date
+    disabled: true
+  - key: sort_order
+    value: desc
+    disabled: true
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Response has status field", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("status");
+          pm.expect(json.status).to.eql("success");
+      });
+      pm.test("Response has data array", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("data");
+          pm.expect(json.data).to.be.an("array");
+      });
+      pm.test("Response has pagination meta", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("meta");
+          pm.expect(json.meta).to.have.property("total_count");
+          pm.expect(json.meta).to.have.property("current_page");
+          pm.expect(json.meta).to.have.property("total_pages");
+          pm.expect(json.meta).to.have.property("size");
+      });
+      const json = pm.response.json();
+      if (json.data && json.data.length > 0) {
+          pm.collectionVariables.set("approval_id", json.data[0].license_no);
+      }
