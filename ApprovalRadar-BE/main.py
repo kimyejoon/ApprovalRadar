@@ -1,13 +1,11 @@
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-import math
-import time
-from database import init_db, vacuum_db, backup_db
-from apscheduler.schedulers.background import BackgroundScheduler
-from scraper import run_scraper_job
+from database import init_db
+
 from app.core.logger import logger
 from app.api.router import api_router
+from app.core.scheduler import start_scheduler, shutdown_scheduler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -15,21 +13,12 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing Database...")
     init_db()
     
-    logger.info("Starting APScheduler for 10-minute scraping intervals...")
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(run_scraper_job, 'interval', minutes=10)
-    scheduler.add_job(vacuum_db, 'cron', day_of_week='sun', hour=3, minute=0)
-    scheduler.add_job(backup_db, 'cron', hour=4, minute=0)
-    scheduler.start()
-    
-    # Run once on startup to catch up
-    run_scraper_job()
+    start_scheduler()
     
     yield
     
     # Shutdown logic
-    logger.info("Shutting down...")
-    scheduler.shutdown()
+    shutdown_scheduler()
 
 app = FastAPI(title="Food Safety Data API", lifespan=lifespan)
 
