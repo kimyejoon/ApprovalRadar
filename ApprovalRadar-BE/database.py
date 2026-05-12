@@ -22,6 +22,9 @@ def init_db():
             business_status TEXT,
             license_date TEXT,
             phone_number TEXT,
+            industry_type TEXT,
+            representative_history TEXT DEFAULT '[]', -- JSON array
+            licensing_history TEXT DEFAULT '[]', -- JSON array
             last_event_date TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -33,10 +36,39 @@ def init_db():
         )
     ''')
     
-    # 크롤러 상태 관리 테이블 (단일 행 보장)
+    # 기존 테이블 구조 확인 및 마이그레이션
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='crawler_state'")
+    has_crawler_state = cursor.fetchone() is not None
+
+    # Check if businesses table has industry_type column
+    cursor.execute("PRAGMA table_info(businesses)")
+    biz_columns = [row[1] for row in cursor.fetchall()]
+    if "industry_type" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN industry_type TEXT")
+
+    if has_crawler_state:
+        cursor.execute("PRAGMA table_info(crawler_state)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "id" in columns and "service_id" not in columns:
+            cursor.execute('''
+                CREATE TABLE crawler_state_new (
+                    service_id TEXT PRIMARY KEY,
+                    last_total_count INTEGER DEFAULT 0,
+                    pivots TEXT DEFAULT '{}',
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            cursor.execute('''
+                INSERT INTO crawler_state_new (service_id, last_total_count, pivots, updated_at)
+                SELECT 'I2859', last_total_count, pivots, updated_at FROM crawler_state WHERE id = 1
+            ''')
+            cursor.execute('DROP TABLE crawler_state')
+            cursor.execute('ALTER TABLE crawler_state_new RENAME TO crawler_state')
+    
+    # 크롤러 상태 관리 테이블 (다중 API 지원)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS crawler_state (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
+            service_id TEXT PRIMARY KEY,
             last_total_count INTEGER DEFAULT 0,
             pivots TEXT DEFAULT '{}',
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -78,7 +78,7 @@ export function ApprovalTable({
               <CaretDown weight="bold" className="w-4 h-4" />
             </button>
           </TableHead>
-          <SortableHead label="인허가시각" sortKey="approvalDate" sortConfig={sortConfig} onSort={onSort} />
+          <SortableHead label="인허가 변동시각" sortKey="approvalDate" sortConfig={sortConfig} onSort={onSort} />
           <SortableHead label="전화번호" sortKey="phone" sortConfig={sortConfig} onSort={onSort} />
         </TableRow>
       </TableHeader>

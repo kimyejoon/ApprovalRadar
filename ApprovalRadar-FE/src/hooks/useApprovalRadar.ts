@@ -32,7 +32,7 @@ export function useApprovalRadar() {
         sortConfig.key === 'id' ? 'license_no' :
         sortConfig.key === 'name' ? 'business_name' :
         sortConfig.key === 'owner' ? 'representative_name' :
-        sortConfig.key === 'approvalDate' ? 'license_date' :
+        sortConfig.key === 'approvalDate' ? 'last_event_date' :
         sortConfig.key === 'phone' ? 'phone_number' : 'created_at'
       ) : 'created_at',
       sort_order: sortConfig ? sortConfig.direction : 'desc',
@@ -47,7 +47,7 @@ export function useApprovalRadar() {
         location: item.address,
         owner: item.representative_name,
         status: item.business_status,
-        approvalDate: item.license_date,
+        approvalDate: item.last_event_date,
         phone: item.phone_number,
         isTransfer: false,
         raw: item,

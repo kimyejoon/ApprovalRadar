@@ -55,9 +55,13 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
               <div className="text-text-muted mb-1">업종</div>
               <div className="text-text-primary">{selectedItem.type}</div>
             </div>
-            <div className="col-span-2">
-              <div className="text-text-muted mb-1">인허가시각</div>
-              <div className="text-text-primary">{formatApprovalDate(selectedItem.approvalDate)}</div>
+            <div>
+              <div className="text-text-muted mb-1">최초 인허가시각</div>
+              <div className="text-text-primary">{formatApprovalDate(selectedItem.raw.license_date)}</div>
+            </div>
+            <div>
+              <div className="text-text-muted mb-1">인허가 변동시각</div>
+              <div className="text-text-primary text-brand font-medium">{formatApprovalDate(selectedItem.approvalDate)}</div>
             </div>
           </div>
           

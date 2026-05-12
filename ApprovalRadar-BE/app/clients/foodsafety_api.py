@@ -37,7 +37,7 @@ class ApiClient:
             new_key = self.api_keys[self.current_key_idx]
             logger.info(f"[키 회전] API 한도 초과! 새로운 키로 교체: {new_key[:5]}***")
                 
-    def fetch_data(self, start_idx: int, end_idx: int, max_retries: int = 5) -> dict:
+    def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5, **kwargs) -> dict:
         """
         주어진 구간의 데이터를 조회합니다.
         - 한도 초과(INFO-300 등) 시 자동으로 키를 회전하고 재시도합니다.
@@ -48,22 +48,29 @@ class ApiClient:
         
         while attempt < max_retries:
             api_key = self.get_current_key()
-            url = f"{settings.BASE_URL}/{api_key}/{settings.SERVICE_ID}/{settings.DATA_TYPE}/{start_idx}/{end_idx}"
+            url = f"{settings.BASE_URL}/{api_key}/{service_id}/{settings.DATA_TYPE}/{start_idx}/{end_idx}"
+            
+            if kwargs:
+                # kwargs에 담긴 추가 조건을 변수명=값 형태로 URL에 조합 (예: /LCNS_NO=20240714123)
+                params = "&".join(f"{k}={v}" for k, v in kwargs.items())
+                url += f"/{params}"
             
             try:
                 response = requests.get(url, timeout=10)
                 response.raise_for_status()
                 res = response.json()
                 
-                if settings.SERVICE_ID in res:
-                    code = res[settings.SERVICE_ID]['RESULT']['CODE']
-                    msg = res[settings.SERVICE_ID]['RESULT']['MSG']
+                if service_id in res:
+                    code = res[service_id]['RESULT']['CODE']
+                    msg = res[service_id]['RESULT']['MSG']
                     
                     if code == "INFO-000" or code == "INFO-200":
                         return res
                     elif code in ["INFO-300", "INFO-333"] or "유효 호출건수" in msg:
-                        # 한도 초과: 키 회전 후 즉시 재시도 (백오프 적용 X)
+                        # 한도 초과: 키 회전 후 즉시 재시도 시 WAF에 걸릴 수 있으므로 짧은 대기 추가
                         self.rotate_key(api_key)
+                        logger.warning(f"키 회전 후 {settings.GAP_SECONDS}초 대기...")
+                        time.sleep(settings.GAP_SECONDS)
                         continue
                     elif code in ["ERROR-500", "ERROR-601"]:
                         # 서버 일시적 오류: 지수 백오프 적용
@@ -85,25 +92,32 @@ class ApiClient:
             except (requests.exceptions.RequestException, ValueError) as e:
                 logger.warning(f"[네트워크/응답 오류] {str(e)}. {backoff}초 후 재시도합니다...")
                 time.sleep(backoff)
+                
+                # 2회 이상 연속으로 파싱 에러(WAF 차단 등)가 나면, IP 차단이 아니라 키 단위 차단일 수 있으므로 키를 회전합니다.
+                if attempt >= 2:
+                    logger.warning("연속적인 응답 오류 발생! 해당 키가 WAF에 의해 임시 차단된 것으로 의심되어 키를 회전합니다.")
+                    self.rotate_key(api_key)
+                    time.sleep(settings.GAP_SECONDS)
+                    
                 backoff *= 2
                 attempt += 1
                 
         logger.error(f"❌ 최대 재시도 횟수({max_retries}) 초과. API 요청 완전 실패: {start_idx}~{end_idx}")
         raise Exception(f"식품나라 API 서버 통신 실패 (최대 재시도 초과): {start_idx}~{end_idx}")
 
-    def check_keys_status(self):
+    def check_keys_status(self, service_id: str = "I2859"):
         """모든 로드된 API 키의 상태를 테스트하여 출력합니다."""
         logger.info(f"\n--- API 키 상태 점검 시작 (총 {len(self.api_keys)}개) ---")
         
         for idx, key in enumerate(self.api_keys):
             masked_key = f"{key[:5]}***{key[-3:]}" if len(key) > 8 else "***"
-            url = f"{settings.BASE_URL}/{key}/{settings.SERVICE_ID}/{settings.DATA_TYPE}/1/1"
+            url = f"{settings.BASE_URL}/{key}/{service_id}/{settings.DATA_TYPE}/1/1"
             
             try:
                 res = requests.get(url, timeout=5).json()
-                if settings.SERVICE_ID in res:
-                    code = res[settings.SERVICE_ID]['RESULT']['CODE']
-                    msg = res[settings.SERVICE_ID]['RESULT']['MSG']
+                if service_id in res:
+                    code = res[service_id]['RESULT']['CODE']
+                    msg = res[service_id]['RESULT']['MSG']
                     
                     if code == "INFO-000":
                         status = "[bold green]정상 동작 (Active)[/bold green]"

@@ -144,14 +144,13 @@ class BusinessRepository:
     def insert_business(self, record: dict, conn=None):
         query = '''
             INSERT INTO businesses 
-            (license_no, business_name, address, representative_name, business_status, license_date, phone_number, last_event_date, is_new,
-             update_type, prev_business_status, prev_representative_name, prev_business_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+            (license_no, business_name, address, representative_name, business_status, license_date, phone_number, industry_type, last_event_date, is_new, update_type, prev_business_status, prev_representative_name, prev_business_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
         '''
         params = (
             record["license_no"], record["business_name"], record["address"], 
             record["representative_name"], record["business_status"], 
-            record["license_date"], record["phone_number"], record["last_event_date"],
+            record["license_date"], record["phone_number"], record.get("industry_type"), record["last_event_date"],
             record.get("update_type"), record.get("prev_business_status"), 
             record.get("prev_representative_name"), record.get("prev_business_name")
         )
@@ -168,6 +167,8 @@ class BusinessRepository:
             UPDATE businesses 
             SET business_name = ?, address = ?, representative_name = ?, 
                 business_status = ?, phone_number = ?,
+                industry_type = COALESCE(?, industry_type),
+                representative_history = ?, licensing_history = ?,
                 update_type = ?, prev_business_status = ?, prev_representative_name = ?, prev_business_name = ?,
                 last_event_date = ?,
                 updated_at = ?, is_new = 1
@@ -175,11 +176,22 @@ class BusinessRepository:
         '''
         params = (
             updates["business_name"], updates["address"], updates["representative_name"], 
-            updates["business_status"], updates["phone_number"],
+            updates["business_status"], updates["phone_number"], updates.get("industry_type"),
+            updates["representative_history"], updates["licensing_history"],
             updates.get("update_type"), updates.get("prev_business_status"), updates.get("prev_representative_name"), updates.get("prev_business_name"),
             updates["last_event_date"], updates["updated_at"], license_no
         )
         
+        if conn:
+            conn.execute(query, params)
+        else:
+            with get_db() as c:
+                c.execute(query, params)
+                c.commit()
+
+    def update_industry_type(self, license_no: str, industry_type: str, conn=None):
+        query = "UPDATE businesses SET industry_type = ? WHERE license_no = ?"
+        params = (industry_type, license_no)
         if conn:
             conn.execute(query, params)
         else:

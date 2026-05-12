@@ -13,6 +13,11 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing Database...")
     init_db()
     
+    # 누락된 세부업종 데이터 백그라운드 백필(Backfill) 시작
+    import threading
+    from app.services.industry_filler import fill_missing_industry_types
+    threading.Thread(target=fill_missing_industry_types, daemon=True, name="IndustryBackfillThread").start()
+    
     start_scheduler()
     
     yield

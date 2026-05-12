@@ -1,39 +1,72 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import type { ApprovalMappedItem } from '@/lib/api';
+import { fetchIndicators } from '@/lib/api';
+import { useIndicatorStore } from '@/store/useIndicatorStore';
 
 interface DashboardIndicatorsProps {
-  data: ApprovalMappedItem[];
+  searchQuery: string;
+  locationFilters: string[];
 }
 
-export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
-  const todayChangesCount = data.length;
+export function DashboardIndicators({ searchQuery, locationFilters }: DashboardIndicatorsProps) {
+  const setTodayNewCount = useIndicatorStore(state => state.setTodayNewCount);
+
+  const { data: indicatorResponse } = useQuery({
+    queryKey: ['indicators', searchQuery, locationFilters],
+    queryFn: () => fetchIndicators({
+      search: searchQuery.trim() || undefined,
+      regions: locationFilters.length > 0 ? locationFilters.join(',') : undefined,
+    }),
+    refetchInterval: 1000 * 60 * 5, // 5 min polling
+    refetchOnWindowFocus: true,
+  });
+
+  const data = indicatorResponse?.data;
+
+  useEffect(() => {
+    if (data?.total_approvals !== undefined) {
+      setTodayNewCount(data.total_approvals);
+    }
+  }, [data?.total_approvals, setTodayNewCount]);
+
+  const todayChangesCount = data?.total_approvals || 0;
 
   // 신규 인허가 비율 (Pie Chart)
   const pieData = useMemo(() => {
-    const newCount = data.filter(d => d.status.includes('정상') || d.status.includes('영업')).length || 1;
-    const closedCount = data.filter(d => d.status.includes('폐업') || d.status.includes('취소')).length || 0;
-
-    return [
-      { name: '신규/영업', value: newCount, color: '#3ecf8e' },
-      { name: '폐업/취소', value: closedCount, color: '#f87171' }
-    ];
+    if (!data?.status_distribution) return [];
+    return data.status_distribution.map(d => ({
+      name: d.name,
+      value: d.value,
+      color: d.name.includes('정상') || d.name.includes('영업') ? '#3ecf8e' : '#f87171'
+    }));
   }, [data]);
 
-  // 트렌드 차트 데이터 (Bar Chart - 하드코딩 유지하되 추후 API 연동 용이하도록 구조화)
+  // 트렌드 차트 데이터 (Bar Chart)
   const barData = useMemo(() => {
-    return [
-      { date: '5.05', count: 12 },
-      { date: '5.06', count: 8 },
-      { date: '5.07', count: 15 },
-      { date: '5.08', count: 10 },
-      { date: '5.09', count: 22 },
-      { date: '5.10', count: 18 },
-      { date: '5.11', count: 9 }, // 오늘
-    ];
-  }, []);
+    if (!data?.trend_chart) return [];
+    // 최근 7일 데이터만 가져오기
+    const recent7DaysData = data.trend_chart.slice(-7);
+    return recent7DaysData.map(item => {
+      let formattedDate = item.date;
+      if (item.date && item.date.length === 8 && !item.date.includes('-')) {
+        const month = parseInt(item.date.substring(4, 6), 10);
+        const day = parseInt(item.date.substring(6, 8), 10);
+        formattedDate = `${month}월 ${day}일`;
+      } else if (item.date && item.date.includes('-')) {
+        const parts = item.date.split('-');
+        if (parts.length === 3) {
+          formattedDate = `${parseInt(parts[1], 10)}월 ${parseInt(parts[2], 10)}일`;
+        }
+      }
+      return {
+        ...item,
+        date: formattedDate
+      };
+    });
+  }, [data]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
@@ -43,7 +76,7 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
           <CardTitle className="text-sm font-medium text-text-muted">금일 인허가 변동 건수</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-4xl font-bold text-text-primary">{todayChangesCount}건</div>
+          <div className="text-4xl font-bold text-text-primary">{todayChangesCount.toLocaleString()}건</div>
         </CardContent>
       </Card>
 
@@ -71,7 +104,8 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
               </Pie>
               <Tooltip
                 formatter={(value: number) => [`${value}건`, '']}
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                contentStyle={{ borderRadius: '8px', border: '1px solid var(--color-border-standard)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', fontSize: '12px' }}
+                itemStyle={{ color: 'var(--color-text-primary)' }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -96,24 +130,25 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
         <CardContent className="h-[140px] pb-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={barData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-subtle)" />
               <XAxis
                 dataKey="date"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 10, fill: '#64748b' }}
+                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
                 dy={5}
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 10, fill: '#64748b' }}
+                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
               />
               <Tooltip
-                cursor={{ fill: '#f8fafc' }}
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                cursor={{ fill: 'var(--color-accent)' }}
+                contentStyle={{ borderRadius: '8px', border: '1px solid var(--color-border-standard)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', fontSize: '12px' }}
+                itemStyle={{ color: 'var(--color-text-primary)' }}
               />
-              <Bar dataKey="count" fill="#3ecf8e" radius={[4, 4, 0, 0]} maxBarSize={30} />
+              <Bar dataKey="count" fill="var(--color-brand)" radius={[4, 4, 0, 0]} maxBarSize={30} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

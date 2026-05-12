@@ -74,3 +74,103 @@ export async function fetchApprovals(params: FetchApprovalsParams): Promise<Appr
 
   return response.json();
 }
+
+export interface FetchIndicatorsParams {
+  search?: string;
+  start_date?: string;
+  end_date?: string;
+  regions?: string;
+}
+
+export interface StatusDistribution {
+  name: string;
+  value: number;
+}
+
+export interface TrendChart {
+  date: string;
+  count: number;
+}
+
+export interface IndicatorData {
+  total_approvals: number;
+  status_distribution: StatusDistribution[];
+  trend_chart: TrendChart[];
+}
+
+export interface IndicatorResponse {
+  status: string;
+  data: IndicatorData;
+}
+
+export async function fetchIndicators(params: FetchIndicatorsParams): Promise<IndicatorResponse> {
+  const url = new URL(`${API_BASE_URL}/api/v1/approvals/indicators`);
+  
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.append(key, String(value));
+    }
+  });
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch indicators');
+  }
+
+  return response.json();
+}
+
+export interface ExportApprovalsParams {
+  start_date?: string;
+  end_date?: string;
+}
+
+export async function exportApprovalsExcel(params: ExportApprovalsParams, customFilename?: string): Promise<void> {
+  const url = new URL(`${API_BASE_URL}/api/v1/approvals/export`);
+  
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.append(key, String(value));
+    }
+  });
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to export excel');
+  }
+
+  // Use custom filename if provided, otherwise try to extract from header
+  let filename = customFilename || 'approvals_export.xlsx';
+  if (!customFilename) {
+    const disposition = response.headers.get('content-disposition');
+    if (disposition && disposition.includes('filename*=')) {
+      const filenameMatch = disposition.split("filename*=UTF-8''")[1];
+      if (filenameMatch) {
+        filename = decodeURIComponent(filenameMatch);
+      }
+    } else if (disposition && disposition.includes('filename=')) {
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch && filenameMatch.length > 1) {
+        filename = filenameMatch[1];
+      }
+    }
+  }
+
+  const blob = await response.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(downloadUrl);
+}
