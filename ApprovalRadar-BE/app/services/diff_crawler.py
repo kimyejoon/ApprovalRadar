@@ -72,8 +72,10 @@ class DiffCrawlerEngine:
 
     def scan_for_updates(self):
         """주기적으로 실행되어 차분(Delta)을 감지합니다."""
+        start_time = time.time()
         state = self.state_repo.load_state()
         if state["last_total_count"] == 0:
+            logger.info("최초 실행: 베이스라인 부트스트랩을 시작합니다...")
             state = self.bootstrap()
             return [] # 부트스트랩 시에는 데이터를 가져오지 않고 베이스라인만 구축
             
@@ -83,7 +85,8 @@ class DiffCrawlerEngine:
         # 만약 old_tail + 1 이 존재한다면 늘어난 것임.
         row_next = self._fetch_single(old_tail + 1)
         if not row_next:
-            logger.info(f"새로운 데이터가 감지되지 않았습니다. (전체 데이터: {old_tail}건)")
+            elapsed = time.time() - start_time
+            logger.info(f"✨ [소요시간: {elapsed:.2f}초] 새로운 데이터가 감지되지 않았습니다. (현재 전체 데이터: {old_tail}건)")
             return []
             
         # 늘어났다면 새로운 Tail을 찾는다 (장기간 꺼져 있었을 수 있으므로 Exponential Jump 활용)
@@ -109,7 +112,7 @@ class DiffCrawlerEngine:
         new_tail = best_valid
             
         diff_count = new_tail - old_tail
-        logger.info(f"꼬리 검사: 총 {diff_count}건의 신규 삽입(밀림) 감지!")
+        logger.info(f"🔍 [Tail 탐색] 인덱스가 {old_tail}에서 {new_tail}로 증가했습니다. (총 {diff_count}건의 신규 삽입 감지)")
         
         # 2. Pivot 검사
         pivots = state["pivots"]
@@ -119,7 +122,7 @@ class DiffCrawlerEngine:
         shift_amounts = {} # pivot_idx -> shift_amount
         current_shift = 0
         
-        logger.info("피벗 점검 및 Shift 보정 중...")
+        logger.info(f"⚙️ 총 {len(pivot_indices)}개의 피벗 지점에서 Shift 오프셋 보정을 시작합니다...")
         for p_idx in pivot_indices:
             # 피벗이 가리키던 예전 데이터
             old_data = pivots[str(p_idx)]
@@ -155,10 +158,9 @@ class DiffCrawlerEngine:
             
         for seg_start, seg_end, count, base_shift in segments:
             # seg_start ~ seg_end 사이에서 count 개의 신규 데이터를 찾아야 함.
-            logger.info(f"구간 {seg_start}~{seg_end} 에서 {count}건의 삽입 발견! 데이터 다운로드 중...")
-            
             new_start = seg_start + base_shift
             new_end = seg_end + base_shift + count
+            logger.info(f"📥 [구간 {seg_start}~{seg_end}] 내에 {count}건의 중간 삽입 감지. (실제 요청: {new_start}~{new_end}) 다운로드 진행...")
             
             # API는 한 번에 최대 1000건 조회 가능하므로 청크 분할
             fetched_rows = []
