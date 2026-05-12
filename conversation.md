@@ -19,3 +19,4 @@
   - 엑셀 다운로드 시 데이터 내용 길이에 맞춰 열 너비가 자동으로 조정되는 로직 구현
 * 전역 파이썬(global python)으로 서버를 실행하여 발생한 FastAPI 모듈 인식 오류 해결. 프로젝트의 가상환경(.venv)을 활성화하여 실행하도록 안내함.
 * `git pull origin dev` 명령어 실행 중 발생한 "divergent branches" 오류 해결을 위해 `git config pull.rebase false` (Merge 방식) 설정 후 성공적으로 병합을 완료함.
+* 새 터미널 창에서 가상환경 미활성화 및 경로 문제로 발생한 `uvicorn: command not found` 에러 해결을 위해 올바른 경로 이동(`ApprovalRadar-BE`) 및 `.venv` 활성화 방법을 안내함.
