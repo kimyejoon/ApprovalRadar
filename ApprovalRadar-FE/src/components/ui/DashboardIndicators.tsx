@@ -1,19 +1,19 @@
 import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "./card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import type { ApprovalMappedItem } from '@/lib/api';
 
 interface DashboardIndicatorsProps {
-  data: { status: string; [key: string]: unknown }[];
+  data: ApprovalMappedItem[];
 }
 
 export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
-  // 1. 금일 변동 건수 계산 (더미 데이터에서는 전체 데이터 중 최근 날짜를 오늘로 가정하거나 전체 건수로 표시)
-  // 실제 연동 시에는 date-fns의 isToday 등을 사용하여 필터링.
-  const todayChangesCount = 9; // 기획 상 금일 9건으로 고정 표시 요구됨 (또는 data.length)
+  const todayChangesCount = data.length;
 
-  // 2. 신규 인허가 비율 (Pie Chart)
+  // 신규 인허가 비율 (Pie Chart)
   const pieData = useMemo(() => {
-    const newCount = data.filter(d => d.status === '영업/정상' || d.status.includes('영업')).length || 1;
+    const newCount = data.filter(d => d.status.includes('정상') || d.status.includes('영업')).length || 1;
     const closedCount = data.filter(d => d.status.includes('폐업') || d.status.includes('취소')).length || 0;
     
     return [
@@ -22,7 +22,7 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
     ];
   }, [data]);
 
-  // 3. 트렌드 차트 데이터 (Bar Chart - 최근 7일 더미)
+  // 트렌드 차트 데이터 (Bar Chart - 하드코딩 유지하되 추후 API 연동 용이하도록 구조화)
   const barData = useMemo(() => {
     return [
       { date: '5.05', count: 12 },
@@ -44,7 +44,6 @@ export function DashboardIndicators({ data }: DashboardIndicatorsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-4xl font-bold text-text-primary">{todayChangesCount}건</div>
-          <p className="text-xs text-brand mt-1">+전일 대비 2건 증가</p>
         </CardContent>
       </Card>
 
