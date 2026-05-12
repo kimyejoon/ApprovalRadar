@@ -130,7 +130,7 @@ export interface ExportApprovalsParams {
   end_date?: string;
 }
 
-export async function exportApprovalsExcel(params: ExportApprovalsParams): Promise<void> {
+export async function exportApprovalsExcel(params: ExportApprovalsParams, customFilename?: string): Promise<void> {
   const url = new URL(`${API_BASE_URL}/api/v1/approvals/export`);
   
   Object.entries(params).forEach(([key, value]) => {
@@ -147,18 +147,20 @@ export async function exportApprovalsExcel(params: ExportApprovalsParams): Promi
     throw new Error('Failed to export excel');
   }
 
-  // Extract filename from Content-Disposition header if possible
-  let filename = 'approvals_export.xlsx';
-  const disposition = response.headers.get('content-disposition');
-  if (disposition && disposition.includes('filename*=')) {
-    const filenameMatch = disposition.split("filename*=UTF-8''")[1];
-    if (filenameMatch) {
-      filename = decodeURIComponent(filenameMatch);
-    }
-  } else if (disposition && disposition.includes('filename=')) {
-    const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
-    if (filenameMatch && filenameMatch.length > 1) {
-      filename = filenameMatch[1];
+  // Use custom filename if provided, otherwise try to extract from header
+  let filename = customFilename || 'approvals_export.xlsx';
+  if (!customFilename) {
+    const disposition = response.headers.get('content-disposition');
+    if (disposition && disposition.includes('filename*=')) {
+      const filenameMatch = disposition.split("filename*=UTF-8''")[1];
+      if (filenameMatch) {
+        filename = decodeURIComponent(filenameMatch);
+      }
+    } else if (disposition && disposition.includes('filename=')) {
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch && filenameMatch.length > 1) {
+        filename = filenameMatch[1];
+      }
     }
   }
 
