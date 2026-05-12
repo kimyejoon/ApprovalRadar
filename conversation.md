@@ -17,3 +17,5 @@
   - 파일명 형식: `대표자변경분_YYYYMMDD(시작일)-YYYYMMDD(종료일).xlsx` (파라미터 부재 시 당일 날짜 기준 적용)
   - 10건 다운로드 제한을 해제하고 전체 건수 다운로드 허용
   - 엑셀 다운로드 시 데이터 내용 길이에 맞춰 열 너비가 자동으로 조정되는 로직 구현
+* 전역 파이썬(global python)으로 서버를 실행하여 발생한 FastAPI 모듈 인식 오류 해결. 프로젝트의 가상환경(.venv)을 활성화하여 실행하도록 안내함.
+* `git pull origin dev` 명령어 실행 중 발생한 "divergent branches" 오류 해결을 위해 `git config pull.rebase false` (Merge 방식) 설정 후 성공적으로 병합을 완료함.
