@@ -72,8 +72,14 @@ class BusinessRepository:
             cursor = conn.cursor()
             where_clause, params = self._build_where_clause(search, start_date, end_date, regions)
             
-            # 1. Total approvals
-            cursor.execute(f"SELECT COUNT(*) FROM businesses{where_clause}", params)
+            # 1. Total approvals (Target Day Only)
+            target_date = end_date
+            if not target_date:
+                from datetime import datetime
+                target_date = datetime.now().strftime('%Y%m%d')
+                
+            today_where_clause, today_params = self._build_where_clause(search, target_date, target_date, regions)
+            cursor.execute(f"SELECT COUNT(*) FROM businesses{today_where_clause}", today_params)
             total_approvals = cursor.fetchone()[0]
             
             # 2. Status distribution
