@@ -85,7 +85,31 @@ class BusinessRepository:
             trend_where = where_clause + (" AND " if where_clause else " WHERE ") + "last_event_date IS NOT NULL AND last_event_date != ''"
             trend_query = f"SELECT substr(last_event_date, 1, 10) as date, COUNT(*) as count FROM businesses{trend_where} GROUP BY date ORDER BY date ASC"
             cursor.execute(trend_query, params)
-            trend_chart = [{"date": row[0], "count": row[1]} for row in cursor.fetchall()]
+            
+            db_trend_results = {row[0].replace('-', ''): row[1] for row in cursor.fetchall()}
+            
+            trend_chart = []
+            if start_date and end_date:
+                from datetime import datetime, timedelta
+                try:
+                    start_dt = datetime.strptime(start_date.replace('-', ''), '%Y%m%d')
+                    end_dt = datetime.strptime(end_date.replace('-', ''), '%Y%m%d')
+                    
+                    if (end_dt - start_dt).days <= 365:
+                        current_dt = start_dt
+                        while current_dt <= end_dt:
+                            date_str = current_dt.strftime('%Y%m%d')
+                            trend_chart.append({
+                                "date": date_str,
+                                "count": db_trend_results.get(date_str, 0)
+                            })
+                            current_dt += timedelta(days=1)
+                    else:
+                        trend_chart = [{"date": k, "count": v} for k, v in db_trend_results.items()]
+                except ValueError:
+                    trend_chart = [{"date": k, "count": v} for k, v in db_trend_results.items()]
+            else:
+                trend_chart = [{"date": k, "count": v} for k, v in db_trend_results.items()]
             
             return total_approvals, status_distribution, trend_chart
 

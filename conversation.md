@@ -30,3 +30,4 @@
 * 기존 JSON 형태의 변경 이력(licensing_history, representative_history) 컬럼을 삭제하고, 변경 타입(update_type) 및 이전 상태값(prev_business_status, prev_representative_name, prev_business_name)을 담는 플랫(flat)한 문자열 컬럼들로 데이터베이스 구조를 최적화(정규화)함.
 * 기존 JSON 데이터를 파싱하여 새 컬럼 구조에 맞게 데이터를 마이그레이션하는 스크립트 작성 및 실행 완료.
 * 백엔드 API 스키마(BusinessModel) 및 데이터 수집기(scraper.py)에서 JSON 업데이트 로직을 제거하고 새 컬럼 기반으로 즉시 업데이트되도록 로직 간소화 적용 완료.
+* 프론트엔드 대시보드의 매끄러운 30일 시각화를 위해 `GET /api/v1/approvals/indicators` API를 개선함. 파라미터가 비어있을 경우 백엔드 서버에서 자동으로 오늘 기준 최근 30일(시작일, 종료일)을 주입하며, 데이터가 없는 날짜도 차트에서 누락되지 않고 0건(`count: 0`)으로 명시적 반환되도록 Zero-Padding 로직을 추가함.

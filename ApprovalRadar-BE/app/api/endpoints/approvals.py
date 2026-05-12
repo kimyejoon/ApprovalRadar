@@ -63,6 +63,14 @@ def get_approval_indicators(
     repo: BusinessRepository = Depends(get_business_repo)
 ):
     try:
+        from datetime import datetime, timedelta
+        
+        # 파라미터가 비어있는 경우(프론트에서 안넘겨준 경우) 자동으로 최근 30일 설정
+        if not start_date and not end_date:
+            today = datetime.now()
+            start_date = (today - timedelta(days=29)).strftime('%Y%m%d')
+            end_date = today.strftime('%Y%m%d')
+
         cache_key = str((search, start_date, end_date, tuple(regions) if regions else None))
         cached = INDICATORS_CACHE.get(cache_key)
         
