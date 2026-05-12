@@ -3,13 +3,11 @@ import datetime
 import sys
 import os
 
-# root 디렉터리의 database 모듈 임포트 지원
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from database import get_db
 
-class StateManager:
-    @staticmethod
-    def load_state() -> dict:
+class StateRepository:
+    def load_state(self) -> dict:
         try:
             with get_db() as conn:
                 cursor = conn.cursor()
@@ -21,15 +19,15 @@ class StateManager:
                         "pivots": json.loads(row["pivots"] or "{}")
                     }
         except Exception as e:
-            print(f"Error loading state from DB: {e}")
+            from app.core.logger import logger
+            logger.error(f"Error loading state from DB: {e}")
             
         return {
             "last_total_count": 0,
             "pivots": {}
         }
 
-    @staticmethod
-    def save_state(state: dict):
+    def save_state(self, state: dict):
         try:
             with get_db() as conn:
                 cursor = conn.cursor()
@@ -40,5 +38,5 @@ class StateManager:
                 ''', (state.get("last_total_count", 0), json.dumps(state.get("pivots", {}), ensure_ascii=False), now))
                 conn.commit()
         except Exception as e:
-            print(f"Error saving state to DB: {e}")
-
+            from app.core.logger import logger
+            logger.error(f"Error saving state to DB: {e}")

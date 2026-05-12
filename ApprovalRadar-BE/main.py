@@ -1,9 +1,8 @@
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-import json
 import math
-from database import init_db, get_db
+from database import init_db
 from apscheduler.schedulers.background import BackgroundScheduler
 from scraper import run_scraper_job
 from pydantic import BaseModel
@@ -12,6 +11,10 @@ from datetime import datetime
 import urllib.parse
 from fastapi.responses import StreamingResponse
 from excel_export import generate_excel_export
+
+# Repositories
+from app.repositories.business_repository import BusinessRepository
+from app.core.logger import logger
 
 # 프론트엔드 개발자가 Swagger에서 확인할 수 있는 응답 데이터 형태(Schema)를 정의합니다.
 class BusinessModel(BaseModel):
@@ -66,13 +69,16 @@ def parse_comma_separated_list(regions: Optional[str] = Query(None, description=
         return None
     return [r.strip() for r in regions.split(',') if r.strip()]
 
+def get_business_repo() -> BusinessRepository:
+    return BusinessRepository()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
-    print("Initializing Database...")
+    logger.info("Initializing Database...")
     init_db()
     
-    print("Starting APScheduler for 10-minute scraping intervals...")
+    logger.info("Starting APScheduler for 10-minute scraping intervals...")
     scheduler = BackgroundScheduler()
     scheduler.add_job(run_scraper_job, 'interval', minutes=10)
     scheduler.start()
@@ -83,7 +89,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown logic
-    print("Shutting down...")
+    logger.info("Shutting down...")
     scheduler.shutdown()
 
 app = FastAPI(title="Food Safety Data API", lifespan=lifespan)
@@ -110,86 +116,23 @@ def get_approvals(
     end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)"),
     regions: Optional[List[str]] = Depends(parse_comma_separated_list),
     sort_by: str = Query("created_at", description="정렬 기준 컬럼"),
-    sort_order: str = Query("desc", description="정렬 방향 (asc | desc)")
+    sort_order: str = Query("desc", description="정렬 방향 (asc | desc)"),
+    repo: BusinessRepository = Depends(get_business_repo)
 ):
     try:
-        with get_db() as conn:
-            cursor = conn.cursor()
+        result, total_count = repo.get_approvals(page, size, search, start_date, end_date, regions, sort_by, sort_order)
+        total_pages = math.ceil(total_count / size) if total_count > 0 else 1
+        
+        meta = PaginationMeta(
+            total_count=total_count,
+            current_page=page,
+            total_pages=total_pages,
+            size=size
+        )
             
-            query_conditions = []
-            params = []
-            
-            if search:
-                query_conditions.append("(business_name LIKE ? OR license_no LIKE ?)")
-                search_term = f"%{search}%"
-                params.extend([search_term, search_term])
-                
-            if start_date:
-                query_conditions.append("last_event_date >= ?")
-                params.append(start_date)
-                
-            if end_date:
-                query_conditions.append("last_event_date <= ?")
-                params.append(end_date)
-                
-            if regions:
-                region_conditions = []
-                for r in regions:
-                    region_conditions.append("address LIKE ?")
-                    params.append(f"%{r}%")
-                if region_conditions:
-                    query_conditions.append(f"({' OR '.join(region_conditions)})")
-            
-            where_clause = ""
-            if query_conditions:
-                where_clause = " WHERE " + " AND ".join(query_conditions)
-            
-            # 전체 데이터 개수 구하기
-            count_query = f"SELECT COUNT(*) FROM businesses{where_clause}"
-            cursor.execute(count_query, params)
-            total_count = cursor.fetchone()[0]
-            
-            # 정렬 설정
-            valid_sort_columns = ["created_at", "last_event_date", "updated_at", "license_date", "business_name"]
-            if sort_by not in valid_sort_columns:
-                sort_by = "created_at"
-            order = "ASC" if sort_order.lower() == "asc" else "DESC"
-            
-            # 오프셋 계산 및 데이터 조회
-            offset = (page - 1) * size
-            
-            data_query = f"SELECT * FROM businesses{where_clause} ORDER BY {sort_by} {order} LIMIT ? OFFSET ?"
-            data_params = params + [size, offset]
-            
-            cursor.execute(data_query, data_params)
-            rows = cursor.fetchall()
-            
-            result = []
-            for row in rows:
-                record = dict(row)
-                # Parse JSON strings back to lists
-                try:
-                    record["representative_history"] = json.loads(record.get("representative_history", "[]"))
-                    record["licensing_history"] = json.loads(record.get("licensing_history", "[]"))
-                except Exception:
-                    record["representative_history"] = []
-                    record["licensing_history"] = []
-                result.append(record)
-                
-            # 전체 페이지 수 계산
-            total_pages = math.ceil(total_count / size) if total_count > 0 else 1
-            
-            meta = PaginationMeta(
-                total_count=total_count,
-                current_page=page,
-                total_pages=total_pages,
-                size=size
-            )
-                
         return {"status": "success", "data": result, "meta": meta}
     except Exception as e:
-        # DB Error handling, returns a user-friendly message as required
-        print(f"Database error: {e}")
+        logger.error(f"Database error in get_approvals: {e}")
         raise HTTPException(status_code=500, detail="데이터 제공처의 응답이 지연되고 있거나 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
 
 @app.get("/api/v1/approvals/indicators", response_model=IndicatorsResponse)
@@ -197,56 +140,12 @@ def get_approval_indicators(
     search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
     start_date: Optional[str] = Query(None, description="조회 시작일 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="조회 종료일 (YYYY-MM-DD)"),
-    regions: Optional[List[str]] = Depends(parse_comma_separated_list)
+    regions: Optional[List[str]] = Depends(parse_comma_separated_list),
+    repo: BusinessRepository = Depends(get_business_repo)
 ):
     try:
-        with get_db() as conn:
-            cursor = conn.cursor()
+        total_approvals, status_distribution, trend_chart = repo.get_indicators(search, start_date, end_date, regions)
             
-            query_conditions = []
-            params = []
-            
-            if search:
-                query_conditions.append("(business_name LIKE ? OR license_no LIKE ?)")
-                search_term = f"%{search}%"
-                params.extend([search_term, search_term])
-                
-            if start_date:
-                query_conditions.append("last_event_date >= ?")
-                params.append(start_date)
-                
-            if end_date:
-                query_conditions.append("last_event_date <= ?")
-                params.append(end_date)
-                
-            if regions:
-                region_conditions = []
-                for r in regions:
-                    region_conditions.append("address LIKE ?")
-                    params.append(f"%{r}%")
-                if region_conditions:
-                    query_conditions.append(f"({' OR '.join(region_conditions)})")
-            
-            where_clause = ""
-            if query_conditions:
-                where_clause = " WHERE " + " AND ".join(query_conditions)
-            
-            # 1. Total approvals
-            count_query = f"SELECT COUNT(*) FROM businesses{where_clause}"
-            cursor.execute(count_query, params)
-            total_approvals = cursor.fetchone()[0]
-            
-            # 2. Status distribution
-            status_query = f"SELECT COALESCE(business_status, '상태없음') as name, COUNT(*) as value FROM businesses{where_clause} GROUP BY name"
-            cursor.execute(status_query, params)
-            status_distribution = [{"name": row[0], "value": row[1]} for row in cursor.fetchall()]
-            
-            # 3. Trend chart (exclude empty dates, group by YYYY-MM-DD)
-            trend_where = where_clause + (" AND " if where_clause else " WHERE ") + "last_event_date IS NOT NULL AND last_event_date != ''"
-            trend_query = f"SELECT substr(last_event_date, 1, 10) as date, COUNT(*) as count FROM businesses{trend_where} GROUP BY date ORDER BY date ASC"
-            cursor.execute(trend_query, params)
-            trend_chart = [{"date": row[0], "count": row[1]} for row in cursor.fetchall()]
-                
         return {
             "status": "success",
             "data": {
@@ -256,7 +155,7 @@ def get_approval_indicators(
             }
         }
     except Exception as e:
-        print(f"Database error: {e}")
+        logger.error(f"Database error in get_approval_indicators: {e}")
         raise HTTPException(status_code=500, detail="내부 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
 
 @app.get("/api/v1/approvals/export")
@@ -291,7 +190,6 @@ def export_approvals_excel(
             
         filename = f"대표자변경분{date_str}.xlsx"
 
-        
         # URL encode filename for Content-Disposition header
         encoded_filename = urllib.parse.quote(filename)
         headers = {
@@ -304,31 +202,27 @@ def export_approvals_excel(
             headers=headers
         )
     except Exception as e:
-        print(f"Excel export error: {e}")
+        logger.error(f"Excel export error: {e}")
         raise HTTPException(status_code=500, detail="엑셀 생성 중 서버 오류가 발생했습니다.")
 
 @app.get("/api/v1/approvals/{approval_id}", response_model=SingleBusinessResponse)
-def get_approval_detail(approval_id: str):
+def get_approval_detail(approval_id: str, repo: BusinessRepository = Depends(get_business_repo)):
     try:
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM businesses WHERE license_no = ?", (approval_id,))
-            row = cursor.fetchone()
+        record = repo.get_business_by_license_no(approval_id)
+        if not record:
+            raise HTTPException(status_code=404, detail="해당 인허가 정보를 찾을 수 없습니다.")
+                
+        try:
+            import json
+            record["representative_history"] = json.loads(record.get("representative_history", "[]"))
+            record["licensing_history"] = json.loads(record.get("licensing_history", "[]"))
+        except Exception:
+            record["representative_history"] = []
+            record["licensing_history"] = []
             
-            if not row:
-                raise HTTPException(status_code=404, detail="해당 인허가 정보를 찾을 수 없습니다.")
-                
-            record = dict(row)
-            try:
-                record["representative_history"] = json.loads(record.get("representative_history", "[]"))
-                record["licensing_history"] = json.loads(record.get("licensing_history", "[]"))
-            except Exception:
-                record["representative_history"] = []
-                record["licensing_history"] = []
-                
         return {"status": "success", "data": record}
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Database error: {e}")
+        logger.error(f"Database error in get_approval_detail: {e}")
         raise HTTPException(status_code=500, detail="내부 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")

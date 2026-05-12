@@ -3,12 +3,13 @@ import math
 import concurrent.futures
 from app.core.config import settings
 from app.clients.foodsafety_api import ApiClient
-from app.utils.state_manager import StateManager
+from app.repositories.state_repository import StateRepository
+from app.core.logger import logger
 
 class DiffCrawlerEngine:
-    def __init__(self, api_client: ApiClient, log_callback=None):
+    def __init__(self, api_client: ApiClient):
         self.api_client = api_client
-        self.log_callback = log_callback or print
+        self.state_repo = StateRepository()
 
     def _fetch_single(self, idx: int):
         """특정 인덱스 1건 조회. INFO-200(데이터 없음)이면 None 반환"""
@@ -36,7 +37,7 @@ class DiffCrawlerEngine:
         return None
 
     def find_true_tail(self) -> int:
-        self.log_callback("[Bootstrapper] True Tail(실제 마지막 데이터) 찾는 중...")
+        logger.info("[Bootstrapper] True Tail(실제 마지막 데이터) 찾는 중...")
         low, high = 1, 1000000
         best_valid = 1
         
@@ -49,7 +50,7 @@ class DiffCrawlerEngine:
             else:
                 high = mid - 1
                 
-        self.log_callback(f"[Bootstrapper] 전체 데이터 건수 확인 완료: {best_valid}건")
+        logger.info(f"[Bootstrapper] 전체 데이터 건수 확인 완료: {best_valid}건")
         return best_valid
 
     def bootstrap(self):
@@ -57,7 +58,7 @@ class DiffCrawlerEngine:
         total_count = self.find_true_tail()
         pivots = {}
         
-        self.log_callback(f"[Bootstrapper] 피벗 캐싱 시작 (간격: {settings.PIVOT_INTERVAL})...")
+        logger.info(f"[Bootstrapper] 피벗 캐싱 시작 (간격: {settings.PIVOT_INTERVAL})...")
         pivot_indices = list(range(settings.PIVOT_INTERVAL, total_count, settings.PIVOT_INTERVAL))
         
         # 피벗 병렬 조회
@@ -77,13 +78,13 @@ class DiffCrawlerEngine:
             "last_total_count": total_count,
             "pivots": pivots
         }
-        StateManager.save_state(state)
-        self.log_callback(f"[Bootstrapper] 부트스트랩 완료! 총 {len(pivots)}개의 피벗 색인 생성됨.")
+        self.state_repo.save_state(state)
+        logger.info(f"[Bootstrapper] 부트스트랩 완료! 총 {len(pivots)}개의 피벗 색인 생성됨.")
         return state
 
     def scan_for_updates(self):
         """주기적으로 실행되어 차분(Delta)을 감지합니다."""
-        state = StateManager.load_state()
+        state = self.state_repo.load_state()
         if state["last_total_count"] == 0:
             state = self.bootstrap()
             return [] # 부트스트랩 시에는 데이터를 가져오지 않고 베이스라인만 구축
@@ -94,7 +95,7 @@ class DiffCrawlerEngine:
         # 만약 old_tail + 1 이 존재한다면 늘어난 것임.
         row_next = self._fetch_single(old_tail + 1)
         if not row_next:
-            self.log_callback(f"새로운 데이터가 감지되지 않았습니다. (전체 데이터: {old_tail}건)")
+            logger.info(f"새로운 데이터가 감지되지 않았습니다. (전체 데이터: {old_tail}건)")
             return []
             
         # 늘어났다면 새로운 Tail을 찾는다 (장기간 꺼져 있었을 수 있으므로 Exponential Jump 활용)
@@ -120,7 +121,7 @@ class DiffCrawlerEngine:
         new_tail = best_valid
             
         diff_count = new_tail - old_tail
-        self.log_callback(f"꼬리 검사: 총 {diff_count}건의 신규 삽입(밀림) 감지!")
+        logger.info(f"꼬리 검사: 총 {diff_count}건의 신규 삽입(밀림) 감지!")
         
         # 2. Pivot 검사
         pivots = state["pivots"]
@@ -130,13 +131,12 @@ class DiffCrawlerEngine:
         shift_amounts = {} # pivot_idx -> shift_amount
         current_shift = 0
         
-        self.log_callback("피벗 점검 및 Shift 보정 중...")
+        logger.info("피벗 점검 및 Shift 보정 중...")
         for p_idx in pivot_indices:
             # 피벗이 가리키던 예전 데이터
             old_data = pivots[str(p_idx)]
             
             # 여기서부터 current_shift ~ diff_count 사이를 이진 탐색하여 실제 오프셋을 찾음
-            # 간단하게는 (p_idx + current_shift) 부터 순차적으로 맞춰봄
             found_offset = current_shift
             for offset in range(current_shift, diff_count + 1):
                 row = self._fetch_single(p_idx + offset)
@@ -148,14 +148,6 @@ class DiffCrawlerEngine:
             current_shift = found_offset
             
         # 3. 새로운 데이터 다운로드
-        # shift_amounts 를 바탕으로 각 구간별 새로 끼어든(Shift를 유발한) 인덱스를 찾을 수 있음.
-        # 가장 무식하고 확실한 방법: shift 가 +1 증가한 구간 안에서 이진 탐색으로 끼어든 지점을 찾는다.
-        # (구현 편의상 여기서는 늘어난 만큼의 새 데이터를 수집한다고 가정하지만,
-        # 정확히는 전체 데이터를 대상으로 차분 다운로드)
-        
-        # 현재는 간단히: 가장 최근 추가된 내역들을 수집하기 위해, 가장 앞단(1번부터 diff_count까지)을 다운로드?
-        # 아니요, 데이터는 알파벳순(BSSH_NM)이므로 어느 곳에 삽입되었는지 구간 이진 탐색을 해야 합니다.
-        
         new_data_rows = []
         prev_idx = 0
         prev_shift = 0
@@ -175,7 +167,7 @@ class DiffCrawlerEngine:
             
         for seg_start, seg_end, count, base_shift in segments:
             # seg_start ~ seg_end 사이에서 count 개의 신규 데이터를 찾아야 함.
-            self.log_callback(f"구간 {seg_start}~{seg_end} 에서 {count}건의 삽입 발견! 데이터 다운로드 중...")
+            logger.info(f"구간 {seg_start}~{seg_end} 에서 {count}건의 삽입 발견! 데이터 다운로드 중...")
             
             new_start = seg_start + base_shift
             new_end = seg_end + base_shift + count
@@ -236,6 +228,6 @@ class DiffCrawlerEngine:
             
         state["last_total_count"] = new_tail
         state["pivots"] = new_pivots
-        StateManager.save_state(state)
+        self.state_repo.save_state(state)
         
         return new_data_rows
