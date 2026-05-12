@@ -29,7 +29,7 @@ def generate_excel_export(start_date: Optional[str], end_date: Optional[str], se
     ws.title = "인허가 데이터"
 
     # 헤더 설정
-    headers = ["업소명", "소재지", "인허가번호", "대표자명", "영업상태", "인허가시각", "전화번호"]
+    headers = ["업소명", "소재지", "인허가번호", "대표자명", "영업상태", "최초인허가일", "변동인허가일", "전화번호"]
     ws.append(headers)
 
     # 헤더 스타일 지정
@@ -50,12 +50,17 @@ def generate_excel_export(start_date: Optional[str], end_date: Optional[str], se
         if last_event_date and len(last_event_date) == 8:
             last_event_date = f"{last_event_date[:4]}-{last_event_date[4:6]}-{last_event_date[6:]}"
             
+        license_date = record.get("license_date", "")
+        if license_date and len(license_date) == 8:
+            license_date = f"{license_date[:4]}-{license_date[4:6]}-{license_date[6:]}"
+            
         ws.append([
             record.get("business_name", ""),
             record.get("address", ""),
             record.get("license_no", ""),
             record.get("representative_name", ""),
             record.get("business_status", ""),
+            license_date,
             last_event_date,
             record.get("phone_number", "")
         ])
