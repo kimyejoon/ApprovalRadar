@@ -5,6 +5,25 @@ import time
 from datetime import datetime
 import urllib.parse
 from fastapi.responses import StreamingResponse
+from enum import Enum
+
+class SortByEnum(str, Enum):
+    created_at = "created_at"
+    last_event_date = "last_event_date"
+    updated_at = "updated_at"
+    license_date = "license_date"
+    business_name = "business_name"
+    phone = "phone"
+    phone_number = "phone_number"
+    date = "date"
+    representative_name = "representative_name"
+    business_status = "business_status"
+    license_no = "license_no"
+    industry_type = "industry_type"
+
+class SortOrderEnum(str, Enum):
+    asc = "asc"
+    desc = "desc"
 
 from app.repositories.business_repository import BusinessRepository
 from app.core.logger import logger
@@ -34,12 +53,13 @@ def get_approvals(
     start_date: Optional[str] = Query(None, description="조회 시작일 (YYYYMMDD)"),
     end_date: Optional[str] = Query(None, description="조회 종료일 (YYYYMMDD)"),
     regions: Optional[List[str]] = Depends(parse_comma_separated_list),
-    sort_by: str = Query("created_at", description="정렬 기준 컬럼"),
-    sort_order: str = Query("desc", description="정렬 방향 (asc | desc)"),
+    sort_by: SortByEnum = Query(SortByEnum.created_at, description="정렬 기준 컬럼"),
+    sort_order: SortOrderEnum = Query(SortOrderEnum.desc, description="정렬 방향 (asc | desc)"),
+    infer_update_type: Optional[str] = Query(None, description="데이터 필터링 유형 (허용값: 신규등록, 상태변경, 대표자변경, 변경민원-상호명, 변경민원-주소, 변경민원-성함, 초기수집(과거변경있음))"),
     repo: BusinessRepository = Depends(get_business_repo)
 ):
     try:
-        result, total_count = repo.get_approvals(page, size, search, start_date, end_date, regions, sort_by, sort_order)
+        result, total_count = repo.get_approvals(page, size, search, start_date, end_date, regions, sort_by.value, sort_order.value, infer_update_type)
         total_pages = math.ceil(total_count / size) if total_count > 0 else 1
         
         meta = PaginationMeta(
@@ -72,12 +92,13 @@ def get_approval_indicators(
         if cached and time.time() - cached['time'] < CACHE_TTL:
             return cached['data']
             
-        total_approvals, today_approvals, status_distribution, trend_chart = repo.get_indicators(start_date, end_date)
+        total_approvals, monthly_approvals, today_approvals, status_distribution, trend_chart = repo.get_indicators(start_date, end_date)
             
         response_data = {
             "status": "success",
             "data": {
                 "total_approvals": total_approvals,
+                "monthly_approvals": monthly_approvals,
                 "today_approvals": today_approvals,
                 "status_distribution": status_distribution,
                 "trend_chart": trend_chart
@@ -95,7 +116,8 @@ def export_approvals_excel(
     search: Optional[str] = Query(None, description="검색 키워드 (상호명, 인허가번호 등)"),
     start_date: Optional[str] = Query(None, description="조회 시작일 (YYYYMMDD)"),
     end_date: Optional[str] = Query(None, description="조회 종료일 (YYYYMMDD)"),
-    regions: Optional[List[str]] = Depends(parse_comma_separated_list)
+    regions: Optional[List[str]] = Depends(parse_comma_separated_list),
+    infer_update_type: Optional[str] = Query(None, description="데이터 필터링 유형 (허용값: 신규등록, 상태변경, 대표자변경, 변경민원-상호명, 변경민원-주소, 변경민원-성함, 초기수집(과거변경있음))")
 ):
     try:
         # Default to today if both are empty
@@ -108,7 +130,7 @@ def export_approvals_excel(
             end_date_db = end_date.replace('-', '') if end_date else None
 
         # Generate the excel file in a buffer
-        excel_buffer = generate_excel_export(start_date_db, end_date_db, search, regions)
+        excel_buffer = generate_excel_export(start_date_db, end_date_db, search, regions, infer_update_type)
         
         # Build filename
         date_str = ""

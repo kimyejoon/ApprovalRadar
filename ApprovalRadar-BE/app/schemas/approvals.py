@@ -6,7 +6,6 @@ class BusinessModel(BaseModel):
     business_name: Optional[str] = None
     address: Optional[str] = None
     representative_name: Optional[str] = None
-    business_status: Optional[str] = None
     license_date: Optional[str] = None
     phone_number: Optional[str] = None
     last_event_date: Optional[str] = None
@@ -17,6 +16,9 @@ class BusinessModel(BaseModel):
     prev_business_status: Optional[str] = None
     prev_representative_name: Optional[str] = None
     prev_business_name: Optional[str] = None
+    infer_update_type: Optional[str] = None
+    infer_update_detail: Optional[str] = None
+    industry_type: Optional[str] = None
 
 class PaginationMeta(BaseModel):
     total_count: int
@@ -43,6 +45,7 @@ class IndicatorTrendChart(BaseModel):
 
 class IndicatorsData(BaseModel):
     total_approvals: int
+    monthly_approvals: int
     today_approvals: int
     status_distribution: List[IndicatorStatusDistribution]
     trend_chart: List[IndicatorTrendChart]

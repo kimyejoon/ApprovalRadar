@@ -47,3 +47,16 @@
 - 2026-05-13: DB 스키마에 `last_event_time`, `license_time` 컬럼 추가 및 scraper.py에서 날짜 데이터의 상세 시각(시분초)을 추출해 개별 컬럼으로 저장하도록 수정.
 - 2026-05-13: 가 비어있던 나머지 1,264건의 과거 데이터에 대해 추론 규칙(초기수집, 상속, 기타 등)을 일괄 적용하여 NULL 값을 모두 제거함.
 - 2026-05-13: `infer_update_type`가 비어있던 나머지 1,264건의 과거 데이터에 대해 추론 규칙(초기수집, 상속, 기타 등)을 일괄 적용하여 NULL 값을 모두 제거함.
+- 2026-05-13: 백엔드 프로젝트(ApprovalRadar-BE)의 전반적인 API 통신 방식과 데이터베이스(SQLite) 테이블 구조, 아키텍처 특이사항 등을 상세히 분석하여 유저에게 리포트함.
+- 2026-05-13: DB의 `infer_update_type` 컬럼 값의 실제 분포를 조회하고, 정규화(카테고리/상세내용 분리) 및 지위승계 용어 통일에 대한 피드백 제공.
+- 2026-05-13: `infer_update_type` 컬럼의 정규화(분류와 상세값을 `infer_update_type`과 `infer_update_detail`로 분리)를 수행하고 기존 3,421건의 데이터를 100% 보존하며 안전하게 마이그레이션 및 적용 완료함.
+- 2026-05-13: `.gitignore`를 업데이트하여 로컬 SQLite DB 파일(`*.db`, `*.db-wal` 등)이 Git에 추적되지 않도록 설정하고 캐시를 제거함.
+- 2026-05-13: `/approvals` API의 `sort_by` 파라미터가 `phone`, `date`로 들어올 경우 각각 `phone_number`, `last_event_date`로 자동 매핑되도록 정렬 로직을 수정함.
+- 2026-05-13: Swagger(OpenAPI) 문서에서 `sort_by`, `sort_order` 파라미터가 드롭다운 메뉴로 제공되도록 Python `Enum`을 도입하여 명세를 고도화하고, `representative_name`, `business_status`, `license_no` 등 누락된 정렬 필드를 추가 허용하여 422 에러를 해결함.
+- 2026-05-13: 식품안전나라 API 일일 호출 한도 초과로 인한 크롤러 자동 중단 로그의 원인 및 해결 방안(자정 리셋 또는 추가 키 발급)을 안내함.
+- 2026-05-13: 프론트엔드 API 응답(`BusinessModel`)에서 `business_status` 필드를 제거하고 정규화된 `infer_update_type`, `infer_update_detail`을 기본으로 전달하도록 수정함.
+- 2026-05-13: `/approvals/indicators` API 응답에 전체 누적 건수(`total_approvals`), 최근 1개월 건수(`monthly_approvals`), 오늘 건수(`today_approvals`)를 각각 분리하여 제공하도록 지표 산출 로직을 개선함.
+- 2026-05-13: DB에서 `last_event_date` 기준 특정 일자(20260507, 20260508)의 데이터 수집 행(row) 개수를 조회하여 확인함.
+- 2026-05-13: `/approvals` API 응답 스키마(`BusinessModel`)에 `industry_type`(업태명) 필드를 추가하여 클라이언트에 제공되도록 수정함.
+- 2026-05-13: `/approvals` API의 `sort_by` 쿼리 파라미터 및 DB 정렬 기준에 `industry_type`을 추가하여 업태명 기준의 문자열 이름 정렬이 정상 작동하도록 허용함.
+- 2026-05-13: `/approvals` 및 `/approvals/export` API에 `infer_update_type` 쿼리 파라미터를 추가하여 프론트엔드에서 데이터 유형(신규등록, 상태변경 등)별 필터링이 가능하도록 지원함. Swagger 문서에 허용되는 값 명세 완료.

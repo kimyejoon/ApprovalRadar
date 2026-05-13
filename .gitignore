@@ -22,6 +22,9 @@ env/
 .env.test.local
 .env.production.local
 
-.conversation.md*.db
-.food_safety.db
-
+*.db
+*.db-wal
+*.db-shm
+*.db.bak
+*.sqlite
+*.sqlite3

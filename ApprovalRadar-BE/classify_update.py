@@ -20,20 +20,21 @@ def classify_update_type():
         if not prev_name:
             continue
             
+        infer_detail = prev_name
         # 1. Check if it's a name (contains asterisks)
         if '*' in prev_name:
-            infer_val = f"변경민원-성함:{prev_name}"
+            infer_type = "변경민원-성함"
         # 2. Check if it's an address
         elif '\n' in prev_name or addr_pattern.match(prev_name):
-            infer_val = f"변경민원-주소:{prev_name}"
+            infer_type = "변경민원-주소"
         # 3. Otherwise, treat as business name
         else:
-            infer_val = f"변경민원-상호명:{prev_name}"
+            infer_type = "변경민원-상호명"
             
-        update_queries.append((infer_val, license_no))
+        update_queries.append((infer_type, infer_detail, license_no))
 
     # Perform updates for 변경민원
-    cursor.executemany("UPDATE businesses SET infer_update_type = ? WHERE license_no = ?", update_queries)
+    cursor.executemany("UPDATE businesses SET infer_update_type = ?, infer_update_detail = ? WHERE license_no = ?", update_queries)
     
     # Add logic for update_type IS NULL
     cursor.execute("UPDATE businesses SET infer_update_type = '신규등록' WHERE update_type IS NULL AND license_date = last_event_date;")

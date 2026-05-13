@@ -34,6 +34,7 @@ def init_db():
             prev_representative_name TEXT,
             prev_business_name TEXT,
             infer_update_type TEXT,
+            infer_update_detail TEXT,
             last_event_time TEXT,
             license_time TEXT
         )
@@ -50,6 +51,8 @@ def init_db():
         cursor.execute("ALTER TABLE businesses ADD COLUMN industry_type TEXT")
     if "infer_update_type" not in biz_columns:
         cursor.execute("ALTER TABLE businesses ADD COLUMN infer_update_type TEXT")
+    if "infer_update_detail" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN infer_update_detail TEXT")
     if "last_event_time" not in biz_columns:
         cursor.execute("ALTER TABLE businesses ADD COLUMN last_event_time TEXT")
     if "license_time" not in biz_columns:

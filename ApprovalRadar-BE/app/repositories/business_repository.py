@@ -7,10 +7,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from database import get_db
 
 class BusinessRepository:
-    def _build_where_clause(self, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]]) -> Tuple[str, List[Any]]:
+    def _build_where_clause(self, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]], infer_update_type: Optional[str] = None) -> Tuple[str, List[Any]]:
         query_conditions = []
         params = []
         
+        if infer_update_type:
+            query_conditions.append("infer_update_type = ?")
+            params.append(infer_update_type)
+            
         if search:
             query_conditions.append("(business_name LIKE ? OR license_no LIKE ?)")
             search_term = f"%{search}%"
@@ -38,18 +42,27 @@ class BusinessRepository:
             
         return where_clause, params
 
-    def get_approvals(self, page: int, size: int, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]], sort_by: str, sort_order: str) -> Tuple[List[Dict[str, Any]], int]:
+    def get_approvals(self, page: int, size: int, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]], sort_by: str, sort_order: str, infer_update_type: Optional[str] = None) -> Tuple[List[Dict[str, Any]], int]:
         with get_db() as conn:
             cursor = conn.cursor()
             
-            where_clause, params = self._build_where_clause(search, start_date, end_date, regions)
+            where_clause, params = self._build_where_clause(search, start_date, end_date, regions, infer_update_type)
             
             # 전체 개수
             cursor.execute(f"SELECT COUNT(*) FROM businesses{where_clause}", params)
             total_count = cursor.fetchone()[0]
             
-            # 정렬 및 페이징
-            valid_sort_columns = ["created_at", "last_event_date", "updated_at", "license_date", "business_name"]
+            # 정렬 기준 컬럼 맵핑
+            if sort_by == "phone":
+                sort_by = "phone_number"
+            elif sort_by == "date":
+                sort_by = "last_event_date"
+                
+            valid_sort_columns = [
+                "created_at", "last_event_date", "updated_at", "license_date", 
+                "business_name", "phone_number", "representative_name", 
+                "business_status", "license_no", "industry_type"
+            ]
             if sort_by not in valid_sort_columns:
                 sort_by = "created_at"
             order = "ASC" if sort_order.lower() == "asc" else "DESC"
@@ -67,15 +80,18 @@ class BusinessRepository:
                 
             return result, total_count
 
-    def get_indicators(self, start_date: Optional[str], end_date: Optional[str]) -> Tuple[int, int, List[Dict[str, Any]], List[Dict[str, Any]]]:
+    def get_indicators(self, start_date: Optional[str], end_date: Optional[str]) -> Tuple[int, int, int, List[Dict[str, Any]], List[Dict[str, Any]]]:
         with get_db() as conn:
             cursor = conn.cursor()
-            # 파라미터가 없으므로 search, regions는 None 전달
-            where_clause, params = self._build_where_clause(None, start_date, end_date, None)
             
-            # 1. Total approvals (Over the entire date range)
-            cursor.execute(f"SELECT COUNT(*) FROM businesses{where_clause}", params)
+            # 1. Total approvals (전체 기간, 필터 없음)
+            cursor.execute("SELECT COUNT(*) FROM businesses")
             total_approvals = cursor.fetchone()[0]
+
+            # 1.2 Monthly approvals (파라미터로 넘어온 start_date ~ end_date 기준, 보통 30일)
+            where_clause, params = self._build_where_clause(None, start_date, end_date, None, None)
+            cursor.execute(f"SELECT COUNT(*) FROM businesses{where_clause}", params)
+            monthly_approvals = cursor.fetchone()[0]
 
             # 1.5 Today approvals (Target Day Only)
             target_date = end_date
@@ -83,7 +99,7 @@ class BusinessRepository:
                 from datetime import datetime
                 target_date = datetime.now().strftime('%Y%m%d')
                 
-            today_where_clause, today_params = self._build_where_clause(None, target_date, target_date, None)
+            today_where_clause, today_params = self._build_where_clause(None, target_date, target_date, None, None)
             cursor.execute(f"SELECT COUNT(*) FROM businesses{today_where_clause}", today_params)
             today_approvals = cursor.fetchone()[0]
             
@@ -122,7 +138,7 @@ class BusinessRepository:
             else:
                 trend_chart = [{"date": k, "count": v} for k, v in db_trend_results.items()]
             
-            return total_approvals, today_approvals, status_distribution, trend_chart
+            return total_approvals, monthly_approvals, today_approvals, status_distribution, trend_chart
 
     def get_business_by_license_no(self, license_no: str, conn=None) -> Optional[Dict[str, Any]]:
         query = "SELECT * FROM businesses WHERE license_no = ?"
@@ -145,15 +161,15 @@ class BusinessRepository:
     def insert_business(self, record: dict, conn=None):
         query = '''
             INSERT INTO businesses 
-            (license_no, business_name, address, representative_name, business_status, license_date, phone_number, industry_type, last_event_date, is_new, update_type, prev_business_status, prev_representative_name, prev_business_name, infer_update_type, last_event_time, license_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+            (license_no, business_name, address, representative_name, business_status, license_date, phone_number, industry_type, last_event_date, is_new, update_type, prev_business_status, prev_representative_name, prev_business_name, infer_update_type, infer_update_detail, last_event_time, license_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
         params = (
             record["license_no"], record["business_name"], record["address"], 
             record["representative_name"], record["business_status"], 
             record["license_date"], record["phone_number"], record.get("industry_type"), record["last_event_date"],
             record.get("update_type"), record.get("prev_business_status"), 
-            record.get("prev_representative_name"), record.get("prev_business_name"), record.get("infer_update_type"),
+            record.get("prev_representative_name"), record.get("prev_business_name"), record.get("infer_update_type"), record.get("infer_update_detail"),
             record.get("last_event_time"), record.get("license_time")
         )
         
@@ -172,7 +188,7 @@ class BusinessRepository:
                 industry_type = COALESCE(?, industry_type),
                 representative_history = ?, licensing_history = ?,
                 update_type = ?, prev_business_status = ?, prev_representative_name = ?, prev_business_name = ?,
-                infer_update_type = ?,
+                infer_update_type = ?, infer_update_detail = ?,
                 last_event_date = ?, last_event_time = ?, license_time = ?,
                 updated_at = ?, is_new = 1
             WHERE license_no = ?
@@ -182,7 +198,7 @@ class BusinessRepository:
             updates["business_status"], updates["phone_number"], updates.get("industry_type"),
             updates["representative_history"], updates["licensing_history"],
             updates.get("update_type"), updates.get("prev_business_status"), updates.get("prev_representative_name"), updates.get("prev_business_name"),
-            updates.get("infer_update_type"),
+            updates.get("infer_update_type"), updates.get("infer_update_detail"),
             updates["last_event_date"], updates.get("last_event_time"), updates.get("license_time"),
             updates["updated_at"], license_no
         )
