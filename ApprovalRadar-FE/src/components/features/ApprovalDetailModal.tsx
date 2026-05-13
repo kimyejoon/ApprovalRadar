@@ -53,11 +53,11 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
               <div className="text-text-muted mb-1">영업상태</div>
               <div className="text-text-primary">
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  selectedItem.status.includes('정상') 
+                  (selectedItem.status || '').includes('정상') || (selectedItem.status || '').includes('영업') 
                     ? 'bg-brand/10 text-brand' 
                     : 'bg-border-prominent text-text-muted'
                 }`}>
-                  {selectedItem.status}
+                  {selectedItem.status || '-'}
                 </span>
               </div>
             </div>

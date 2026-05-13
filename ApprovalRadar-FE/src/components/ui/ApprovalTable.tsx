@@ -110,7 +110,7 @@ export function ApprovalTable({
               <TableCell>{item.owner}</TableCell>
               <TableCell>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  item.status.includes('정상') || item.status.includes('영업') 
+                  (item.status || '').includes('정상') || (item.status || '').includes('영업') 
                     ? 'bg-brand/10 text-brand' 
                     : 'bg-border-prominent text-text-muted'
                 }`}>
