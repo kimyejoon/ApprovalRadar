@@ -26,6 +26,17 @@ export function DashboardIndicators() {
 
   const todayChangesCount = data?.total_approvals || 0;
 
+  // 백엔드 상태명 친화적 변환
+  const CATEGORY_NAMES: Record<string, string> = {
+    '신규등록': '신규등록',
+    '상태변경': '상태 변경',
+    '대표자변경': '대표 변경',
+    '변경민원-상호명': '상호 변경',
+    '변경민원-주소': '주소 변경',
+    '변경민원-성함': '성함 변경',
+    '초기수집(과거변경있음)': '기타',
+  };
+
   // 백엔드 상태 분포 데이터 색상 매핑
   const CATEGORY_COLORS: Record<string, string> = {
     '신규등록': '#434FF4', // 메인 브랜드 컬러
@@ -41,7 +52,7 @@ export function DashboardIndicators() {
   const pieData = useMemo(() => {
     if (!data?.status_distribution) return [];
     return data.status_distribution.map(d => ({
-      name: d.name,
+      name: CATEGORY_NAMES[d.name] || d.name,
       value: d.value,
       color: CATEGORY_COLORS[d.name] || '#d1d5db' // 기본값 연한 회색
     }));
