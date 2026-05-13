@@ -60,3 +60,6 @@
 - 2026-05-13: `/approvals` API 응답 스키마(`BusinessModel`)에 `industry_type`(업태명) 필드를 추가하여 클라이언트에 제공되도록 수정함.
 - 2026-05-13: `/approvals` API의 `sort_by` 쿼리 파라미터 및 DB 정렬 기준에 `industry_type`을 추가하여 업태명 기준의 문자열 이름 정렬이 정상 작동하도록 허용함.
 - 2026-05-13: `/approvals` 및 `/approvals/export` API에 `infer_update_type` 쿼리 파라미터를 추가하여 프론트엔드에서 데이터 유형(신규등록, 상태변경 등)별 필터링이 가능하도록 지원함. Swagger 문서에 허용되는 값 명세 완료.
+- 2026-05-13: `GET /api/v1/approvals/detail` 라우트 신설 (`/{approval_id}` 삭제) 및 `license_date`, `business_name` 파라미터 기반 배열 조회 적용.
+- 2026-05-13: `GET /api/v1/approvals` 및 `/export` API에 `industry_type`, `infer_update_type` 다중 필터(리스트 또는 콤마 구분자) 적용 및 Swagger 명세 강화.
+- 2026-05-13: Swagger UI에서 배열 타입(`List[str]`) 파라미터가 비정상적으로 노출되거나 사라지는 이슈를 해결하기 위해 `regions` 파라미터와 동일한 의존성 파싱 구조(`Depends`)로 변경하여 단일 텍스트(콤마 구분) 입력 방식으로 수정함.

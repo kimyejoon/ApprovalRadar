@@ -7,13 +7,19 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from database import get_db
 
 class BusinessRepository:
-    def _build_where_clause(self, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]], infer_update_type: Optional[str] = None) -> Tuple[str, List[Any]]:
+    def _build_where_clause(self, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]], infer_update_type: Optional[List[str]] = None, industry_type: Optional[List[str]] = None) -> Tuple[str, List[Any]]:
         query_conditions = []
         params = []
         
         if infer_update_type:
-            query_conditions.append("infer_update_type = ?")
-            params.append(infer_update_type)
+            placeholders = ', '.join(['?'] * len(infer_update_type))
+            query_conditions.append(f"infer_update_type IN ({placeholders})")
+            params.extend(infer_update_type)
+            
+        if industry_type:
+            placeholders = ', '.join(['?'] * len(industry_type))
+            query_conditions.append(f"industry_type IN ({placeholders})")
+            params.extend(industry_type)
             
         if search:
             query_conditions.append("(business_name LIKE ? OR license_no LIKE ?)")
@@ -42,11 +48,11 @@ class BusinessRepository:
             
         return where_clause, params
 
-    def get_approvals(self, page: int, size: int, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]], sort_by: str, sort_order: str, infer_update_type: Optional[str] = None) -> Tuple[List[Dict[str, Any]], int]:
+    def get_approvals(self, page: int, size: int, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]], sort_by: str, sort_order: str, infer_update_type: Optional[List[str]] = None, industry_type: Optional[List[str]] = None) -> Tuple[List[Dict[str, Any]], int]:
         with get_db() as conn:
             cursor = conn.cursor()
             
-            where_clause, params = self._build_where_clause(search, start_date, end_date, regions, infer_update_type)
+            where_clause, params = self._build_where_clause(search, start_date, end_date, regions, infer_update_type, industry_type)
             
             # 전체 개수
             cursor.execute(f"SELECT COUNT(*) FROM businesses{where_clause}", params)
@@ -89,7 +95,7 @@ class BusinessRepository:
             total_approvals = cursor.fetchone()[0]
 
             # 1.2 Monthly approvals (파라미터로 넘어온 start_date ~ end_date 기준, 보통 30일)
-            where_clause, params = self._build_where_clause(None, start_date, end_date, None, None)
+            where_clause, params = self._build_where_clause(None, start_date, end_date, None, None, None)
             cursor.execute(f"SELECT COUNT(*) FROM businesses{where_clause}", params)
             monthly_approvals = cursor.fetchone()[0]
 
@@ -99,7 +105,7 @@ class BusinessRepository:
                 from datetime import datetime
                 target_date = datetime.now().strftime('%Y%m%d')
                 
-            today_where_clause, today_params = self._build_where_clause(None, target_date, target_date, None, None)
+            today_where_clause, today_params = self._build_where_clause(None, target_date, target_date, None, None, None)
             cursor.execute(f"SELECT COUNT(*) FROM businesses{today_where_clause}", today_params)
             today_approvals = cursor.fetchone()[0]
             
@@ -157,6 +163,20 @@ class BusinessRepository:
                 if row:
                     return dict(row)
                 return None
+
+    def get_businesses_by_date_and_name(self, license_date: str, business_name: str, conn=None) -> List[Dict[str, Any]]:
+        query = "SELECT * FROM businesses WHERE license_date = ? AND business_name = ? ORDER BY created_at DESC"
+        params = (license_date, business_name)
+        
+        if conn:
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        else:
+            with get_db() as c:
+                cursor = c.execute(query, params)
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
 
     def insert_business(self, record: dict, conn=None):
         query = '''

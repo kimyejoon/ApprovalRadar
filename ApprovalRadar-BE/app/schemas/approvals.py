@@ -35,6 +35,10 @@ class SingleBusinessResponse(BaseModel):
     status: str
     data: BusinessModel
 
+class DetailListResponse(BaseModel):
+    status: str
+    data: List[BusinessModel]
+
 class IndicatorStatusDistribution(BaseModel):
     name: str
     value: int
