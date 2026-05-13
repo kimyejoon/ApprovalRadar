@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { fetchIndicators } from '@/lib/api';
 import { useIndicatorStore } from '@/store/useIndicatorStore';
@@ -9,6 +10,7 @@ import { CATEGORY_NAMES, CATEGORY_COLORS } from '@/lib/constants';
 
 export function DashboardIndicators() {
   const setTodayNewCount = useIndicatorStore(state => state.setTodayNewCount);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const { data: indicatorResponse } = useQuery({
     queryKey: ['indicators'],
@@ -25,7 +27,18 @@ export function DashboardIndicators() {
     }
   }, [data?.total_approvals, setTodayNewCount]);
 
-  const todayChangesCount = data?.total_approvals || 0;
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % 3);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const slideItems = [
+    { title: '전체 인허가 변동건수', count: data?.total_approvals || 0 },
+    { title: '월간 인허가 변동건수', count: data?.monthly_approvals || 0 },
+    { title: '금일 인허가 변동건수', count: data?.today_approvals || 0 },
+  ];
 
   // 상태별 변동 비율 (Pie Chart)
   const pieData = useMemo(() => {
@@ -64,13 +77,24 @@ export function DashboardIndicators() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
       {/* Indicator Card */}
-      <Card className="flex flex-col justify-center border-border-standard shadow-sm bg-surface-primary">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-text-muted">금일 인허가 변동 건수</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-4xl font-bold text-text-primary">{todayChangesCount.toLocaleString()}건</div>
-        </CardContent>
+      <Card className="flex flex-col justify-center border-border-standard shadow-sm bg-surface-primary relative overflow-hidden min-h-[130px]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentIndex}
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -20, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="absolute inset-0 w-full h-full flex flex-col justify-center"
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-text-muted">{slideItems[currentIndex].title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-text-primary">{slideItems[currentIndex].count.toLocaleString()}건</div>
+            </CardContent>
+          </motion.div>
+        </AnimatePresence>
       </Card>
 
       {/* Pie Chart: 상태별 변동 비율 */}
