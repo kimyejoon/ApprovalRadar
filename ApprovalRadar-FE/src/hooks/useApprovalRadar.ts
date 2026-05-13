@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format, startOfToday } from 'date-fns';
 import { fetchApprovals, type ApprovalData, type ApprovalMappedItem } from '@/lib/api';
 import { CATEGORY_NAMES } from '@/lib/constants';
+import { formatPhoneNumber } from '@/lib/utils';
 
 export type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id' | 'type';
 
@@ -52,7 +53,7 @@ export function useApprovalRadar() {
           owner: item.representative_name,
           status: mappedStatus,
           approvalDate: item.last_event_date,
-          phone: item.phone_number,
+          phone: formatPhoneNumber(item.phone_number),
           isTransfer: false,
           raw: item,
         };
