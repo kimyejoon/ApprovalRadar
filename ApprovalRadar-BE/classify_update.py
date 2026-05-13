@@ -32,12 +32,18 @@ def classify_update_type():
             
         update_queries.append((infer_val, license_no))
 
-    # Perform updates
+    # Perform updates for 변경민원
     cursor.executemany("UPDATE businesses SET infer_update_type = ? WHERE license_no = ?", update_queries)
+    
+    # Add logic for update_type IS NULL
+    cursor.execute("UPDATE businesses SET infer_update_type = '신규등록' WHERE update_type IS NULL AND license_date = last_event_date;")
+    new_reg_count = cursor.rowcount
+    
     conn.commit()
     conn.close()
     
     print(f"Successfully updated {len(update_queries)} records for '변경민원'.")
+    print(f"Successfully updated {new_reg_count} records for '신규등록' (update_type IS NULL).")
 
 if __name__ == "__main__":
     classify_update_type()
