@@ -37,7 +37,7 @@ export function DataTablePagination({
       
       <div className="flex items-center gap-4">
         <span className="text-text-muted">
-          총 {totalCount}개 중 {totalCount === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + itemsPerPage, totalCount)}
+          총 {totalCount.toLocaleString()}개 중 {totalCount === 0 ? 0 : (startIndex + 1).toLocaleString()}-{Math.min(startIndex + itemsPerPage, totalCount).toLocaleString()}
         </span>
         <div className="flex items-center gap-1">
           <Button 
