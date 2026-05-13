@@ -8,12 +8,14 @@ import { DataTablePagination } from '@/components/ui/DataTablePagination';
 import { ApprovalDetailModal } from '@/components/features/ApprovalDetailModal';
 import { StatusFilterModal } from '@/components/features/StatusFilterModal';
 import { LocationFilterModal } from '@/components/features/LocationFilterModal';
+import { IndustryFilterModal } from '@/components/features/IndustryFilterModal';
 import { useApprovalRadar } from '@/hooks/useApprovalRadar';
 
 export function DashboardPage() {
   const { state, actions, api } = useApprovalRadar();
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [isLocationFilterOpen, setIsLocationFilterOpen] = useState(false);
+  const [isIndustryFilterOpen, setIsIndustryFilterOpen] = useState(false);
 
   const totalPages = api.meta?.total_pages || 1;
   const totalCount = api.meta?.total_count || 0;
@@ -33,6 +35,8 @@ export function DashboardPage() {
         onStatusReset={() => actions.handleStatusFilterChange('전체')}
         locationFilters={state.locationFilters}
         onLocationFiltersChange={actions.handleLocationFiltersChange}
+        industryFilters={state.industryFilters}
+        onIndustryFiltersChange={actions.handleIndustryFiltersChange}
       />
 
       <ApprovalTable 
@@ -44,6 +48,7 @@ export function DashboardPage() {
         onRowClick={actions.setSelectedItem}
         onLocationClick={() => setIsLocationFilterOpen(true)}
         onStatusClick={() => setIsStatusFilterOpen(true)}
+        onIndustryClick={() => setIsIndustryFilterOpen(true)}
       />
 
       <DataTablePagination 
@@ -74,6 +79,14 @@ export function DashboardPage() {
         onClose={() => setIsLocationFilterOpen(false)} 
         initialLocations={state.locationFilters} 
         onApply={actions.handleLocationFiltersChange} 
+      />
+
+      <IndustryFilterModal 
+        isOpen={isIndustryFilterOpen} 
+        onClose={() => setIsIndustryFilterOpen(false)} 
+        industryFilters={state.industryFilters} 
+        setIndustryFilters={actions.handleIndustryFiltersChange} 
+        onFilterChange={() => actions.handlePageChange(1)} 
       />
     </DashboardLayout>
   );

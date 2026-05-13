@@ -26,6 +26,8 @@ interface DashboardFiltersProps {
   onStatusReset: () => void;
   locationFilters: string[];
   onLocationFiltersChange: (locations: string[]) => void;
+  industryFilters: string[];
+  onIndustryFiltersChange: (industries: string[]) => void;
 }
 
 export function DashboardFilters({
@@ -37,6 +39,8 @@ export function DashboardFilters({
   onStatusReset,
   locationFilters,
   onLocationFiltersChange,
+  industryFilters,
+  onIndustryFiltersChange,
 }: DashboardFiltersProps) {
   let groupedTags: { label: string, onRemove: () => void }[] = [];
 
@@ -75,7 +79,7 @@ export function DashboardFilters({
       </div>
 
       {/* Active Filters Row */}
-      {(statusFilter !== '전체' || groupedTags.length > 0) && (
+      {(statusFilter !== '전체' || groupedTags.length > 0 || industryFilters.length > 0) && (
         <div className="mb-6 flex flex-wrap items-center gap-2">
           {statusFilter !== '전체' && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
@@ -97,6 +101,18 @@ export function DashboardFilters({
             </span>
           )}
           
+          {industryFilters.map(industry => (
+            <span key={industry} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
+              업종: {industry}
+              <button 
+                onClick={() => onIndustryFiltersChange(industryFilters.filter(i => i !== industry))}
+                className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
+              >
+                <X weight="bold" className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          ))}
+
           {groupedTags.map(tag => (
             <span key={tag.label} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
               소재지: {tag.label}

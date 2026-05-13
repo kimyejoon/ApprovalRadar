@@ -15,13 +15,14 @@ export function useApprovalRadar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('대표자변경');
   const [locationFilters, setLocationFilters] = useState<string[]>([]);
+  const [industryFilters, setIndustryFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>({
     from: startOfToday(),
     to: startOfToday()
   });
 
   const { data: apiResponse, isLoading, isError } = useQuery({
-    queryKey: ['approvals', currentPage, itemsPerPage, searchQuery, statusFilter, locationFilters, dateRange, sortConfig],
+    queryKey: ['approvals', currentPage, itemsPerPage, searchQuery, statusFilter, locationFilters, industryFilters, dateRange, sortConfig],
     queryFn: () => fetchApprovals({
       page: currentPage,
       size: itemsPerPage,
@@ -30,6 +31,7 @@ export function useApprovalRadar() {
       end_date: dateRange?.to ? format(dateRange.to, 'yyyyMMdd') : undefined,
       regions: locationFilters.length > 0 ? locationFilters.join(',') : undefined,
       infer_update_type: statusFilter !== '전체' ? statusFilter : undefined,
+      industry_type: industryFilters.length > 0 ? industryFilters.join(',') : undefined,
       sort_by: sortConfig ? (
         sortConfig.key === 'id' ? 'license_no' :
         sortConfig.key === 'name' ? 'business_name' :

@@ -42,6 +42,7 @@ interface ApprovalTableProps {
   onRowClick: (item: ApprovalMappedItem) => void;
   onLocationClick: () => void;
   onStatusClick: () => void;
+  onIndustryClick: () => void;
 }
 
 export function ApprovalTable({
@@ -53,6 +54,7 @@ export function ApprovalTable({
   onRowClick,
   onLocationClick,
   onStatusClick,
+  onIndustryClick,
 }: ApprovalTableProps) {
   return (
     <Table>
@@ -70,7 +72,15 @@ export function ApprovalTable({
           </TableHead>
           <SortableHead label="인허가번호" sortKey="id" sortConfig={sortConfig} onSort={onSort} />
           <SortableHead label="대표자명" sortKey="owner" sortConfig={sortConfig} onSort={onSort} />
-          <SortableHead label="업종" sortKey="type" sortConfig={sortConfig} onSort={onSort} />
+          <TableHead>
+            <button 
+              className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
+              onClick={onIndustryClick}
+            >
+              업종
+              <CaretDown weight="bold" className="w-4 h-4" />
+            </button>
+          </TableHead>
           <TableHead>
             <button 
               className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
