@@ -4,7 +4,7 @@ import { format, startOfToday } from 'date-fns';
 import { fetchApprovals, type ApprovalData, type ApprovalMappedItem } from '@/lib/api';
 import { CATEGORY_NAMES } from '@/lib/constants';
 
-export type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id';
+export type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id' | 'type';
 
 export function useApprovalRadar() {
   const [selectedItem, setSelectedItem] = useState<ApprovalMappedItem | null>(null);
@@ -34,7 +34,8 @@ export function useApprovalRadar() {
         sortConfig.key === 'name' ? 'business_name' :
         sortConfig.key === 'owner' ? 'representative_name' :
         sortConfig.key === 'approvalDate' ? 'last_event_date' :
-        sortConfig.key === 'phone' ? 'phone_number' : 'created_at'
+        sortConfig.key === 'phone' ? 'phone_number' :
+        sortConfig.key === 'type' ? 'industry_type' : 'created_at'
       ) : 'created_at',
       sort_order: sortConfig ? sortConfig.direction : 'desc',
     }),
@@ -46,7 +47,7 @@ export function useApprovalRadar() {
         return {
           id: item.license_no,
           name: item.business_name,
-          type: '-', // 업종 필드 부재
+          type: item.industry_type || '-',
           location: item.address,
           owner: item.representative_name,
           status: mappedStatus,

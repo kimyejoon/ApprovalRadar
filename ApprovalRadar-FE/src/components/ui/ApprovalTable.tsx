@@ -70,6 +70,7 @@ export function ApprovalTable({
           </TableHead>
           <SortableHead label="인허가번호" sortKey="id" sortConfig={sortConfig} onSort={onSort} />
           <SortableHead label="대표자명" sortKey="owner" sortConfig={sortConfig} onSort={onSort} />
+          <SortableHead label="업종" sortKey="type" sortConfig={sortConfig} onSort={onSort} />
           <TableHead>
             <button 
               className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
@@ -86,15 +87,15 @@ export function ApprovalTable({
       <TableBody>
         {isLoading ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-text-muted">데이터를 불러오는 중입니다...</TableCell>
+            <TableCell colSpan={8} className="text-center py-8 text-text-muted">데이터를 불러오는 중입니다...</TableCell>
           </TableRow>
         ) : isError ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-text-muted">데이터를 불러오는데 실패했습니다.</TableCell>
+            <TableCell colSpan={8} className="text-center py-8 text-text-muted">데이터를 불러오는데 실패했습니다.</TableCell>
           </TableRow>
         ) : data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-text-muted">검색 결과가 없습니다.</TableCell>
+            <TableCell colSpan={8} className="text-center py-8 text-text-muted">검색 결과가 없습니다.</TableCell>
           </TableRow>
         ) : (
           data.map((item, index) => (
@@ -109,6 +110,7 @@ export function ApprovalTable({
               <TableCell>{item.location}</TableCell>
               <TableCodeCell>{item.id}</TableCodeCell>
               <TableCell>{item.owner}</TableCell>
+              <TableCell className="text-sm text-text-muted">{item.type}</TableCell>
               <TableCell>
                 <span 
                   className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border" 

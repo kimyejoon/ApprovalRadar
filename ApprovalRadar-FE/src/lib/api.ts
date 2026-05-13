@@ -8,6 +8,7 @@ export interface ApprovalData {
   phone_number: string;
   representative_history: unknown[];
   licensing_history: unknown[];
+  industry_type?: string | null;
   last_event_date: string;
   created_at: string;
   updated_at: string;
