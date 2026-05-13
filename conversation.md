@@ -63,3 +63,4 @@
 - 2026-05-13: `GET /api/v1/approvals/detail` 라우트 신설 (`/{approval_id}` 삭제) 및 `license_date`, `business_name` 파라미터 기반 배열 조회 적용.
 - 2026-05-13: `GET /api/v1/approvals` 및 `/export` API에 `industry_type`, `infer_update_type` 다중 필터(리스트 또는 콤마 구분자) 적용 및 Swagger 명세 강화.
 - 2026-05-13: Swagger UI에서 배열 타입(`List[str]`) 파라미터가 비정상적으로 노출되거나 사라지는 이슈를 해결하기 위해 `regions` 파라미터와 동일한 의존성 파싱 구조(`Depends`)로 변경하여 단일 텍스트(콤마 구분) 입력 방식으로 수정함.
+- 2026-05-13: `/api/v1/approvals` 응답 스키마(`BusinessModel`)에 `business_status`를 다시 추가하여 요청 시 정상적으로 반환되도록 수정함.

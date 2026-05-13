@@ -6,6 +6,7 @@ class BusinessModel(BaseModel):
     business_name: Optional[str] = None
     address: Optional[str] = None
     representative_name: Optional[str] = None
+    business_status: Optional[str] = None
     license_date: Optional[str] = None
     phone_number: Optional[str] = None
     last_event_date: Optional[str] = None
