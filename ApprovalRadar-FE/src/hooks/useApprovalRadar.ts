@@ -12,7 +12,7 @@ export function useApprovalRadar() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('전체');
+  const [statusFilter, setStatusFilter] = useState('대표자변경');
   const [locationFilters, setLocationFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>({
     from: startOfToday(),
