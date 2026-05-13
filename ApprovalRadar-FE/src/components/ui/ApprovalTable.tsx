@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCod
 import { formatApprovalDate } from '@/lib/utils';
 import type { ApprovalMappedItem } from '@/lib/api';
 import type { SortKey } from '@/hooks/useApprovalRadar';
-import { CATEGORY_COLORS } from '@/lib/constants';
+import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/lib/constants';
 
 interface SortableHeadProps {
   label: string;
@@ -111,13 +111,21 @@ export function ApprovalTable({
               <TableCell>{item.owner}</TableCell>
               <TableCell>
                 <span 
-                  className="px-2 py-1 rounded text-xs font-medium border" 
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border" 
                   style={{ 
                     color: CATEGORY_COLORS[item.raw.infer_update_type || ''] || '#9ca3af', 
                     borderColor: CATEGORY_COLORS[item.raw.infer_update_type || ''] || '#9ca3af',
                     backgroundColor: 'transparent'
                   }}
                 >
+                  {CATEGORY_ICONS[item.raw.infer_update_type || ''] && (
+                    <span className="flex items-center">
+                      {(() => {
+                        const Icon = CATEGORY_ICONS[item.raw.infer_update_type || ''];
+                        return <Icon weight="bold" size={12} />;
+                      })()}
+                    </span>
+                  )}
                   {item.status}
                 </span>
               </TableCell>
