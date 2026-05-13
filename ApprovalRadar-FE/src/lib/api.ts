@@ -28,6 +28,7 @@ export interface ApprovalMappedItem {
   location: string;
   owner: string;
   status: string;
+  updateDetail?: string;
   approvalDate: string;
   phone: string;
   isTransfer: boolean;

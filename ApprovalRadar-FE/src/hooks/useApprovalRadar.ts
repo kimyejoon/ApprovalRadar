@@ -52,6 +52,7 @@ export function useApprovalRadar() {
           location: item.address,
           owner: item.representative_name,
           status: mappedStatus,
+          updateDetail: item.infer_update_detail,
           approvalDate: item.last_event_date,
           phone: formatPhoneNumber(item.phone_number),
           isTransfer: false,

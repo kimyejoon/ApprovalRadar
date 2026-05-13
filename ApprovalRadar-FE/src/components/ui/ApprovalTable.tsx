@@ -112,24 +112,31 @@ export function ApprovalTable({
               <TableCell>{item.owner}</TableCell>
               <TableCell className="text-sm text-text-muted">{item.type}</TableCell>
               <TableCell>
-                <span 
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border" 
-                  style={{ 
-                    color: CATEGORY_COLORS[item.raw.infer_update_type || ''] || '#9ca3af', 
-                    borderColor: CATEGORY_COLORS[item.raw.infer_update_type || ''] || '#9ca3af',
-                    backgroundColor: 'transparent'
-                  }}
-                >
-                  {CATEGORY_ICONS[item.raw.infer_update_type || ''] && (
-                    <span className="flex items-center">
-                      {(() => {
-                        const Icon = CATEGORY_ICONS[item.raw.infer_update_type || ''];
-                        return <Icon weight="bold" size={12} />;
-                      })()}
+                <div className="flex flex-col items-start">
+                  <span 
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border" 
+                    style={{ 
+                      color: CATEGORY_COLORS[item.raw.infer_update_type || ''] || '#9ca3af', 
+                      borderColor: CATEGORY_COLORS[item.raw.infer_update_type || ''] || '#9ca3af',
+                      backgroundColor: 'transparent'
+                    }}
+                  >
+                    {CATEGORY_ICONS[item.raw.infer_update_type || ''] && (
+                      <span className="flex items-center">
+                        {(() => {
+                          const Icon = CATEGORY_ICONS[item.raw.infer_update_type || ''];
+                          return <Icon weight="bold" size={12} />;
+                        })()}
+                      </span>
+                    )}
+                    {item.status}
+                  </span>
+                  {item.updateDetail && (
+                    <span className="text-[11px] text-text-muted mt-1 ml-1 leading-tight break-keep">
+                      {item.updateDetail}
                     </span>
                   )}
-                  {item.status}
-                </span>
+                </div>
               </TableCell>
               <TableCell className="text-xs text-text-muted">{formatApprovalDate(item.approvalDate)}</TableCell>
               <TableCell className="font-mono text-xs">{item.phone}</TableCell>
