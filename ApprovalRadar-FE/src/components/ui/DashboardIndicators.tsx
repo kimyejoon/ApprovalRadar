@@ -61,9 +61,9 @@ export function DashboardIndicators() {
   // 트렌드 차트 데이터 (Bar Chart)
   const barData = useMemo(() => {
     if (!data?.trend_chart) return [];
-    // 최근 7일 데이터만 가져오기
-    const recent7DaysData = data.trend_chart.slice(-7);
-    return recent7DaysData.map(item => {
+    // 최근 30일 데이터만 가져오기
+    const recent30DaysData = data.trend_chart.slice(-30);
+    return recent30DaysData.map(item => {
       let formattedDate = item.date;
       if (item.date && item.date.length === 8 && !item.date.includes('-')) {
         const month = parseInt(item.date.substring(4, 6), 10);
@@ -137,10 +137,10 @@ export function DashboardIndicators() {
         </CardContent>
       </Card>
 
-      {/* Bar Chart: 주간 트렌드 */}
+      {/* Bar Chart: 월간 트렌드 */}
       <Card className="border-border-standard shadow-sm bg-surface-primary lg:col-span-2">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-text-muted">최근 7일 변동 추이</CardTitle>
+          <CardTitle className="text-sm font-medium text-text-muted">최근 30일 변동 추이</CardTitle>
         </CardHeader>
         <CardContent className="h-[140px] pb-0">
           <ResponsiveContainer width="100%" height="100%">
