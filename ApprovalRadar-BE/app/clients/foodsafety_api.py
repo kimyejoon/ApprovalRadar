@@ -86,22 +86,29 @@ class ApiClient:
                 else:
                     logger.warning(f"알 수 없는 응답 형식입니다. {backoff}초 후 재시도합니다...")
                     time.sleep(backoff)
-                    backoff *= 2
-                    attempt += 1
                     
-            except (requests.exceptions.RequestException, ValueError) as e:
-                ctx = f"서비스:{service_id}, 범위:{start_idx}~{end_idx}"
-                if kwargs:
-                    ctx += f", 추가:{kwargs}"
-                logger.warning(f"[네트워크/응답 오류] {ctx} | 사유: {str(e)}. {backoff}초 후 재시도합니다...")
+            except ValueError as e:
+                # JSONDecodeError (ValueError)
+                ctx = f"서비스:{service_id}, 추가:{kwargs}" if kwargs else f"서비스:{service_id}"
+                raw_text = response.text[:200].replace('\n', ' ') if 'response' in locals() else "N/A"
+                logger.warning(f"[API 파싱 오류] {ctx} | 서버가 JSON이 아닌 데이터를 반환했습니다 (WAF 차단 의심). 응답 미리보기: {raw_text} | 사유: {str(e)}")
                 time.sleep(backoff)
                 
-                # 2회 이상 연속으로 파싱 에러(WAF 차단 등)가 나면, IP 차단이 아니라 키 단위 차단일 수 있으므로 키를 회전합니다.
                 if attempt >= 2:
                     logger.warning("연속적인 응답 오류 발생! 해당 키가 WAF에 의해 임시 차단된 것으로 의심되어 키를 회전합니다.")
                     self.rotate_key(api_key)
                     time.sleep(settings.GAP_SECONDS)
                     
+                backoff *= 2
+                attempt += 1
+                
+            except requests.exceptions.RequestException as e:
+                ctx = f"서비스:{service_id}, 범위:{start_idx}~{end_idx}"
+                if kwargs:
+                    ctx += f", 추가:{kwargs}"
+                logger.warning(f"[네트워크 통신 오류] {ctx} | 사유: {str(e)}. {backoff}초 후 재시도합니다...")
+                time.sleep(backoff)
+                
                 backoff *= 2
                 attempt += 1
                 
