@@ -42,7 +42,7 @@ def parse_comma_separated_list(regions: Optional[str] = Query(None, description=
         return None
     return [r.strip() for r in regions.split(',') if r.strip()]
 
-def parse_industry_type_list(industry_type: Optional[str] = Query(None, description="업종 필터링 (콤마 구분 다중 선택 가능. 예: 일반음식점,휴게음식점)")) -> Optional[List[str]]:
+def parse_industry_type_list(industry_type: Optional[str] = Query(None, description="업종 필터링 (콤마 구분 다중 선택 가능. 허용값: 일반음식점,휴게음식점,제과점영업,유흥주점영업,단란주점,위탁급식영업,식품제조가공업)")) -> Optional[List[str]]:
     if not industry_type:
         return None
     return [r.strip() for r in industry_type.split(',') if r.strip()]

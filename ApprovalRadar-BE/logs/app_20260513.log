@@ -4342,3 +4342,374 @@
 2026-05-13 18:35:35,454 [ERROR] ApprovalRadar - ❌ I2500 크롤러 스케줄 작업 중 치명적인 오류 발생: All API keys are exhausted for today.
 2026-05-13 18:35:37,270 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
 2026-05-13 18:35:37,272 [ERROR] ApprovalRadar - Failed to fetch or update 20260517461: All API keys are exhausted for today.
+2026-05-13 18:35:40,330 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:35:40,332 [ERROR] ApprovalRadar - Failed to fetch or update 20260342644: All API keys are exhausted for today.
+2026-05-13 18:35:43,381 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:35:43,383 [ERROR] ApprovalRadar - Failed to fetch or update 20260342653: All API keys are exhausted for today.
+2026-05-13 18:35:46,445 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:35:46,447 [ERROR] ApprovalRadar - Failed to fetch or update 20260342681: All API keys are exhausted for today.
+2026-05-13 18:35:49,588 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:35:49,589 [ERROR] ApprovalRadar - Failed to fetch or update 20260342666: All API keys are exhausted for today.
+2026-05-13 18:35:52,701 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:35:52,703 [ERROR] ApprovalRadar - Failed to fetch or update 20260917187: All API keys are exhausted for today.
+2026-05-13 18:35:55,842 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:35:55,845 [ERROR] ApprovalRadar - Failed to fetch or update 20260913211: All API keys are exhausted for today.
+2026-05-13 18:35:58,986 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:35:58,989 [ERROR] ApprovalRadar - Failed to fetch or update 20260268449: All API keys are exhausted for today.
+2026-05-13 18:36:02,132 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:02,134 [ERROR] ApprovalRadar - Failed to fetch or update 20260268473: All API keys are exhausted for today.
+2026-05-13 18:36:05,282 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:05,284 [ERROR] ApprovalRadar - Failed to fetch or update 20260337507: All API keys are exhausted for today.
+2026-05-13 18:36:08,426 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:08,428 [ERROR] ApprovalRadar - Failed to fetch or update 20260337518: All API keys are exhausted for today.
+2026-05-13 18:36:11,572 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:11,575 [ERROR] ApprovalRadar - Failed to fetch or update 20260222430: All API keys are exhausted for today.
+2026-05-13 18:36:14,698 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:14,699 [ERROR] ApprovalRadar - Failed to fetch or update 20260222434: All API keys are exhausted for today.
+2026-05-13 18:36:17,843 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:17,844 [ERROR] ApprovalRadar - Failed to fetch or update 20260222401: All API keys are exhausted for today.
+2026-05-13 18:36:20,988 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:20,990 [ERROR] ApprovalRadar - Failed to fetch or update 20260222421: All API keys are exhausted for today.
+2026-05-13 18:36:24,135 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:24,138 [ERROR] ApprovalRadar - Failed to fetch or update 20260222423: All API keys are exhausted for today.
+2026-05-13 18:36:27,281 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:27,282 [ERROR] ApprovalRadar - Failed to fetch or update 20260222440: All API keys are exhausted for today.
+2026-05-13 18:36:30,322 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:30,325 [ERROR] ApprovalRadar - Failed to fetch or update 20260219383: All API keys are exhausted for today.
+2026-05-13 18:36:33,397 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:33,399 [ERROR] ApprovalRadar - Failed to fetch or update 20260219417: All API keys are exhausted for today.
+2026-05-13 18:36:36,477 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:36,479 [ERROR] ApprovalRadar - Failed to fetch or update 20260219418: All API keys are exhausted for today.
+2026-05-13 18:36:39,542 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:39,543 [ERROR] ApprovalRadar - Failed to fetch or update 20260219409: All API keys are exhausted for today.
+2026-05-13 18:36:42,598 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:42,603 [ERROR] ApprovalRadar - Failed to fetch or update 20260704201: All API keys are exhausted for today.
+2026-05-13 18:36:45,682 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:45,685 [ERROR] ApprovalRadar - Failed to fetch or update 20260704206: All API keys are exhausted for today.
+2026-05-13 18:36:48,815 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:48,817 [ERROR] ApprovalRadar - Failed to fetch or update 20260704187: All API keys are exhausted for today.
+2026-05-13 18:36:51,942 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:51,944 [ERROR] ApprovalRadar - Failed to fetch or update 20260704213: All API keys are exhausted for today.
+2026-05-13 18:36:55,086 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:55,089 [ERROR] ApprovalRadar - Failed to fetch or update 20260832044: All API keys are exhausted for today.
+2026-05-13 18:36:58,126 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:36:58,128 [ERROR] ApprovalRadar - Failed to fetch or update 20260832030: All API keys are exhausted for today.
+2026-05-13 18:37:01,186 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:01,188 [ERROR] ApprovalRadar - Failed to fetch or update 20260832047: All API keys are exhausted for today.
+2026-05-13 18:37:04,248 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:04,249 [ERROR] ApprovalRadar - Failed to fetch or update 20260832036: All API keys are exhausted for today.
+2026-05-13 18:37:07,318 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:07,320 [ERROR] ApprovalRadar - Failed to fetch or update 20260832033: All API keys are exhausted for today.
+2026-05-13 18:37:10,358 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:10,359 [ERROR] ApprovalRadar - Failed to fetch or update 20260832042: All API keys are exhausted for today.
+2026-05-13 18:37:13,472 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:13,474 [ERROR] ApprovalRadar - Failed to fetch or update 20260832043: All API keys are exhausted for today.
+2026-05-13 18:37:16,618 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:16,621 [ERROR] ApprovalRadar - Failed to fetch or update 20260832039: All API keys are exhausted for today.
+2026-05-13 18:37:19,760 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:19,764 [ERROR] ApprovalRadar - Failed to fetch or update 20260832040: All API keys are exhausted for today.
+2026-05-13 18:37:22,902 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:22,903 [ERROR] ApprovalRadar - Failed to fetch or update 20260832031: All API keys are exhausted for today.
+2026-05-13 18:37:26,028 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:26,029 [ERROR] ApprovalRadar - Failed to fetch or update 20260832045: All API keys are exhausted for today.
+2026-05-13 18:37:29,163 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:29,166 [ERROR] ApprovalRadar - Failed to fetch or update 20260832041: All API keys are exhausted for today.
+2026-05-13 18:37:32,294 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:32,298 [ERROR] ApprovalRadar - Failed to fetch or update 20260832035: All API keys are exhausted for today.
+2026-05-13 18:37:35,440 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:35,442 [ERROR] ApprovalRadar - Failed to fetch or update 20260832038: All API keys are exhausted for today.
+2026-05-13 18:37:38,585 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:38,587 [ERROR] ApprovalRadar - Failed to fetch or update 20260832028: All API keys are exhausted for today.
+2026-05-13 18:37:41,729 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:41,731 [ERROR] ApprovalRadar - Failed to fetch or update 20260310285: All API keys are exhausted for today.
+2026-05-13 18:37:44,769 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:44,772 [ERROR] ApprovalRadar - Failed to fetch or update 20260310338: All API keys are exhausted for today.
+2026-05-13 18:37:47,832 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:47,834 [ERROR] ApprovalRadar - Failed to fetch or update 20260310352: All API keys are exhausted for today.
+2026-05-13 18:37:50,887 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:50,889 [ERROR] ApprovalRadar - Failed to fetch or update 20260664452: All API keys are exhausted for today.
+2026-05-13 18:37:53,944 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:53,947 [ERROR] ApprovalRadar - Failed to fetch or update 20260664518: All API keys are exhausted for today.
+2026-05-13 18:37:57,008 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:37:57,012 [ERROR] ApprovalRadar - Failed to fetch or update 20260664461: All API keys are exhausted for today.
+2026-05-13 18:38:00,129 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:00,130 [ERROR] ApprovalRadar - Failed to fetch or update 20260664476: All API keys are exhausted for today.
+2026-05-13 18:38:03,262 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:03,264 [ERROR] ApprovalRadar - Failed to fetch or update 20260590328: All API keys are exhausted for today.
+2026-05-13 18:38:06,454 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:06,456 [ERROR] ApprovalRadar - Failed to fetch or update 20260408396: All API keys are exhausted for today.
+2026-05-13 18:38:09,570 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:09,572 [ERROR] ApprovalRadar - Failed to fetch or update 20260408482: All API keys are exhausted for today.
+2026-05-13 18:38:12,763 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:12,766 [ERROR] ApprovalRadar - Failed to fetch or update 20260408507: All API keys are exhausted for today.
+2026-05-13 18:38:15,861 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:15,865 [ERROR] ApprovalRadar - Failed to fetch or update 20260408503: All API keys are exhausted for today.
+2026-05-13 18:38:19,003 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:19,005 [ERROR] ApprovalRadar - Failed to fetch or update 20260507763: All API keys are exhausted for today.
+2026-05-13 18:38:22,148 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:22,150 [ERROR] ApprovalRadar - Failed to fetch or update 20260418161: All API keys are exhausted for today.
+2026-05-13 18:38:25,293 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:25,295 [ERROR] ApprovalRadar - Failed to fetch or update 20260418177: All API keys are exhausted for today.
+2026-05-13 18:38:28,437 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:28,439 [ERROR] ApprovalRadar - Failed to fetch or update 20260418147: All API keys are exhausted for today.
+2026-05-13 18:38:31,554 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:31,556 [ERROR] ApprovalRadar - Failed to fetch or update 20260582332: All API keys are exhausted for today.
+2026-05-13 18:38:34,701 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:34,702 [ERROR] ApprovalRadar - Failed to fetch or update 20260582498: All API keys are exhausted for today.
+2026-05-13 18:38:37,842 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:37,844 [ERROR] ApprovalRadar - Failed to fetch or update 20260582502: All API keys are exhausted for today.
+2026-05-13 18:38:40,989 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:40,991 [ERROR] ApprovalRadar - Failed to fetch or update 20260582468: All API keys are exhausted for today.
+2026-05-13 18:38:44,142 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:44,144 [ERROR] ApprovalRadar - Failed to fetch or update 20260403565: All API keys are exhausted for today.
+2026-05-13 18:38:47,285 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:47,287 [ERROR] ApprovalRadar - Failed to fetch or update 20260403483: All API keys are exhausted for today.
+2026-05-13 18:38:50,425 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:50,427 [ERROR] ApprovalRadar - Failed to fetch or update 20260403557: All API keys are exhausted for today.
+2026-05-13 18:38:53,578 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:53,579 [ERROR] ApprovalRadar - Failed to fetch or update 20260543435: All API keys are exhausted for today.
+2026-05-13 18:38:56,717 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:56,719 [ERROR] ApprovalRadar - Failed to fetch or update 20260543444: All API keys are exhausted for today.
+2026-05-13 18:38:59,859 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:38:59,861 [ERROR] ApprovalRadar - Failed to fetch or update 20260543454: All API keys are exhausted for today.
+2026-05-13 18:39:03,010 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:03,012 [ERROR] ApprovalRadar - Failed to fetch or update 20260391241: All API keys are exhausted for today.
+2026-05-13 18:39:06,154 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:06,157 [ERROR] ApprovalRadar - Failed to fetch or update 20260382228: All API keys are exhausted for today.
+2026-05-13 18:39:09,300 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:09,301 [ERROR] ApprovalRadar - Failed to fetch or update 20260385226: All API keys are exhausted for today.
+2026-05-13 18:39:12,442 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:12,444 [ERROR] ApprovalRadar - Failed to fetch or update 20260385235: All API keys are exhausted for today.
+2026-05-13 18:39:15,602 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:15,605 [ERROR] ApprovalRadar - Failed to fetch or update 20260391243: All API keys are exhausted for today.
+2026-05-13 18:39:18,718 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:18,720 [ERROR] ApprovalRadar - Failed to fetch or update 20260385227: All API keys are exhausted for today.
+2026-05-13 18:39:21,778 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:21,780 [ERROR] ApprovalRadar - Failed to fetch or update 20260050323: All API keys are exhausted for today.
+2026-05-13 18:39:24,834 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:24,835 [ERROR] ApprovalRadar - Failed to fetch or update 20260050310: All API keys are exhausted for today.
+2026-05-13 18:39:27,897 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:27,899 [ERROR] ApprovalRadar - Failed to fetch or update 20260050316: All API keys are exhausted for today.
+2026-05-13 18:39:30,952 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:30,954 [ERROR] ApprovalRadar - Failed to fetch or update 20260050354: All API keys are exhausted for today.
+2026-05-13 18:39:34,019 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:34,019 [ERROR] ApprovalRadar - Failed to fetch or update 20260050336: All API keys are exhausted for today.
+2026-05-13 18:39:37,101 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:37,103 [ERROR] ApprovalRadar - Failed to fetch or update 20260045564: All API keys are exhausted for today.
+2026-05-13 18:39:40,242 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:40,246 [ERROR] ApprovalRadar - Failed to fetch or update 20260045599: All API keys are exhausted for today.
+2026-05-13 18:39:43,401 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:43,403 [ERROR] ApprovalRadar - Failed to fetch or update 20260045586: All API keys are exhausted for today.
+2026-05-13 18:39:46,531 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:46,532 [ERROR] ApprovalRadar - Failed to fetch or update 20260045593: All API keys are exhausted for today.
+2026-05-13 18:39:49,693 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:49,695 [ERROR] ApprovalRadar - Failed to fetch or update 20260093381: All API keys are exhausted for today.
+2026-05-13 18:39:52,822 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:52,823 [ERROR] ApprovalRadar - Failed to fetch or update 20260062387: All API keys are exhausted for today.
+2026-05-13 18:39:55,965 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:55,969 [ERROR] ApprovalRadar - Failed to fetch or update 20260062386: All API keys are exhausted for today.
+2026-05-13 18:39:59,120 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:39:59,121 [ERROR] ApprovalRadar - Failed to fetch or update 20260076229: All API keys are exhausted for today.
+2026-05-13 18:40:02,268 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:02,270 [ERROR] ApprovalRadar - Failed to fetch or update 20260076251: All API keys are exhausted for today.
+2026-05-13 18:40:05,403 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:05,407 [ERROR] ApprovalRadar - Failed to fetch or update 20260104471: All API keys are exhausted for today.
+2026-05-13 18:40:08,530 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:08,532 [ERROR] ApprovalRadar - Failed to fetch or update 20260104485: All API keys are exhausted for today.
+2026-05-13 18:40:11,676 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:11,677 [ERROR] ApprovalRadar - Failed to fetch or update 20260058373: All API keys are exhausted for today.
+2026-05-13 18:40:11,679 [INFO] ApprovalRadar - [진척도] 100/2403 처리 완료 (성공: 0, 실패: 100)
+2026-05-13 18:40:14,824 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:14,828 [ERROR] ApprovalRadar - Failed to fetch or update 20260058329: All API keys are exhausted for today.
+2026-05-13 18:40:17,967 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:17,969 [ERROR] ApprovalRadar - Failed to fetch or update 20260072359: All API keys are exhausted for today.
+2026-05-13 18:40:21,012 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:21,014 [ERROR] ApprovalRadar - Failed to fetch or update 20260072355: All API keys are exhausted for today.
+2026-05-13 18:40:24,076 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:24,078 [ERROR] ApprovalRadar - Failed to fetch or update 20260072360: All API keys are exhausted for today.
+2026-05-13 18:40:27,133 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:27,136 [ERROR] ApprovalRadar - Failed to fetch or update 20260089338: All API keys are exhausted for today.
+2026-05-13 18:40:30,185 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:30,187 [ERROR] ApprovalRadar - Failed to fetch or update 20260161579: All API keys are exhausted for today.
+2026-05-13 18:40:33,250 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:33,252 [ERROR] ApprovalRadar - Failed to fetch or update 20260161588: All API keys are exhausted for today.
+2026-05-13 18:40:36,364 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:36,366 [ERROR] ApprovalRadar - Failed to fetch or update 20260161568: All API keys are exhausted for today.
+2026-05-13 18:40:39,486 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:39,489 [ERROR] ApprovalRadar - Failed to fetch or update 20260136701: All API keys are exhausted for today.
+2026-05-13 18:40:42,626 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:42,630 [ERROR] ApprovalRadar - Failed to fetch or update 20260136867: All API keys are exhausted for today.
+2026-05-13 18:40:45,773 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:45,774 [ERROR] ApprovalRadar - Failed to fetch or update 20260136854: All API keys are exhausted for today.
+2026-05-13 18:40:48,917 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:48,918 [ERROR] ApprovalRadar - Failed to fetch or update 20260121784: All API keys are exhausted for today.
+2026-05-13 18:40:51,956 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:51,957 [ERROR] ApprovalRadar - Failed to fetch or update 20260121768: All API keys are exhausted for today.
+2026-05-13 18:40:55,030 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:55,031 [ERROR] ApprovalRadar - Failed to fetch or update 20260121811: All API keys are exhausted for today.
+2026-05-13 18:40:58,099 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:40:58,101 [ERROR] ApprovalRadar - Failed to fetch or update 20260121830: All API keys are exhausted for today.
+2026-05-13 18:41:01,197 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:01,198 [ERROR] ApprovalRadar - Failed to fetch or update 20260121688: All API keys are exhausted for today.
+2026-05-13 18:41:04,249 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:04,250 [ERROR] ApprovalRadar - Failed to fetch or update 20260121800: All API keys are exhausted for today.
+2026-05-13 18:41:07,288 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:07,289 [ERROR] ApprovalRadar - Failed to fetch or update 20260121815: All API keys are exhausted for today.
+2026-05-13 18:41:10,413 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:10,414 [ERROR] ApprovalRadar - Failed to fetch or update 20260845272: All API keys are exhausted for today.
+2026-05-13 18:41:13,544 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:13,545 [ERROR] ApprovalRadar - Failed to fetch or update 20260354399: All API keys are exhausted for today.
+2026-05-13 18:41:16,687 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:16,688 [ERROR] ApprovalRadar - Failed to fetch or update 20260354429: All API keys are exhausted for today.
+2026-05-13 18:41:19,833 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:19,834 [ERROR] ApprovalRadar - Failed to fetch or update 20260169141: All API keys are exhausted for today.
+2026-05-13 18:41:22,977 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:22,979 [ERROR] ApprovalRadar - Failed to fetch or update 20260174128: All API keys are exhausted for today.
+2026-05-13 18:41:26,036 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:26,037 [ERROR] ApprovalRadar - Failed to fetch or update 20260192475: All API keys are exhausted for today.
+2026-05-13 18:41:29,099 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:29,100 [ERROR] ApprovalRadar - Failed to fetch or update 20260192533: All API keys are exhausted for today.
+2026-05-13 18:41:32,160 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:32,162 [ERROR] ApprovalRadar - Failed to fetch or update 20260192522: All API keys are exhausted for today.
+2026-05-13 18:41:35,200 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:35,202 [ERROR] ApprovalRadar - Failed to fetch or update 20260192545: All API keys are exhausted for today.
+2026-05-13 18:41:38,238 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:38,238 [ERROR] ApprovalRadar - Failed to fetch or update 20260192546: All API keys are exhausted for today.
+2026-05-13 18:41:41,354 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:41,354 [ERROR] ApprovalRadar - Failed to fetch or update 20260178490: All API keys are exhausted for today.
+2026-05-13 18:41:44,489 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:44,490 [ERROR] ApprovalRadar - Failed to fetch or update 20260178473: All API keys are exhausted for today.
+2026-05-13 18:41:47,615 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:47,617 [ERROR] ApprovalRadar - Failed to fetch or update 20260178370: All API keys are exhausted for today.
+2026-05-13 18:41:50,763 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:50,765 [ERROR] ApprovalRadar - Failed to fetch or update 20260178360: All API keys are exhausted for today.
+2026-05-13 18:41:53,810 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:53,811 [ERROR] ApprovalRadar - Failed to fetch or update 20260178375: All API keys are exhausted for today.
+2026-05-13 18:41:56,877 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:56,878 [ERROR] ApprovalRadar - Failed to fetch or update 20260178449: All API keys are exhausted for today.
+2026-05-13 18:41:59,935 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:41:59,936 [ERROR] ApprovalRadar - Failed to fetch or update 20260279379: All API keys are exhausted for today.
+2026-05-13 18:42:02,995 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:02,997 [ERROR] ApprovalRadar - Failed to fetch or update 20260279386: All API keys are exhausted for today.
+2026-05-13 18:42:06,057 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:06,059 [ERROR] ApprovalRadar - Failed to fetch or update 20260279361: All API keys are exhausted for today.
+2026-05-13 18:42:09,142 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:09,143 [ERROR] ApprovalRadar - Failed to fetch or update 20260279370: All API keys are exhausted for today.
+2026-05-13 18:42:12,285 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:12,286 [ERROR] ApprovalRadar - Failed to fetch or update 20260279400: All API keys are exhausted for today.
+2026-05-13 18:42:15,431 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:15,432 [ERROR] ApprovalRadar - Failed to fetch or update 20260279388: All API keys are exhausted for today.
+2026-05-13 18:42:18,562 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:18,564 [ERROR] ApprovalRadar - Failed to fetch or update 20260279369: All API keys are exhausted for today.
+2026-05-13 18:42:21,702 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:21,703 [ERROR] ApprovalRadar - Failed to fetch or update 20260121684: All API keys are exhausted for today.
+2026-05-13 18:42:24,846 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:24,847 [ERROR] ApprovalRadar - Failed to fetch or update 20260154696: All API keys are exhausted for today.
+2026-05-13 18:42:27,993 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:27,995 [ERROR] ApprovalRadar - Failed to fetch or update 20260145160: All API keys are exhausted for today.
+2026-05-13 18:42:31,038 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:31,040 [ERROR] ApprovalRadar - Failed to fetch or update 20260145381: All API keys are exhausted for today.
+2026-05-13 18:42:34,098 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:34,100 [ERROR] ApprovalRadar - Failed to fetch or update 20260145358: All API keys are exhausted for today.
+2026-05-13 18:42:37,161 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:37,162 [ERROR] ApprovalRadar - Failed to fetch or update 20260145235: All API keys are exhausted for today.
+2026-05-13 18:42:40,218 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:40,220 [ERROR] ApprovalRadar - Failed to fetch or update 20260145340: All API keys are exhausted for today.
+2026-05-13 18:42:43,260 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:43,261 [ERROR] ApprovalRadar - Failed to fetch or update 20260145291: All API keys are exhausted for today.
+2026-05-13 18:42:46,398 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:46,400 [ERROR] ApprovalRadar - Failed to fetch or update 20260145226: All API keys are exhausted for today.
+2026-05-13 18:42:49,516 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:49,517 [ERROR] ApprovalRadar - Failed to fetch or update 20260145331: All API keys are exhausted for today.
+2026-05-13 18:42:52,648 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:52,649 [ERROR] ApprovalRadar - Failed to fetch or update 20260145288: All API keys are exhausted for today.
+2026-05-13 18:42:55,793 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:55,793 [ERROR] ApprovalRadar - Failed to fetch or update 20260145418: All API keys are exhausted for today.
+2026-05-13 18:42:58,937 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:42:58,939 [ERROR] ApprovalRadar - Failed to fetch or update 20260145341: All API keys are exhausted for today.
+2026-05-13 18:43:02,109 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:02,110 [ERROR] ApprovalRadar - Failed to fetch or update 20260310387: All API keys are exhausted for today.
+2026-05-13 18:43:05,229 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:05,230 [ERROR] ApprovalRadar - Failed to fetch or update 20260431240: All API keys are exhausted for today.
+2026-05-13 18:43:08,357 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:08,359 [ERROR] ApprovalRadar - Failed to fetch or update 20260431270: All API keys are exhausted for today.
+2026-05-13 18:43:11,394 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:11,396 [ERROR] ApprovalRadar - Failed to fetch or update 20260431262: All API keys are exhausted for today.
+2026-05-13 18:43:14,454 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:14,456 [ERROR] ApprovalRadar - Failed to fetch or update 20260499246: All API keys are exhausted for today.
+2026-05-13 18:43:17,518 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:17,519 [ERROR] ApprovalRadar - Failed to fetch or update 20260499301: All API keys are exhausted for today.
+2026-05-13 18:43:20,576 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:20,577 [ERROR] ApprovalRadar - Failed to fetch or update 20260499303: All API keys are exhausted for today.
+2026-05-13 18:43:23,644 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:23,645 [ERROR] ApprovalRadar - Failed to fetch or update 20260517090: All API keys are exhausted for today.
+2026-05-13 18:43:26,746 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:26,748 [ERROR] ApprovalRadar - Failed to fetch or update 20160137095: All API keys are exhausted for today.
+2026-05-13 18:43:29,873 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:29,874 [ERROR] ApprovalRadar - Failed to fetch or update 20010555233: All API keys are exhausted for today.
+2026-05-13 18:43:33,020 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:33,021 [ERROR] ApprovalRadar - Failed to fetch or update 20250113369: All API keys are exhausted for today.
+2026-05-13 18:43:36,060 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:36,061 [ERROR] ApprovalRadar - Failed to fetch or update 20260354492: All API keys are exhausted for today.
+2026-05-13 18:43:39,119 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:39,120 [ERROR] ApprovalRadar - Failed to fetch or update 20260718053: All API keys are exhausted for today.
+2026-05-13 18:43:42,182 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:42,182 [ERROR] ApprovalRadar - Failed to fetch or update 20260715135: All API keys are exhausted for today.
+2026-05-13 18:43:45,244 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:45,245 [ERROR] ApprovalRadar - Failed to fetch or update 20260971803: All API keys are exhausted for today.
+2026-05-13 18:43:48,303 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:48,304 [ERROR] ApprovalRadar - Failed to fetch or update 20210401325: All API keys are exhausted for today.
+2026-05-13 18:43:51,375 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:51,376 [ERROR] ApprovalRadar - Failed to fetch or update 20040386288: All API keys are exhausted for today.
+2026-05-13 18:43:54,496 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:54,497 [ERROR] ApprovalRadar - Failed to fetch or update 20260226104: All API keys are exhausted for today.
+2026-05-13 18:43:57,555 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:43:57,556 [ERROR] ApprovalRadar - Failed to fetch or update 20260707285: All API keys are exhausted for today.
+2026-05-13 18:44:00,621 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:44:00,623 [ERROR] ApprovalRadar - Failed to fetch or update 20260273621: All API keys are exhausted for today.
+2026-05-13 18:44:03,672 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:44:03,673 [ERROR] ApprovalRadar - Failed to fetch or update 20260211136: All API keys are exhausted for today.
+2026-05-13 18:44:06,723 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:44:06,724 [ERROR] ApprovalRadar - Failed to fetch or update 20020025430: All API keys are exhausted for today.
+2026-05-13 18:44:09,766 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:44:09,769 [ERROR] ApprovalRadar - Failed to fetch or update 20260097709: All API keys are exhausted for today.
+2026-05-13 18:44:12,899 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:44:12,901 [ERROR] ApprovalRadar - Failed to fetch or update 20240147597: All API keys are exhausted for today.
+2026-05-13 18:44:16,043 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:44:16,045 [ERROR] ApprovalRadar - Failed to fetch or update 20260108686: All API keys are exhausted for today.
+2026-05-13 18:44:19,190 [ERROR] ApprovalRadar - 🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.
+2026-05-13 18:44:19,191 [ERROR] ApprovalRadar - Failed to fetch or update 20260704232: All API keys are exhausted for today.
+2026-05-13 18:44:19,705 [INFO] ApprovalRadar - Shutting down APScheduler...
+2026-05-13 18:44:20,087 [INFO] ApprovalRadar - Initializing Database...
+2026-05-13 18:44:20,089 [INFO] ApprovalRadar - Starting Industry Type Backfill Job...
+2026-05-13 18:44:20,089 [INFO] ApprovalRadar - Configuring APScheduler jobs...
+2026-05-13 18:44:20,091 [INFO] ApprovalRadar - Adding initial catch-up scraper job to background...
+2026-05-13 18:44:20,092 [INFO] ApprovalRadar - Starting DiffCrawler Delta Sync Job for I2859...
+2026-05-13 18:44:20,093 [INFO] ApprovalRadar - APScheduler started successfully.
+2026-05-13 18:44:20,093 [INFO] ApprovalRadar - 총 2403건의 세부업종 누락 데이터를 발견했습니다. 백필을 시작합니다.
+2026-05-13 18:44:20,293 [INFO] ApprovalRadar - [키 회전] API 한도 초과! 새로운 키로 교체: f1282***
+2026-05-13 18:44:20,294 [WARNING] ApprovalRadar - 키 회전 후 3.0초 대기...
+2026-05-13 18:44:20,297 [INFO] ApprovalRadar - [키 회전] API 한도 초과! 새로운 키로 교체: f1282***
+2026-05-13 18:44:20,297 [WARNING] ApprovalRadar - 키 회전 후 3.0초 대기...
+2026-05-13 18:44:23,362 [INFO] ApprovalRadar - [키 회전] API 한도 초과! 새로운 키로 교체: ba698***
+2026-05-13 18:44:23,363 [WARNING] ApprovalRadar - 키 회전 후 3.0초 대기...
+2026-05-13 18:44:23,381 [INFO] ApprovalRadar - [키 회전] API 한도 초과! 새로운 키로 교체: ba698***
+2026-05-13 18:44:23,381 [WARNING] ApprovalRadar - 키 회전 후 3.0초 대기...
+2026-05-13 18:44:26,480 [INFO] ApprovalRadar - [키 회전] API 한도 초과! 새로운 키로 교체: 67f07***
+2026-05-13 18:44:26,481 [WARNING] ApprovalRadar - 키 회전 후 3.0초 대기...
+2026-05-13 18:44:26,558 [INFO] ApprovalRadar - [키 회전] API 한도 초과! 새로운 키로 교체: 67f07***
+2026-05-13 18:44:26,559 [WARNING] ApprovalRadar - 키 회전 후 3.0초 대기...
+2026-05-13 18:44:29,729 [WARNING] ApprovalRadar - [네트워크/응답 오류] Expecting value: line 1 column 1 (char 0). 1초 후 재시도합니다...
+2026-05-13 18:44:30,372 [INFO] ApprovalRadar - ✨ [소요시간: 10.28초] 새로운 데이터가 감지되지 않았습니다. (현재 전체 데이터: 22416건)
+2026-05-13 18:44:30,373 [INFO] ApprovalRadar - Starting DiffCrawler Delta Sync Job for I2500...
+2026-05-13 18:44:30,374 [INFO] ApprovalRadar - 최초 실행: 베이스라인 부트스트랩을 시작합니다...
+2026-05-13 18:44:30,374 [INFO] ApprovalRadar - [Bootstrapper] True Tail(실제 마지막 데이터) 찾는 중...
+2026-05-13 18:44:30,405 [INFO] ApprovalRadar - [키 회전] API 한도 초과! 새로운 키로 교체: f1282***
+2026-05-13 18:44:30,405 [WARNING] ApprovalRadar - 키 회전 후 3.0초 대기...
+2026-05-13 18:44:33,520 [INFO] ApprovalRadar - [키 회전] API 한도 초과! 새로운 키로 교체: ba698***
+2026-05-13 18:44:33,522 [WARNING] ApprovalRadar - 키 회전 후 3.0초 대기...
+2026-05-13 18:44:36,578 [INFO] ApprovalRadar - [키 회전] API 한도 초과! 새로운 키로 교체: 67f07***
+2026-05-13 18:44:36,580 [WARNING] ApprovalRadar - 키 회전 후 3.0초 대기...
+2026-05-13 18:44:42,440 [WARNING] ApprovalRadar - [네트워크/응답 오류] Expecting value: line 1 column 1 (char 0). 1초 후 재시도합니다...
+2026-05-13 18:44:43,502 [WARNING] ApprovalRadar - [네트워크/응답 오류] Expecting value: line 1 column 1 (char 0). 2초 후 재시도합니다...
+2026-05-13 18:44:45,563 [WARNING] ApprovalRadar - [네트워크/응답 오류] Expecting value: line 1 column 1 (char 0). 4초 후 재시도합니다...
