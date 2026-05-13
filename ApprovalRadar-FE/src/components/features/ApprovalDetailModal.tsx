@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '../ui/button';
 import { Modal } from '../ui/Modal';
-import { formatApprovalDate } from '../../lib/utils';
+import { formatApprovalDate, formatPhoneNumber } from '../../lib/utils';
 import { type ApprovalMappedItem, fetchApprovalDetail } from '../../lib/api';
 import { CATEGORY_COLORS, CATEGORY_ICONS, INDUSTRY_ICONS } from '@/lib/constants';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
@@ -89,8 +89,9 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="text-text-primary font-medium">{item.business_name}</span>
+                          <span className="text-[11px] text-text-muted mt-0.5 font-mono">{item.license_no}</span>
                           {item.prev_business_name && (
-                            <span className="text-[11px] text-text-muted mt-0.5 leading-tight">
+                            <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
                               (이전: {item.prev_business_name})
                             </span>
                           )}
@@ -99,32 +100,50 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="text-text-primary">{item.representative_name}</span>
+                          {item.phone_number && (
+                            <span className="text-[11px] text-text-muted mt-0.5 font-mono">
+                              {formatPhoneNumber(item.phone_number)}
+                            </span>
+                          )}
                           {item.prev_representative_name && (
-                            <span className="text-[11px] text-text-muted mt-0.5 leading-tight">
+                            <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
                               (이전: {item.prev_representative_name})
                             </span>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span 
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border" 
-                          style={{ 
-                            color: CATEGORY_COLORS[item.infer_update_type || ''] || '#9ca3af', 
-                            borderColor: CATEGORY_COLORS[item.infer_update_type || ''] || '#9ca3af',
-                            backgroundColor: 'transparent'
-                          }}
-                        >
-                          {CATEGORY_ICONS[item.infer_update_type || ''] && (
-                            <span className="flex items-center">
-                              {(() => {
-                                const Icon = CATEGORY_ICONS[item.infer_update_type || ''];
-                                return <Icon weight="bold" size={10} />;
-                              })()}
+                        <div className="flex flex-col items-start gap-1">
+                          <span 
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border" 
+                            style={{ 
+                              color: CATEGORY_COLORS[item.infer_update_type || ''] || '#9ca3af', 
+                              borderColor: CATEGORY_COLORS[item.infer_update_type || ''] || '#9ca3af',
+                              backgroundColor: 'transparent'
+                            }}
+                          >
+                            {CATEGORY_ICONS[item.infer_update_type || ''] && (
+                              <span className="flex items-center">
+                                {(() => {
+                                  const Icon = CATEGORY_ICONS[item.infer_update_type || ''];
+                                  return <Icon weight="bold" size={10} />;
+                                })()}
+                              </span>
+                            )}
+                            {item.infer_update_type || '-'}
+                          </span>
+                          {(item.infer_update_detail || item.update_type) && (
+                            <span className="text-[11px] text-text-secondary leading-tight break-keep">
+                              {item.infer_update_detail || item.update_type}
                             </span>
                           )}
-                          {item.infer_update_type || '-'}
-                        </span>
+                          {item.business_status && (
+                             <span className="text-[11px] text-text-muted leading-tight mt-0.5">
+                               {item.business_status}
+                               {item.prev_business_status && ` (이전: ${item.prev_business_status})`}
+                             </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm text-text-muted">
                         <div className="flex items-center gap-1.5">
