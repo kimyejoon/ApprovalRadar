@@ -3,25 +3,18 @@ import { X, CheckCircle, WarningCircle, Info, BellRinging } from '@phosphor-icon
 import type { Toast } from '@/store/useToastStore';
 import { useToastStore } from '@/store/useToastStore';
 import { cn } from '@/lib/utils';
+import { Button } from './button';
 
 interface ToastItemProps {
   toast: Toast;
 }
 
 const icons = {
-  default: <BellRinging className="w-14 h-14 text-brand animate-pulse" weight="fill" />,
-  success: <CheckCircle className="w-14 h-14 text-green-500" weight="fill" />,
-  warning: <WarningCircle className="w-14 h-14 text-yellow-500" weight="fill" />,
-  error: <WarningCircle className="w-14 h-14 text-red-500" weight="fill" />,
-  info: <Info className="w-14 h-14 text-blue-500" weight="fill" />,
-};
-
-const bgColors = {
-  default: 'bg-surface-primary border-brand/50 shadow-brand/20',
-  success: 'bg-surface-primary border-green-500/50 shadow-green-500/20',
-  warning: 'bg-surface-primary border-yellow-500/50 shadow-yellow-500/20',
-  error: 'bg-surface-primary border-red-500/50 shadow-red-500/20',
-  info: 'bg-surface-primary border-blue-500/50 shadow-blue-500/20',
+  default: <BellRinging className="w-16 h-16 text-brand animate-pulse" weight="fill" />,
+  success: <CheckCircle className="w-16 h-16 text-green-500" weight="fill" />,
+  warning: <WarningCircle className="w-16 h-16 text-yellow-500" weight="fill" />,
+  error: <WarningCircle className="w-16 h-16 text-red-500" weight="fill" />,
+  info: <Info className="w-16 h-16 text-blue-500" weight="fill" />,
 };
 
 export function ToastItem({ toast }: ToastItemProps) {
@@ -30,29 +23,37 @@ export function ToastItem({ toast }: ToastItemProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 50, scale: 0.9 }}
+      initial={{ opacity: 0, y: 50, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
       layout
-      className={cn(
-        'pointer-events-auto flex w-full max-w-4xl rounded-3xl border-4 p-8 shadow-2xl',
-        bgColors[type]
-      )}
+      className="relative bg-background border border-border-standard rounded-xl shadow-2xl w-full max-w-3xl flex flex-col overflow-hidden pointer-events-auto"
+      role="alertdialog"
     >
-      <div className="flex w-full items-start gap-8">
-        <div className="shrink-0 mt-1">{icons[type]}</div>
-        <div className="flex-1 flex flex-col gap-4">
-          <p className="text-4xl font-extrabold tracking-tight text-text-primary">{toast.title}</p>
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border-standard shrink-0 bg-surface">
+        <h2 className="text-lg font-sans font-medium text-text-primary m-0 tracking-tight flex items-center gap-2">
+          <BellRinging className="w-5 h-5 text-brand" weight="fill" />
+          실시간 중요 알림
+        </h2>
+        <Button variant="ghost" size="sm" className="w-8 h-8 p-0" onClick={() => removeToast(toast.id)} aria-label="Close">
+          <X className="w-4 h-4 text-text-muted" />
+        </Button>
+      </div>
+
+      <div className="flex flex-col md:flex-row items-center gap-8 p-10 bg-background">
+        <div className="shrink-0">{icons[type]}</div>
+        <div className="flex-1 flex flex-col gap-4 text-center md:text-left">
+          <p className="text-3xl font-extrabold tracking-tight text-text-primary">{toast.title}</p>
           {toast.description && (
-            <p className="text-2xl font-medium text-text-secondary leading-snug">{toast.description}</p>
+            <p className="text-2xl font-medium text-brand leading-snug">{toast.description}</p>
           )}
         </div>
-        <button
-          onClick={() => removeToast(toast.id)}
-          className="shrink-0 rounded-2xl p-4 text-text-muted hover:bg-surface-secondary hover:text-text-primary transition-colors focus:outline-none focus:ring-4 focus:ring-brand/50"
-        >
-          <X className="w-10 h-10" weight="bold" />
-        </button>
+      </div>
+      
+      <div className="px-6 py-4 border-t border-border-standard bg-surface flex justify-end">
+         <Button onClick={() => removeToast(toast.id)} className="bg-brand text-white hover:bg-brand/90 transition-colors">
+            확인 및 닫기
+         </Button>
       </div>
     </motion.div>
   );
@@ -64,12 +65,15 @@ export function ToastProvider() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed inset-0 z-100 flex max-h-screen w-full flex-col items-center justify-center gap-6 p-8 pointer-events-auto bg-black/60 backdrop-blur-md transition-all duration-300">
-      <AnimatePresence mode="popLayout">
-        {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} />
-        ))}
-      </AnimatePresence>
+    <div className="fixed inset-0 z-100 flex items-center justify-center p-4 pointer-events-auto">
+      <div className="absolute inset-0 bg-[rgba(15,15,15,0.84)] backdrop-blur-sm" />
+      <div className="relative z-10 flex flex-col gap-4 w-full items-center">
+        <AnimatePresence mode="popLayout">
+          {toasts.map((toast) => (
+            <ToastItem key={toast.id} toast={toast} />
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
