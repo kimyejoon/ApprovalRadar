@@ -28,7 +28,19 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
               <div className="font-mono text-text-primary">{selectedItem.id}</div>
             </div>
             <div className="col-span-2">
-              <div className="text-text-muted mb-1">소재지</div>
+              <div className="text-text-muted mb-1 flex items-center gap-2">
+                소재지
+                <a 
+                  href={`https://map.naver.com/p/search/${encodeURIComponent(selectedItem.name)}?c=15.00,0,0,0,dh`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium text-white transition-opacity hover:opacity-90 shadow-sm"
+                  style={{ backgroundColor: '#434FF4' }}
+                >
+                  <img src="/naver_map.webp" alt="Naver Map" className="w-3.5 h-3.5 object-contain" />
+                  네이버맵 검색결과
+                </a>
+              </div>
               <div className="text-text-primary">{selectedItem.location}</div>
             </div>
             <div>
