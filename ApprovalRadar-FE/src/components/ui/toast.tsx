@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, WarningCircle, Info, BellRinging } from '@phosphor-icons/react';
-import { Toast, useToastStore } from '@/store/useToastStore';
+import type { Toast } from '@/store/useToastStore';
+import { useToastStore } from '@/store/useToastStore';
 import { cn } from '@/lib/utils';
 
 interface ToastItemProps {
