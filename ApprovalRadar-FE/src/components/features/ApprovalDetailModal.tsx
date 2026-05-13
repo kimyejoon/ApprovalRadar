@@ -34,6 +34,7 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
       isOpen={isOpen} 
       onClose={onClose}
       title="인허가 이력 및 상세 정보"
+      maxWidth="max-w-5xl"
     >
       {selectedItem && (
         <div className="space-y-6">
