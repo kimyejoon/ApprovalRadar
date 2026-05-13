@@ -64,7 +64,7 @@ export function useSSE() {
             title: `새로운 인허가 변동 감지!`,
             description: `[${statusName}] ${latestItem.business_name} (${latestItem.address})`,
             type: 'default',
-            duration: 8000,
+            duration: 0,
           });
 
           // 4. 대시보드의 데이터 캐시 무효화 (자동 새로고침)
@@ -89,7 +89,7 @@ export function useSSE() {
           title: "테스트: 새로운 인허가 변동 감지!",
           description: "[신규] 테스트식당 (서울특별시 강남구 테헤란로)",
           type: "default",
-          duration: 5000,
+          duration: 0,
         });
         // 캐시 무효화 시뮬레이션
         queryClient.invalidateQueries({ queryKey: ['approvals'] });
