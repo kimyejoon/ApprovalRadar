@@ -45,7 +45,10 @@ export function DashboardPage() {
         isError={api.isError}
         sortConfig={state.sortConfig}
         onSort={actions.handleSort}
-        onRowClick={actions.setSelectedItem}
+        onRowClick={(item) => {
+          actions.setSelectedItem(item);
+          actions.handleMarkAsRead(item.id, item.isRead);
+        }}
         onLocationClick={() => setIsLocationFilterOpen(true)}
         onStatusClick={() => setIsStatusFilterOpen(true)}
         onIndustryClick={() => setIsIndustryFilterOpen(true)}

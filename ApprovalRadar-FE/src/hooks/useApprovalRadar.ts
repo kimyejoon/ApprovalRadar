@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfToday } from 'date-fns';
-import { fetchApprovals, type ApprovalData, type ApprovalMappedItem } from '@/lib/api';
+import { fetchApprovals, markApprovalAsRead, type ApprovalData, type ApprovalMappedItem, type ApprovalsResponse } from '@/lib/api';
 import { CATEGORY_NAMES } from '@/lib/constants';
 import { formatPhoneNumber } from '@/lib/utils';
 
@@ -60,6 +60,7 @@ export function useApprovalRadar() {
           approvalDate: item.last_event_date,
           phone: formatPhoneNumber(item.phone_number),
           isTransfer: false,
+          isRead: item.is_read === 1,
           raw: item,
         };
       });
@@ -69,6 +70,50 @@ export function useApprovalRadar() {
       };
     }
   });
+
+  const queryClient = useQueryClient();
+
+  const markAsReadMutation = useMutation({
+    mutationFn: (license_no: string) => markApprovalAsRead(license_no),
+    onMutate: async (license_no) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      const queryKey = ['approvals', currentPage, itemsPerPage, searchQuery, statusFilters, locationFilters, industryFilters, dateRange, sortConfig];
+      await queryClient.cancelQueries({ queryKey });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData<ApprovalsResponse>(queryKey);
+
+      // Optimistically update to the new value
+      if (previousData) {
+        queryClient.setQueryData<ApprovalsResponse>(queryKey, {
+          ...previousData,
+          data: previousData.data.map(item => 
+            item.license_no === license_no ? { ...item, is_read: 1 } : item
+          )
+        });
+      }
+
+      // Return a context object with the snapshotted value
+      return { previousData, queryKey };
+    },
+    onError: (_err, _newTodo, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(context.queryKey, context.previousData);
+      }
+    },
+    onSettled: (_data, _error, _variables, context) => {
+      // Always refetch after error or success to ensure data is correct
+      if (context?.queryKey) {
+        queryClient.invalidateQueries({ queryKey: context.queryKey });
+      }
+    },
+  });
+
+  const handleMarkAsRead = (license_no: string, currentIsRead: boolean) => {
+    if (!currentIsRead) {
+      markAsReadMutation.mutate(license_no);
+    }
+  };
 
   const handleSort = (key: SortKey) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -124,6 +169,7 @@ export function useApprovalRadar() {
         setCurrentPage(1);
       },
       handleDateRangeChange,
+      handleMarkAsRead,
     },
     api: {
       data: apiResponse?.data || [],

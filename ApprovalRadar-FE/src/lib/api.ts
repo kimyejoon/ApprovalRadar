@@ -19,6 +19,8 @@ export interface ApprovalData {
   prev_business_name?: string | null;
   infer_update_type?: string;
   infer_update_detail?: string;
+  is_read?: number;
+  read_at?: string | null;
 }
 
 export interface ApprovalMappedItem {
@@ -34,6 +36,7 @@ export interface ApprovalMappedItem {
   approvalDate: string;
   phone: string;
   isTransfer: boolean;
+  isRead: boolean;
   raw: ApprovalData;
 }
 
@@ -109,6 +112,22 @@ export async function fetchApprovalDetail(params: ApprovalDetailParams): Promise
 
   if (!response.ok) {
     throw new Error('Failed to fetch approval detail');
+  }
+
+  return response.json();
+}
+
+export async function markApprovalAsRead(license_no: string): Promise<{ status: string }> {
+  const url = new URL(`${API_BASE_URL}/api/v1/approvals/readInfo/${license_no}`);
+  const response = await fetch(url.toString(), {
+    method: 'PUT',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to mark approval as read');
   }
 
   return response.json();

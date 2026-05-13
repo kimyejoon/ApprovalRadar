@@ -112,7 +112,7 @@ export function ApprovalTable({
             <TableRow 
               key={item.id + '-' + index} 
               onClick={() => onRowClick(item)}
-              className="cursor-pointer group"
+              className={`cursor-pointer group ${!item.isRead ? 'bg-[#434FF4]/5 hover:bg-[#434FF4]/10' : ''}`}
             >
               <TableCell className="font-medium text-text-primary group-hover:text-brand transition-colors">
                 <div className="flex flex-col">
