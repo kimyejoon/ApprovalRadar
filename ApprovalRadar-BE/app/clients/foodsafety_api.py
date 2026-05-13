@@ -90,7 +90,10 @@ class ApiClient:
                     attempt += 1
                     
             except (requests.exceptions.RequestException, ValueError) as e:
-                logger.warning(f"[네트워크/응답 오류] {str(e)}. {backoff}초 후 재시도합니다...")
+                ctx = f"서비스:{service_id}, 범위:{start_idx}~{end_idx}"
+                if kwargs:
+                    ctx += f", 추가:{kwargs}"
+                logger.warning(f"[네트워크/응답 오류] {ctx} | 사유: {str(e)}. {backoff}초 후 재시도합니다...")
                 time.sleep(backoff)
                 
                 # 2회 이상 연속으로 파싱 에러(WAF 차단 등)가 나면, IP 차단이 아니라 키 단위 차단일 수 있으므로 키를 회전합니다.
