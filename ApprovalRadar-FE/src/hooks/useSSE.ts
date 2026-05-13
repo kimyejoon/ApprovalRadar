@@ -25,8 +25,14 @@ export function useSSE() {
     eventSource.onmessage = async (event) => {
       try {
         const rawData = event.data;
+        
         // 백엔드에서 5초마다 보내는 Keep-Alive 핑 무시
-        if (!rawData || rawData === 'ping' || rawData === 'keep-alive') {
+        if (!rawData || rawData.includes('현재 정상 연결중임')) {
+          return;
+        }
+
+        // 업데이트 이벤트인지 명시적으로 확인
+        if (!rawData.includes('신규 업데이트가 발생했다')) {
           return;
         }
 
