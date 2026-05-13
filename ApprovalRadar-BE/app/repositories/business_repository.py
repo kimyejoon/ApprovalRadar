@@ -67,10 +67,11 @@ class BusinessRepository:
                 
             return result, total_count
 
-    def get_indicators(self, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]]) -> Tuple[int, int, List[Dict[str, Any]], List[Dict[str, Any]]]:
+    def get_indicators(self, start_date: Optional[str], end_date: Optional[str]) -> Tuple[int, int, List[Dict[str, Any]], List[Dict[str, Any]]]:
         with get_db() as conn:
             cursor = conn.cursor()
-            where_clause, params = self._build_where_clause(search, start_date, end_date, regions)
+            # 파라미터가 없으므로 search, regions는 None 전달
+            where_clause, params = self._build_where_clause(None, start_date, end_date, None)
             
             # 1. Total approvals (Over the entire date range)
             cursor.execute(f"SELECT COUNT(*) FROM businesses{where_clause}", params)
@@ -82,12 +83,12 @@ class BusinessRepository:
                 from datetime import datetime
                 target_date = datetime.now().strftime('%Y%m%d')
                 
-            today_where_clause, today_params = self._build_where_clause(search, target_date, target_date, regions)
+            today_where_clause, today_params = self._build_where_clause(None, target_date, target_date, None)
             cursor.execute(f"SELECT COUNT(*) FROM businesses{today_where_clause}", today_params)
             today_approvals = cursor.fetchone()[0]
             
-            # 2. Status distribution
-            status_query = f"SELECT COALESCE(business_status, '상태없음') as name, COUNT(*) as value FROM businesses{where_clause} GROUP BY name"
+            # 2. Status distribution (파이 차트용 데이터, infer_update_type 기준)
+            status_query = f"SELECT COALESCE(infer_update_type, 'null') as name, COUNT(*) as value FROM businesses{where_clause} GROUP BY name"
             cursor.execute(status_query, params)
             status_distribution = [{"name": row[0], "value": row[1]} for row in cursor.fetchall()]
             

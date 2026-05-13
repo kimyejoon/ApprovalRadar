@@ -23,3 +23,5 @@ env/
 .env.production.local
 
 .conversation.md*.db
+.food_safety.db
+
