@@ -26,13 +26,24 @@ export function DashboardIndicators() {
 
   const todayChangesCount = data?.total_approvals || 0;
 
-  // 신규 인허가 비율 (Pie Chart)
+  // 백엔드 상태 분포 데이터 색상 매핑
+  const CATEGORY_COLORS: Record<string, string> = {
+    '신규등록': '#434FF4', // 메인 브랜드 컬러
+    '상태변경': '#ef4444', // 빨강
+    '대표자변경': '#f59e0b', // 주황
+    '변경민원-상호명': '#8b5cf6', // 보라
+    '변경민원-주소': '#06b6d4', // 청록
+    '변경민원-성함': '#10b981', // 초록
+    '초기수집(과거변경있음)': '#9ca3af', // 회색
+  };
+
+  // 상태별 변동 비율 (Pie Chart)
   const pieData = useMemo(() => {
     if (!data?.status_distribution) return [];
     return data.status_distribution.map(d => ({
       name: d.name,
       value: d.value,
-      color: d.name.includes('정상') || d.name.includes('영업') ? '#3ecf8e' : '#f87171'
+      color: CATEGORY_COLORS[d.name] || '#d1d5db' // 기본값 연한 회색
     }));
   }, [data]);
 
@@ -72,7 +83,7 @@ export function DashboardIndicators() {
         </CardContent>
       </Card>
 
-      {/* Pie Chart: 신규 인허가 비율 */}
+      {/* Pie Chart: 상태별 변동 비율 */}
       <Card className="border-border-standard shadow-sm bg-surface-primary">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-text-muted">상태별 변동 비율</CardTitle>
@@ -82,10 +93,10 @@ export function DashboardIndicators() {
             <PieChart>
               <Pie
                 data={pieData}
-                cx="50%"
+                cx="40%"
                 cy="50%"
-                innerRadius={35}
-                outerRadius={55}
+                innerRadius={30}
+                outerRadius={50}
                 paddingAngle={2}
                 dataKey="value"
                 stroke="none"
@@ -95,21 +106,22 @@ export function DashboardIndicators() {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => [`${value}건`, '']}
+                formatter={(value: number) => [`${value.toLocaleString()}건`, '']}
                 contentStyle={{ borderRadius: '8px', border: '1px solid var(--color-border-standard)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', fontSize: '12px' }}
                 itemStyle={{ color: 'var(--color-text-primary)' }}
               />
             </PieChart>
           </ResponsiveContainer>
-          <div className="flex flex-col w-32 justify-center space-y-1 text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-brand"></span>
-              <span className="text-text-secondary">신규/영업</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-red-400"></span>
-              <span className="text-text-secondary">폐업/취소</span>
-            </div>
+          <div className="flex flex-col w-[140px] justify-center space-y-1 text-[10px] pr-2 max-h-[120px] overflow-y-auto">
+            {pieData.map((entry, index) => (
+              <div key={`legend-${index}`} className="flex items-center justify-between gap-1.5">
+                <div className="flex items-center gap-1.5 overflow-hidden">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }}></span>
+                  <span className="text-text-secondary truncate" title={entry.name}>{entry.name}</span>
+                </div>
+                <span className="text-text-muted shrink-0">{entry.value.toLocaleString()}</span>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
