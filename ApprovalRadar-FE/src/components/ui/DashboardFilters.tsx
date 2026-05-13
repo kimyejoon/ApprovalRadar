@@ -59,6 +59,22 @@ export function DashboardFilters({
     }
   }
 
+  const MAIN_TARGETS = ['일반음식점', '제과점영업', '휴게음식점'];
+  let groupedIndustryTags: { label: string, onRemove: () => void }[] = [];
+
+  if (industryFilters.length > 0) {
+    if (arrayEquals(industryFilters, MAIN_TARGETS)) {
+      groupedIndustryTags.push({ label: '메인 타겟 3종', onRemove: () => onIndustryFiltersChange([]) });
+    } else if (arrayEquals(industryFilters, Object.keys(CATEGORY_NAMES))) { // This won't match exactly without importing INDUSTRY_NAMES but we can skip '전체 선택' logic for now since only '메인 타겟 3종' was requested, or just keep as is
+      groupedIndustryTags.push({ label: '전체 업종', onRemove: () => onIndustryFiltersChange([]) });
+    } else {
+      groupedIndustryTags = industryFilters.map(ind => ({
+        label: ind,
+        onRemove: () => onIndustryFiltersChange(industryFilters.filter(i => i !== ind))
+      }));
+    }
+  }
+
   return (
     <>
       {/* Search Bar & Date Picker */}
@@ -101,11 +117,11 @@ export function DashboardFilters({
             </span>
           ))}
           
-          {industryFilters.map(industry => (
-            <span key={industry} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
-              업종: {industry}
+          {groupedIndustryTags.map(tag => (
+            <span key={tag.label} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
+              업종: {tag.label}
               <button 
-                onClick={() => onIndustryFiltersChange(industryFilters.filter(i => i !== industry))}
+                onClick={tag.onRemove}
                 className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
               >
                 <X weight="bold" className="w-3.5 h-3.5" />
