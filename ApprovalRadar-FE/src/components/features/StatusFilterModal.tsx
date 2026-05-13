@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Modal } from '../ui/Modal';
 import { CATEGORY_NAMES, CATEGORY_ICONS } from '@/lib/constants';
@@ -21,6 +22,20 @@ interface StatusFilterModalProps {
 }
 
 export function StatusFilterModal({ isOpen, onClose, statusFilter, setStatusFilter, onFilterChange }: StatusFilterModalProps) {
+  const [localStatus, setLocalStatus] = useState(statusFilter);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLocalStatus(statusFilter);
+    }
+  }, [isOpen, statusFilter]);
+
+  const handleApply = () => {
+    setStatusFilter(localStatus);
+    onFilterChange();
+    onClose();
+  };
+
   return (
     <Modal 
       isOpen={isOpen} 
@@ -30,7 +45,7 @@ export function StatusFilterModal({ isOpen, onClose, statusFilter, setStatusFilt
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2">
           {STATUS_OPTIONS.map(option => {
-            const isSelected = statusFilter === option.value;
+            const isSelected = localStatus === option.value;
             const IconComponent = option.icon;
             return (
               <label 
@@ -52,10 +67,7 @@ export function StatusFilterModal({ isOpen, onClose, statusFilter, setStatusFilt
                     name="status_modal" 
                     value={option.value}
                     checked={isSelected}
-                    onChange={(e) => {
-                      setStatusFilter(e.target.value);
-                      onFilterChange();
-                    }}
+                    onChange={(e) => setLocalStatus(e.target.value)}
                     className="accent-brand w-4 h-4"
                   />
                 </div>
@@ -66,8 +78,9 @@ export function StatusFilterModal({ isOpen, onClose, statusFilter, setStatusFilt
             );
           })}
         </div>
-        <div className="flex justify-end mt-4">
-          <Button variant="secondary" onClick={onClose}>닫기</Button>
+        <div className="flex justify-end mt-4 gap-2">
+          <Button variant="secondary" onClick={onClose}>취소</Button>
+          <Button onClick={handleApply}>적용하기</Button>
         </div>
       </div>
     </Modal>
