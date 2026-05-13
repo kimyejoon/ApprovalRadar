@@ -1,5 +1,6 @@
 import { MagnifyingGlass, X } from '@phosphor-icons/react';
 import { DatePickerWithPresets } from '@/components/ui/DatePickerWithPresets';
+import { CATEGORY_NAMES, CATEGORY_ICONS } from '@/lib/constants';
 
 const ALL_REGIONS = [
   '서울특별시', '부산광역시', '대구광역시', '인천광역시', '광주광역시',
@@ -78,7 +79,15 @@ export function DashboardFilters({
         <div className="mb-6 flex flex-wrap items-center gap-2">
           {statusFilter !== '전체' && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
-              영업상태: {statusFilter}
+              {CATEGORY_ICONS[statusFilter] && (
+                <span className="flex items-center">
+                  {(() => {
+                    const Icon = CATEGORY_ICONS[statusFilter];
+                    return <Icon weight="bold" size={14} />;
+                  })()}
+                </span>
+              )}
+              변경 타입: {CATEGORY_NAMES[statusFilter] || statusFilter}
               <button 
                 onClick={onStatusReset}
                 className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
