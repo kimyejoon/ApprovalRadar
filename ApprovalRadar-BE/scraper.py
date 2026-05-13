@@ -78,15 +78,19 @@ def run_scraper_for_service(service_id: str):
                     logger.warning(f"Unknown service_id: {service_id}. Skipping row mapping.")
                     continue
 
+                event_time = None
                 if event_date:
-                    event_date = str(event_date).replace("-", "").replace(" ", "").replace(":", "")
-                    if len(event_date) > 8:
-                        event_date = event_date[:8]
+                    orig_event = str(event_date).replace("-", "").replace(" ", "").replace(":", "")
+                    if len(orig_event) >= 14:
+                        event_time = orig_event[8:14]
+                    event_date = orig_event[:8]
                         
+                license_time = None
                 if license_date:
-                    license_date = str(license_date).replace("-", "").replace(" ", "").replace(":", "")
-                    if len(license_date) > 8:
-                        license_date = license_date[:8]
+                    orig_license = str(license_date).replace("-", "").replace(" ", "").replace(":", "")
+                    if len(orig_license) >= 14:
+                        license_time = orig_license[8:14]
+                    license_date = orig_license[:8]
                 db_record = business_repo.get_business_by_license_no(lcns_no, conn=conn)
                 
                 if not db_record:
@@ -102,7 +106,9 @@ def run_scraper_for_service(service_id: str):
                         "phone_number": phone_number,
                         "industry_type": industry_type,
                         "last_event_date": event_date,
-                        "infer_update_type": infer_update_type
+                        "infer_update_type": infer_update_type,
+                        "last_event_time": event_time,
+                        "license_time": license_time
                     }
                     business_repo.insert_business(record, conn=conn)
                 else:
@@ -176,6 +182,8 @@ def run_scraper_for_service(service_id: str):
                             "prev_business_name": prev_business_name_val,
                             "infer_update_type": infer_update_type,
                             "last_event_date": event_date,
+                            "last_event_time": event_time,
+                            "license_time": license_time,
                             "updated_at": now
                         }
                         business_repo.update_business(lcns_no, updates, conn=conn)

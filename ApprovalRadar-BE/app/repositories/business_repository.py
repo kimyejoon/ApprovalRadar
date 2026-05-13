@@ -144,15 +144,16 @@ class BusinessRepository:
     def insert_business(self, record: dict, conn=None):
         query = '''
             INSERT INTO businesses 
-            (license_no, business_name, address, representative_name, business_status, license_date, phone_number, industry_type, last_event_date, is_new, update_type, prev_business_status, prev_representative_name, prev_business_name, infer_update_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+            (license_no, business_name, address, representative_name, business_status, license_date, phone_number, industry_type, last_event_date, is_new, update_type, prev_business_status, prev_representative_name, prev_business_name, infer_update_type, last_event_time, license_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
         '''
         params = (
             record["license_no"], record["business_name"], record["address"], 
             record["representative_name"], record["business_status"], 
             record["license_date"], record["phone_number"], record.get("industry_type"), record["last_event_date"],
             record.get("update_type"), record.get("prev_business_status"), 
-            record.get("prev_representative_name"), record.get("prev_business_name"), record.get("infer_update_type")
+            record.get("prev_representative_name"), record.get("prev_business_name"), record.get("infer_update_type"),
+            record.get("last_event_time"), record.get("license_time")
         )
         
         if conn:
@@ -171,7 +172,7 @@ class BusinessRepository:
                 representative_history = ?, licensing_history = ?,
                 update_type = ?, prev_business_status = ?, prev_representative_name = ?, prev_business_name = ?,
                 infer_update_type = ?,
-                last_event_date = ?,
+                last_event_date = ?, last_event_time = ?, license_time = ?,
                 updated_at = ?, is_new = 1
             WHERE license_no = ?
         '''
@@ -181,7 +182,8 @@ class BusinessRepository:
             updates["representative_history"], updates["licensing_history"],
             updates.get("update_type"), updates.get("prev_business_status"), updates.get("prev_representative_name"), updates.get("prev_business_name"),
             updates.get("infer_update_type"),
-            updates["last_event_date"], updates["updated_at"], license_no
+            updates["last_event_date"], updates.get("last_event_time"), updates.get("license_time"),
+            updates["updated_at"], license_no
         )
         
         if conn:
