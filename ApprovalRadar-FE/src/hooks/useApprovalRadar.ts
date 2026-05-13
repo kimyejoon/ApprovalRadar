@@ -28,7 +28,7 @@ export function useApprovalRadar() {
       start_date: dateRange?.from ? format(dateRange.from, 'yyyyMMdd') : undefined,
       end_date: dateRange?.to ? format(dateRange.to, 'yyyyMMdd') : undefined,
       regions: locationFilters.length > 0 ? locationFilters.join(',') : undefined,
-      statuses: statusFilter !== '전체' ? statusFilter : undefined,
+      infer_update_type: statusFilter !== '전체' ? statusFilter : undefined,
       sort_by: sortConfig ? (
         sortConfig.key === 'id' ? 'license_no' :
         sortConfig.key === 'name' ? 'business_name' :

@@ -51,7 +51,7 @@ export interface FetchApprovalsParams {
   start_date?: string;
   end_date?: string;
   regions?: string;
-  statuses?: string;
+  infer_update_type?: string;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
 }
