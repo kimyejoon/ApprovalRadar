@@ -121,6 +121,7 @@ export function ApprovalTable({
                   {item.status}
                 </span>
               </TableCell>
+              <TableCell className="text-xs text-text-muted">{formatApprovalDate(item.approvalDate)}</TableCell>
               <TableCell className="font-mono text-xs">{item.phone}</TableCell>
             </TableRow>
           ))
