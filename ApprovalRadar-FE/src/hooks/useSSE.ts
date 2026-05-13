@@ -5,6 +5,12 @@ import { playNotificationSound } from '@/lib/audio';
 import { fetchApprovals } from '@/lib/api';
 import { CATEGORY_NAMES } from '@/lib/constants';
 
+declare global {
+  interface Window {
+    triggerTestNotification?: () => Promise<void>;
+  }
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export function useSSE() {
@@ -77,7 +83,7 @@ export function useSSE() {
 
     // Chrome Console 테스트용 함수 노출
     if (typeof window !== 'undefined') {
-      (window as any).triggerTestNotification = async () => {
+      window.triggerTestNotification = async () => {
         playNotificationSound();
         addToast({
           title: "테스트: 새로운 인허가 변동 감지!",
@@ -99,7 +105,7 @@ export function useSSE() {
         console.log('SSE Connection Closed');
       }
       if (typeof window !== 'undefined') {
-        delete (window as any).triggerTestNotification;
+        delete window.triggerTestNotification;
       }
     };
   }, [addToast, queryClient]);
