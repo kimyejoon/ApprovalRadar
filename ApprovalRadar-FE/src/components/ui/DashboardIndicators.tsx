@@ -106,7 +106,7 @@ export function DashboardIndicators() {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => [`${value.toLocaleString()}건`, '']}
+                formatter={(value: number, name: string) => [`${value.toLocaleString()}건`, name]}
                 contentStyle={{ borderRadius: '8px', border: '1px solid var(--color-border-standard)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', fontSize: '12px' }}
                 itemStyle={{ color: 'var(--color-text-primary)' }}
               />
