@@ -43,16 +43,28 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
               <div className="text-sm text-text-muted mb-1">현재 상호명</div>
               <div className="text-lg font-bold text-text-primary">{selectedItem.name}</div>
             </div>
-            <a 
-              href={`https://map.naver.com/p/search/${encodeURIComponent(selectedItem.name)}?c=15.00,0,0,0,dh`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors bg-transparent border shadow-sm hover:bg-[#434FF4]/5"
-              style={{ color: '#434FF4', borderColor: '#434FF4' }}
-            >
-              <img src="/naver_map.webp" alt="Naver Map" className="w-4 h-4 object-contain" />
-              네이버맵 검색결과
-            </a>
+            <div className="flex flex-wrap items-center gap-2">
+              <a 
+                href={`https://www.diningcode.com/list.dc?query=${encodeURIComponent(selectedItem.name)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors bg-transparent border shadow-sm hover:bg-[#0CD1E5]/5"
+                style={{ color: '#0CD1E5', borderColor: '#0CD1E5' }}
+              >
+                <img src="/dining_code.jpg" alt="Dining Code" className="w-4 h-4 object-contain rounded-sm" />
+                다이닝코드 검색결과
+              </a>
+              <a 
+                href={`https://map.naver.com/p/search/${encodeURIComponent(selectedItem.name)}?c=15.00,0,0,0,dh`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors bg-transparent border shadow-sm hover:bg-[#434FF4]/5"
+                style={{ color: '#434FF4', borderColor: '#434FF4' }}
+              >
+                <img src="/naver_map.webp" alt="Naver Map" className="w-4 h-4 object-contain" />
+                네이버맵 검색결과
+              </a>
+            </div>
           </div>
 
           <div className="overflow-x-auto border border-border-standard rounded-lg">
