@@ -26,6 +26,7 @@ export function IndustryFilterModal({ isOpen, onClose, industryFilters, setIndus
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocalIndustries(industryFilters);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
