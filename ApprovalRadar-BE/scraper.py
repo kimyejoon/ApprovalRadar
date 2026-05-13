@@ -85,6 +85,7 @@ def run_scraper_for_service(service_id: str):
                 
                 if not db_record:
                     # 신규 등록
+                    infer_update_type = "신규등록" if license_date == event_date else "초기수집(과거변경있음)"
                     record = {
                         "license_no": lcns_no,
                         "business_name": bssh_nm,
@@ -94,7 +95,8 @@ def run_scraper_for_service(service_id: str):
                         "license_date": license_date,
                         "phone_number": phone_number,
                         "industry_type": industry_type,
-                        "last_event_date": event_date
+                        "last_event_date": event_date,
+                        "infer_update_type": infer_update_type
                     }
                     business_repo.insert_business(record, conn=conn)
                 else:
@@ -143,6 +145,15 @@ def run_scraper_for_service(service_id: str):
                         prev_business_name_val = prev_name
                         is_updated = True
                         
+                    # infer_update_type 결정 로직
+                    infer_update_type = None
+                    if update_type == "대표자변경":
+                        infer_update_type = f"대표자변경:[{prev_representative_name_val}]" if prev_representative_name_val else "대표자변경"
+                    elif update_type == "명칭변경":
+                        infer_update_type = f"명칭변경:[{prev_business_name_val}]" if prev_business_name_val else "명칭변경"
+                    elif update_type == "상태변경":
+                        infer_update_type = f"상태변경:[{prev_business_status_val}]" if prev_business_status_val else "상태변경"
+
                     if is_updated or (industry_type and not db_record.get("industry_type")):
                         updates = {
                             "business_name": bssh_nm,
@@ -157,6 +168,7 @@ def run_scraper_for_service(service_id: str):
                             "prev_business_status": prev_business_status_val,
                             "prev_representative_name": prev_representative_name_val,
                             "prev_business_name": prev_business_name_val,
+                            "infer_update_type": infer_update_type,
                             "last_event_date": event_date,
                             "updated_at": now
                         }
