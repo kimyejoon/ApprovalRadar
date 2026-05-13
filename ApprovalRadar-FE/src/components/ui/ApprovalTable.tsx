@@ -105,7 +105,7 @@ export function ApprovalTable({
               <TableCell className="font-medium text-text-primary group-hover:text-brand transition-colors">
                 {item.name}
               </TableCell>
-              <TableCell className="max-w-[200px] truncate">{item.location}</TableCell>
+              <TableCell>{item.location}</TableCell>
               <TableCodeCell>{item.id}</TableCodeCell>
               <TableCell>{item.owner}</TableCell>
               <TableCell>
