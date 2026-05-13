@@ -1,4 +1,4 @@
-import { Storefront, UserSwitch, MapPin, IdentificationCard, PlusCircle, Info, Archive, Tag, Coffee, ForkKnife, Cake, Martini, Wine, CookingPot, type Icon } from '@phosphor-icons/react';
+import { UserSwitch, MapPin, IdentificationCard, PlusCircle, Info, Archive, Tag, Coffee, ForkKnife, Cake, Martini, Wine, CookingPot, type Icon } from '@phosphor-icons/react';
 
 export const CATEGORY_NAMES: Record<string, string> = {
   '신규등록': '신규등록',

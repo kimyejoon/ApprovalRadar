@@ -56,6 +56,7 @@ export interface FetchApprovalsParams {
   end_date?: string;
   regions?: string;
   infer_update_type?: string;
+  industry_type?: string;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
 }
@@ -132,6 +133,8 @@ export interface TrendChart {
 
 export interface IndicatorData {
   total_approvals: number;
+  monthly_approvals: number;
+  today_approvals: number;
   status_distribution: StatusDistribution[];
   trend_chart: TrendChart[];
 }

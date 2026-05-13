@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Modal } from '../ui/Modal';
 import { INDUSTRY_NAMES, INDUSTRY_ICONS } from '@/lib/constants';
-import { ArrowCounterClockwise, X } from '@phosphor-icons/react';
+import { ArrowCounterClockwise } from '@phosphor-icons/react';
 
 const INDUSTRY_OPTIONS = Object.keys(INDUSTRY_NAMES).map(key => ({
   value: key,
@@ -28,7 +28,8 @@ export function IndustryFilterModal({ isOpen, onClose, industryFilters, setIndus
     if (isOpen) {
       setLocalIndustries(industryFilters);
     }
-  }, [isOpen, industryFilters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const handleApply = () => {
     setIndustryFilters(localIndustries);
