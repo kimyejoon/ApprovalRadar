@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Modal } from '../ui/Modal';
 import { INDUSTRY_NAMES, INDUSTRY_ICONS } from '@/lib/constants';
+import { ArrowCounterClockwise, X } from '@phosphor-icons/react';
 
 const INDUSTRY_OPTIONS = Object.keys(INDUSTRY_NAMES).map(key => ({
   value: key,
   label: INDUSTRY_NAMES[key],
   icon: INDUSTRY_ICONS[key]
 }));
+
+const MAIN_TARGETS = ['일반음식점', '제과점영업', '휴게음식점'];
+const ALL_INDUSTRIES = Object.keys(INDUSTRY_NAMES);
 
 interface IndustryFilterModalProps {
   isOpen: boolean;
@@ -47,6 +51,20 @@ export function IndustryFilterModal({ isOpen, onClose, industryFilters, setIndus
       title="업종 필터"
     >
       <div className="space-y-4">
+        {/* Quick Select Buttons */}
+        <div className="flex flex-wrap justify-center gap-2 w-full max-w-[500px]">
+          <Button variant="secondary" onClick={() => setLocalIndustries(MAIN_TARGETS)} className="text-xs py-1 px-3">
+            빠른선택: 메인타겟 3종
+          </Button>
+          <Button variant="secondary" onClick={() => setLocalIndustries(ALL_INDUSTRIES)} className="text-xs py-1 px-3">
+            전체 선택
+          </Button>
+          <Button variant="secondary" onClick={() => setLocalIndustries([])} className="text-xs py-1 px-3 flex items-center gap-1 text-text-muted hover:text-text-primary transition-colors">
+            <ArrowCounterClockwise weight="bold" className="w-3.5 h-3.5" />
+            초기화
+          </Button>
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
           {INDUSTRY_OPTIONS.map(option => {
             const isSelected = localIndustries.includes(option.value);

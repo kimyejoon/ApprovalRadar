@@ -85,6 +85,34 @@ export async function fetchApprovals(params: FetchApprovalsParams): Promise<Appr
   return response.json();
 }
 
+export interface ApprovalDetailParams {
+  license_date: string;
+  business_name: string;
+}
+
+export interface ApprovalDetailResponse {
+  status: string;
+  data: ApprovalData[];
+}
+
+export async function fetchApprovalDetail(params: ApprovalDetailParams): Promise<ApprovalDetailResponse> {
+  const url = new URL(`${API_BASE_URL}/api/v1/approvals/detail`);
+  url.searchParams.append('license_date', params.license_date);
+  url.searchParams.append('business_name', params.business_name);
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch approval detail');
+  }
+
+  return response.json();
+}
+
 export interface FetchIndicatorsParams {
   search?: string;
   start_date?: string;

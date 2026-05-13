@@ -15,7 +15,7 @@ export function useApprovalRadar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilters, setStatusFilters] = useState<string[]>(['대표자변경']);
   const [locationFilters, setLocationFilters] = useState<string[]>([]);
-  const [industryFilters, setIndustryFilters] = useState<string[]>([]);
+  const [industryFilters, setIndustryFilters] = useState<string[]>(['일반음식점', '제과점영업', '휴게음식점']);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>({
     from: startOfToday(),
     to: startOfToday()
