@@ -6,6 +6,7 @@ export interface Toast {
   description?: string;
   type?: 'default' | 'success' | 'warning' | 'error' | 'info';
   duration?: number;
+  metadata?: Array<{ label: string; value: string }>;
 }
 
 interface ToastState {

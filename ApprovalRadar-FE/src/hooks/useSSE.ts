@@ -41,6 +41,21 @@ export function useSSE() {
           const latestItem = latestResponse.data[0];
           const statusName = latestItem.infer_update_type ? CATEGORY_NAMES[latestItem.infer_update_type] || latestItem.infer_update_type : '상태 변경';
           
+          const metadata: Array<{label: string, value: string}> = [];
+          if (latestItem.industry_type) metadata.push({ label: '업종', value: latestItem.industry_type });
+          if (latestItem.representative_name) {
+            const prevRep = latestItem.prev_representative_name ? ` (이전: ${latestItem.prev_representative_name})` : '';
+            metadata.push({ label: '대표자', value: `${latestItem.representative_name}${prevRep}` });
+          }
+          if (latestItem.phone_number) metadata.push({ label: '연락처', value: latestItem.phone_number });
+          if (latestItem.business_status) {
+            const prevStatus = latestItem.prev_business_status ? ` (이전: ${latestItem.prev_business_status})` : '';
+            metadata.push({ label: '영업상태', value: `${latestItem.business_status}${prevStatus}` });
+          }
+          if (latestItem.infer_update_detail || latestItem.update_type) {
+             metadata.push({ label: '변경 상세내역', value: latestItem.infer_update_detail || latestItem.update_type || '' });
+          }
+
           playNotificationSound();
 
           addToast({
@@ -48,6 +63,7 @@ export function useSSE() {
             description: `[${statusName}] ${latestItem.business_name} (${latestItem.address})`,
             type: 'default',
             duration: 0,
+            metadata,
           });
 
           queryClient.invalidateQueries({ queryKey: ['approvals'] });

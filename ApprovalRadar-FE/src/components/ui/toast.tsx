@@ -2,7 +2,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, WarningCircle, Info, BellRinging } from '@phosphor-icons/react';
 import type { Toast } from '@/store/useToastStore';
 import { useToastStore } from '@/store/useToastStore';
-import { cn } from '@/lib/utils';
 import { Button } from './button';
 
 interface ToastItemProps {
@@ -33,7 +32,7 @@ export function ToastItem({ toast }: ToastItemProps) {
       <div className="flex items-center justify-between px-6 py-4 border-b border-border-standard shrink-0 bg-surface">
         <h2 className="text-lg font-sans font-medium text-text-primary m-0 tracking-tight flex items-center gap-2">
           <BellRinging className="w-5 h-5 text-brand" weight="fill" />
-          실시간 중요 알림
+          실시간 변동 알림
         </h2>
         <Button variant="ghost" size="sm" className="w-8 h-8 p-0" onClick={() => removeToast(toast.id)} aria-label="Close">
           <X className="w-4 h-4 text-text-muted" />
@@ -47,13 +46,23 @@ export function ToastItem({ toast }: ToastItemProps) {
           {toast.description && (
             <p className="text-2xl font-medium text-brand leading-snug">{toast.description}</p>
           )}
+          {toast.metadata && toast.metadata.length > 0 && (
+            <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 p-5 bg-surface-secondary/50 rounded-xl border border-border-standard text-left">
+              {toast.metadata.map((meta, idx) => (
+                <div key={idx} className="flex flex-col">
+                  <span className="text-sm font-medium text-text-muted mb-1">{meta.label}</span>
+                  <span className="text-lg font-semibold text-text-primary break-keep">{meta.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-      
+
       <div className="px-6 py-4 border-t border-border-standard bg-surface flex justify-end">
-         <Button onClick={() => removeToast(toast.id)} className="bg-brand text-white hover:bg-brand/90 transition-colors">
-            확인 및 닫기
-         </Button>
+        <Button onClick={() => removeToast(toast.id)} className="bg-brand text-white hover:bg-brand/90 transition-colors">
+          확인 및 닫기
+        </Button>
       </div>
     </motion.div>
   );
