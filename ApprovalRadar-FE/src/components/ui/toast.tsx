@@ -9,19 +9,19 @@ interface ToastItemProps {
 }
 
 const icons = {
-  default: <BellRinging className="w-5 h-5 text-brand animate-pulse" weight="fill" />,
-  success: <CheckCircle className="w-5 h-5 text-green-500" weight="fill" />,
-  warning: <WarningCircle className="w-5 h-5 text-yellow-500" weight="fill" />,
-  error: <WarningCircle className="w-5 h-5 text-red-500" weight="fill" />,
-  info: <Info className="w-5 h-5 text-blue-500" weight="fill" />,
+  default: <BellRinging className="w-14 h-14 text-brand animate-pulse" weight="fill" />,
+  success: <CheckCircle className="w-14 h-14 text-green-500" weight="fill" />,
+  warning: <WarningCircle className="w-14 h-14 text-yellow-500" weight="fill" />,
+  error: <WarningCircle className="w-14 h-14 text-red-500" weight="fill" />,
+  info: <Info className="w-14 h-14 text-blue-500" weight="fill" />,
 };
 
 const bgColors = {
-  default: 'bg-surface-primary border-brand/30 shadow-brand/10',
-  success: 'bg-surface-primary border-green-500/30 shadow-green-500/10',
-  warning: 'bg-surface-primary border-yellow-500/30 shadow-yellow-500/10',
-  error: 'bg-surface-primary border-red-500/30 shadow-red-500/10',
-  info: 'bg-surface-primary border-blue-500/30 shadow-blue-500/10',
+  default: 'bg-surface-primary border-brand/50 shadow-brand/20',
+  success: 'bg-surface-primary border-green-500/50 shadow-green-500/20',
+  warning: 'bg-surface-primary border-yellow-500/50 shadow-yellow-500/20',
+  error: 'bg-surface-primary border-red-500/50 shadow-red-500/20',
+  info: 'bg-surface-primary border-blue-500/50 shadow-blue-500/20',
 };
 
 export function ToastItem({ toast }: ToastItemProps) {
@@ -30,28 +30,28 @@ export function ToastItem({ toast }: ToastItemProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 50, scale: 0.95 }}
+      initial={{ opacity: 0, y: 50, scale: 0.9 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
       layout
       className={cn(
-        'pointer-events-auto flex w-full max-w-md rounded-xl border p-4 shadow-lg backdrop-blur-sm',
+        'pointer-events-auto flex w-full max-w-4xl rounded-3xl border-4 p-8 shadow-2xl',
         bgColors[type]
       )}
     >
-      <div className="flex w-full items-start gap-4">
-        <div className="shrink-0 mt-0.5">{icons[type]}</div>
-        <div className="flex-1 flex flex-col gap-1">
-          <p className="text-sm font-semibold text-text-primary">{toast.title}</p>
+      <div className="flex w-full items-start gap-8">
+        <div className="shrink-0 mt-1">{icons[type]}</div>
+        <div className="flex-1 flex flex-col gap-4">
+          <p className="text-4xl font-extrabold tracking-tight text-text-primary">{toast.title}</p>
           {toast.description && (
-            <p className="text-sm text-text-secondary leading-relaxed">{toast.description}</p>
+            <p className="text-2xl font-medium text-text-secondary leading-snug">{toast.description}</p>
           )}
         </div>
         <button
           onClick={() => removeToast(toast.id)}
-          className="shrink-0 rounded-lg p-1 text-text-muted hover:bg-surface-secondary hover:text-text-primary transition-colors"
+          className="shrink-0 rounded-2xl p-4 text-text-muted hover:bg-surface-secondary hover:text-text-primary transition-colors focus:outline-none focus:ring-4 focus:ring-brand/50"
         >
-          <X className="w-4 h-4" />
+          <X className="w-10 h-10" weight="bold" />
         </button>
       </div>
     </motion.div>
@@ -61,8 +61,10 @@ export function ToastItem({ toast }: ToastItemProps) {
 export function ToastProvider() {
   const toasts = useToastStore((state) => state.toasts);
 
+  if (toasts.length === 0) return null;
+
   return (
-    <div className="fixed inset-0 z-100 flex max-h-screen w-full flex-col items-center justify-center gap-3 p-4 pointer-events-none">
+    <div className="fixed inset-0 z-100 flex max-h-screen w-full flex-col items-center justify-center gap-6 p-8 pointer-events-auto bg-black/60 backdrop-blur-md transition-all duration-300">
       <AnimatePresence mode="popLayout">
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} />
