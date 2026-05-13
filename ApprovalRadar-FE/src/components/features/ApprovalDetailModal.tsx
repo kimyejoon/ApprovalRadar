@@ -2,6 +2,7 @@ import { Button } from '../ui/button';
 import { Modal } from '../ui/Modal';
 import { formatApprovalDate } from '../../lib/utils';
 import { type ApprovalMappedItem } from '../../lib/api';
+import { CATEGORY_COLORS } from '@/lib/constants';
 
 interface ApprovalDetailModalProps {
   isOpen: boolean;
@@ -50,13 +51,16 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
               <div className="font-mono text-text-primary">{selectedItem.phone}</div>
             </div>
             <div>
-              <div className="text-text-muted mb-1">영업상태</div>
+              <div className="text-text-muted mb-1">변경 타입</div>
               <div className="text-text-primary">
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  (selectedItem.status || '').includes('정상') || (selectedItem.status || '').includes('영업') 
-                    ? 'bg-brand/10 text-brand' 
-                    : 'bg-border-prominent text-text-muted'
-                }`}>
+                <span 
+                  className="px-2 py-1 rounded text-xs font-medium border" 
+                  style={{ 
+                    color: CATEGORY_COLORS[selectedItem.raw.infer_update_type || ''] || '#9ca3af', 
+                    borderColor: CATEGORY_COLORS[selectedItem.raw.infer_update_type || ''] || '#9ca3af',
+                    backgroundColor: 'transparent'
+                  }}
+                >
                   {selectedItem.status || '-'}
                 </span>
               </div>

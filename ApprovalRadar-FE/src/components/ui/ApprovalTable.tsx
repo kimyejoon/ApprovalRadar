@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCod
 import { formatApprovalDate } from '@/lib/utils';
 import type { ApprovalMappedItem } from '@/lib/api';
 import type { SortKey } from '@/hooks/useApprovalRadar';
+import { CATEGORY_COLORS } from '@/lib/constants';
 
 interface SortableHeadProps {
   label: string;
@@ -74,7 +75,7 @@ export function ApprovalTable({
               className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
               onClick={onStatusClick}
             >
-              영업상태
+              변경 타입
               <CaretDown weight="bold" className="w-4 h-4" />
             </button>
           </TableHead>
@@ -109,15 +110,17 @@ export function ApprovalTable({
               <TableCodeCell>{item.id}</TableCodeCell>
               <TableCell>{item.owner}</TableCell>
               <TableCell>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  (item.status || '').includes('정상') || (item.status || '').includes('영업') 
-                    ? 'bg-brand/10 text-brand' 
-                    : 'bg-border-prominent text-text-muted'
-                }`}>
+                <span 
+                  className="px-2 py-1 rounded text-xs font-medium border" 
+                  style={{ 
+                    color: CATEGORY_COLORS[item.raw.infer_update_type || ''] || '#9ca3af', 
+                    borderColor: CATEGORY_COLORS[item.raw.infer_update_type || ''] || '#9ca3af',
+                    backgroundColor: 'transparent'
+                  }}
+                >
                   {item.status}
                 </span>
               </TableCell>
-              <TableCell className="text-xs text-text-muted">{formatApprovalDate(item.approvalDate)}</TableCell>
               <TableCell className="font-mono text-xs">{item.phone}</TableCell>
             </TableRow>
           ))

@@ -12,6 +12,12 @@ export interface ApprovalData {
   created_at: string;
   updated_at: string;
   is_new: number;
+  update_type?: string;
+  prev_business_status?: string | null;
+  prev_representative_name?: string | null;
+  prev_business_name?: string | null;
+  infer_update_type?: string;
+  infer_update_detail?: string;
 }
 
 export interface ApprovalMappedItem {

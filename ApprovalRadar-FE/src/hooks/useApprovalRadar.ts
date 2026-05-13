@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfToday } from 'date-fns';
 import { fetchApprovals, type ApprovalData, type ApprovalMappedItem } from '@/lib/api';
+import { CATEGORY_NAMES } from '@/lib/constants';
 
 export type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id';
 
@@ -40,18 +41,21 @@ export function useApprovalRadar() {
     refetchInterval: 1000 * 60 * 5, // 5 min polling
     refetchOnWindowFocus: true,
     select: (response) => {
-      const mappedData: ApprovalMappedItem[] = response.data.map((item: ApprovalData) => ({
-        id: item.license_no,
-        name: item.business_name,
-        type: '-', // 업종 필드 부재
-        location: item.address,
-        owner: item.representative_name,
-        status: item.business_status,
-        approvalDate: item.last_event_date,
-        phone: item.phone_number,
-        isTransfer: false,
-        raw: item,
-      }));
+      const mappedData: ApprovalMappedItem[] = response.data.map((item: ApprovalData) => {
+        const mappedStatus = item.infer_update_type ? CATEGORY_NAMES[item.infer_update_type] || item.infer_update_type : '기타';
+        return {
+          id: item.license_no,
+          name: item.business_name,
+          type: '-', // 업종 필드 부재
+          location: item.address,
+          owner: item.representative_name,
+          status: mappedStatus,
+          approvalDate: item.last_event_date,
+          phone: item.phone_number,
+          isTransfer: false,
+          raw: item,
+        };
+      });
       return {
         ...response,
         data: mappedData,

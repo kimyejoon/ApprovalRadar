@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { fetchIndicators } from '@/lib/api';
 import { useIndicatorStore } from '@/store/useIndicatorStore';
+import { CATEGORY_NAMES, CATEGORY_COLORS } from '@/lib/constants';
 
 export function DashboardIndicators() {
   const setTodayNewCount = useIndicatorStore(state => state.setTodayNewCount);
@@ -25,28 +26,6 @@ export function DashboardIndicators() {
   }, [data?.total_approvals, setTodayNewCount]);
 
   const todayChangesCount = data?.total_approvals || 0;
-
-  // 백엔드 상태명 친화적 변환
-  const CATEGORY_NAMES: Record<string, string> = {
-    '신규등록': '신규등록',
-    '상태변경': '상태 변경',
-    '대표자변경': '대표 변경',
-    '변경민원-상호명': '상호 변경',
-    '변경민원-주소': '주소 변경',
-    '변경민원-성함': '성함 변경',
-    '초기수집(과거변경있음)': '기타',
-  };
-
-  // 백엔드 상태 분포 데이터 색상 매핑
-  const CATEGORY_COLORS: Record<string, string> = {
-    '신규등록': '#434FF4', // 메인 브랜드 컬러
-    '상태변경': '#ef4444', // 빨강
-    '대표자변경': '#f59e0b', // 주황
-    '변경민원-상호명': '#8b5cf6', // 보라
-    '변경민원-주소': '#06b6d4', // 청록
-    '변경민원-성함': '#10b981', // 초록
-    '초기수집(과거변경있음)': '#9ca3af', // 회색
-  };
 
   // 상태별 변동 비율 (Pie Chart)
   const pieData = useMemo(() => {
