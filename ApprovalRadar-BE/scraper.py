@@ -78,9 +78,15 @@ def run_scraper_for_service(service_id: str):
                     logger.warning(f"Unknown service_id: {service_id}. Skipping row mapping.")
                     continue
 
-                if event_date and len(event_date) > 8:
-                    event_date = event_date[:8]
-                    
+                if event_date:
+                    event_date = str(event_date).replace("-", "").replace(" ", "").replace(":", "")
+                    if len(event_date) > 8:
+                        event_date = event_date[:8]
+                        
+                if license_date:
+                    license_date = str(license_date).replace("-", "").replace(" ", "").replace(":", "")
+                    if len(license_date) > 8:
+                        license_date = license_date[:8]
                 db_record = business_repo.get_business_by_license_no(lcns_no, conn=conn)
                 
                 if not db_record:
