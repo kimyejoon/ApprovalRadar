@@ -137,10 +137,11 @@ export function DashboardIndicators() {
               />
               <Tooltip
                 cursor={{ fill: 'var(--color-accent)' }}
+                formatter={(value: number) => [`${value}건`, '변동 건수']}
                 contentStyle={{ borderRadius: '8px', border: '1px solid var(--color-border-standard)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', fontSize: '12px' }}
                 itemStyle={{ color: 'var(--color-text-primary)' }}
               />
-              <Bar dataKey="count" fill="var(--color-brand)" radius={[4, 4, 0, 0]} maxBarSize={30} />
+              <Bar dataKey="count" name="변동 건수" fill="var(--color-brand)" radius={[4, 4, 0, 0]} maxBarSize={30} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
