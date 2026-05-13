@@ -36,7 +36,9 @@ def init_db():
             infer_update_type TEXT,
             infer_update_detail TEXT,
             last_event_time TEXT,
-            license_time TEXT
+            license_time TEXT,
+            is_read INTEGER DEFAULT 0,
+            read_at TEXT
         )
     ''')
     
@@ -57,6 +59,10 @@ def init_db():
         cursor.execute("ALTER TABLE businesses ADD COLUMN last_event_time TEXT")
     if "license_time" not in biz_columns:
         cursor.execute("ALTER TABLE businesses ADD COLUMN license_time TEXT")
+    if "is_read" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN is_read INTEGER DEFAULT 0")
+    if "read_at" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN read_at TEXT")
 
     if has_crawler_state:
         cursor.execute("PRAGMA table_info(crawler_state)")

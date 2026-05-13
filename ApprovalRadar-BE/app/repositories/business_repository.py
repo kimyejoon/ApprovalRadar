@@ -239,3 +239,16 @@ class BusinessRepository:
             with get_db() as c:
                 c.execute(query, params)
                 c.commit()
+
+    def update_read_info(self, license_no: str, conn=None):
+        from datetime import datetime
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        query = "UPDATE businesses SET is_read = 1, read_at = ? WHERE license_no = ?"
+        params = (now_str, license_no)
+        if conn:
+            conn.execute(query, params)
+        else:
+            with get_db() as c:
+                c.execute(query, params)
+                c.commit()
+

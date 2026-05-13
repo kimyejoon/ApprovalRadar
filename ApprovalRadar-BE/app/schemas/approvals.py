@@ -20,6 +20,11 @@ class BusinessModel(BaseModel):
     infer_update_type: Optional[str] = None
     infer_update_detail: Optional[str] = None
     industry_type: Optional[str] = None
+    is_read: Optional[int] = 0
+    read_at: Optional[str] = None
+
+class ReadInfoRequest(BaseModel):
+    license_no: str
 
 class PaginationMeta(BaseModel):
     total_count: int
