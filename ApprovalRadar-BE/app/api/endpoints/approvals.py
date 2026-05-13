@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, Path
 from typing import List, Optional
 import math
 import time
@@ -29,7 +29,7 @@ from app.repositories.business_repository import BusinessRepository
 from app.core.logger import logger
 from excel_export import generate_excel_export
 from app.schemas.approvals import (
-    BusinessResponse, IndicatorsResponse, SingleBusinessResponse, DetailListResponse, PaginationMeta, ReadInfoRequest
+    BusinessResponse, IndicatorsResponse, SingleBusinessResponse, DetailListResponse, PaginationMeta
 )
 
 router = APIRouter()
@@ -123,13 +123,13 @@ def get_approval_indicators(
         logger.error(f"Database error in get_approval_indicators: {e}")
         raise HTTPException(status_code=500, detail="내부 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
 
-@router.put("/readInfo", summary="인허가 정보 읽음 처리", description="특정 인허가건을 읽음(is_read=1) 상태로 변경하고 읽은 시간을 기록합니다.")
+@router.put("/readInfo/{license_no}", summary="인허가 정보 읽음 처리", description="특정 인허가건을 읽음(is_read=1) 상태로 변경하고 읽은 시간을 기록합니다.")
 def update_read_info(
-    req: ReadInfoRequest,
+    license_no: str = Path(..., description="읽음 처리할 인허가번호"),
     repo: BusinessRepository = Depends(get_business_repo)
 ):
     try:
-        repo.update_read_info(req.license_no)
+        repo.update_read_info(license_no)
         return {"status": "success", "message": "읽음 처리가 완료되었습니다."}
     except Exception as e:
         logger.error(f"Error in update_read_info: {e}")

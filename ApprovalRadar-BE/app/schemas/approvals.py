@@ -23,9 +23,6 @@ class BusinessModel(BaseModel):
     is_read: Optional[int] = 0
     read_at: Optional[str] = None
 
-class ReadInfoRequest(BaseModel):
-    license_no: str
-
 class PaginationMeta(BaseModel):
     total_count: int
     current_page: int

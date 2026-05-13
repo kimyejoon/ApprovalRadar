@@ -66,3 +66,4 @@
 - 2026-05-13: `/api/v1/approvals` 응답 스키마(`BusinessModel`)에 `business_status`를 다시 추가하여 요청 시 정상적으로 반환되도록 수정함.
 - 2026-05-13: `industry_type`(업종) 파라미터의 Swagger 문서 명세에 실제 데이터베이스에 존재하는 모든 업종(일반음식점, 휴게음식점, 제과점영업, 유흥주점영업, 단란주점, 위탁급식영업, 식품제조가공업)을 허용값으로 명시하도록 수정함.
 - 2026-05-13: `businesses` 테이블에 사용자의 확인 여부를 나타내는 `is_read` (기본값 0) 컬럼과 읽은 시각을 기록하는 `read_at` 컬럼을 추가하고, 이를 상태로 업데이트할 수 있는 `PUT /api/v1/readInfo` API를 생성함. 또한 Swagger 문서에 명세를 추가하고 응답 스키마에도 반영함.
+- 2026-05-13: 프론트엔드의 요청에 따라 `PUT /api/v1/readInfo` API를 `PUT /api/v1/readInfo/{license_no}` 형태의 Path 파라미터 방식으로 변경하여 RESTful 설계 규칙에 부합하도록 개선함.
