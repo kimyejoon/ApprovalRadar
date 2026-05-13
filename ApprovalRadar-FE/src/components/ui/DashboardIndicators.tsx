@@ -6,20 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchIndicators } from '@/lib/api';
 import { useIndicatorStore } from '@/store/useIndicatorStore';
 
-interface DashboardIndicatorsProps {
-  searchQuery: string;
-  locationFilters: string[];
-}
-
-export function DashboardIndicators({ searchQuery, locationFilters }: DashboardIndicatorsProps) {
+export function DashboardIndicators() {
   const setTodayNewCount = useIndicatorStore(state => state.setTodayNewCount);
 
   const { data: indicatorResponse } = useQuery({
-    queryKey: ['indicators', searchQuery, locationFilters],
-    queryFn: () => fetchIndicators({
-      search: searchQuery.trim() || undefined,
-      regions: locationFilters.length > 0 ? locationFilters.join(',') : undefined,
-    }),
+    queryKey: ['indicators'],
+    queryFn: () => fetchIndicators({}),
     refetchInterval: 1000 * 60 * 5, // 5 min polling
     refetchOnWindowFocus: true,
   });

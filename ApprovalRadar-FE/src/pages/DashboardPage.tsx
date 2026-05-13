@@ -22,10 +22,7 @@ export function DashboardPage() {
     <DashboardLayout>
       <DashboardHeader totalCount={totalCount} dateRange={state.dateRange} />
 
-      <DashboardIndicators 
-        searchQuery={state.searchQuery}
-        locationFilters={state.locationFilters}
-      />
+      <DashboardIndicators />
 
       <DashboardFilters 
         searchQuery={state.searchQuery}
@@ -35,7 +32,7 @@ export function DashboardPage() {
         statusFilter={state.statusFilter}
         onStatusReset={() => actions.handleStatusFilterChange('전체')}
         locationFilters={state.locationFilters}
-        onLocationRemove={(loc) => actions.handleLocationFiltersChange(state.locationFilters.filter(l => l !== loc))}
+        onLocationFiltersChange={actions.handleLocationFiltersChange}
       />
 
       <ApprovalTable 
