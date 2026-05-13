@@ -24,9 +24,11 @@ export interface ApprovalData {
 export interface ApprovalMappedItem {
   id: string;
   name: string;
+  prevName?: string | null;
   type: string;
   location: string;
   owner: string;
+  prevOwner?: string | null;
   status: string;
   updateDetail?: string;
   approvalDate: string;

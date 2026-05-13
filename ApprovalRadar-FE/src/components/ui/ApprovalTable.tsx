@@ -105,11 +105,27 @@ export function ApprovalTable({
               className="cursor-pointer group"
             >
               <TableCell className="font-medium text-text-primary group-hover:text-brand transition-colors">
-                {item.name}
+                <div className="flex flex-col">
+                  <span>{item.name}</span>
+                  {item.prevName && (
+                    <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
+                      (이전: {item.prevName})
+                    </span>
+                  )}
+                </div>
               </TableCell>
               <TableCell>{item.location}</TableCell>
               <TableCodeCell>{item.id}</TableCodeCell>
-              <TableCell>{item.owner}</TableCell>
+              <TableCell>
+                <div className="flex flex-col">
+                  <span>{item.owner}</span>
+                  {item.prevOwner && (
+                    <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
+                      (이전: {item.prevOwner})
+                    </span>
+                  )}
+                </div>
+              </TableCell>
               <TableCell className="text-sm text-text-muted">{item.type}</TableCell>
               <TableCell>
                 <div className="flex flex-col items-start">

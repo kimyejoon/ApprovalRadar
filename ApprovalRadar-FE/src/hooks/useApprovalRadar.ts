@@ -48,9 +48,11 @@ export function useApprovalRadar() {
         return {
           id: item.license_no,
           name: item.business_name,
+          prevName: item.prev_business_name,
           type: item.industry_type || '-',
           location: item.address,
           owner: item.representative_name,
+          prevOwner: item.prev_representative_name,
           status: mappedStatus,
           updateDetail: item.infer_update_detail,
           approvalDate: item.last_event_date,
