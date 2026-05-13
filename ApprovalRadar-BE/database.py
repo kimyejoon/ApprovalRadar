@@ -32,7 +32,8 @@ def init_db():
             update_type TEXT,
             prev_business_status TEXT,
             prev_representative_name TEXT,
-            prev_business_name TEXT
+            prev_business_name TEXT,
+            infer_update_type TEXT
         )
     ''')
     
@@ -45,6 +46,8 @@ def init_db():
     biz_columns = [row[1] for row in cursor.fetchall()]
     if "industry_type" not in biz_columns:
         cursor.execute("ALTER TABLE businesses ADD COLUMN industry_type TEXT")
+    if "infer_update_type" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN infer_update_type TEXT")
 
     if has_crawler_state:
         cursor.execute("PRAGMA table_info(crawler_state)")
