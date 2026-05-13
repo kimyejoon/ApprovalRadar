@@ -4,36 +4,41 @@ import { Modal } from '../ui/Modal';
 import { CATEGORY_NAMES, CATEGORY_ICONS } from '@/lib/constants';
 import { SquaresFour } from '@phosphor-icons/react';
 
-const STATUS_OPTIONS = [
-  { value: '전체', label: '전체', icon: SquaresFour },
-  ...Object.keys(CATEGORY_NAMES).map(key => ({
-    value: key,
-    label: CATEGORY_NAMES[key],
-    icon: CATEGORY_ICONS[key] || SquaresFour
-  }))
-];
+const STATUS_OPTIONS = Object.keys(CATEGORY_NAMES).map(key => ({
+  value: key,
+  label: CATEGORY_NAMES[key],
+  icon: CATEGORY_ICONS[key] || SquaresFour
+}));
 
 interface StatusFilterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  statusFilter: string;
-  setStatusFilter: (status: string) => void;
+  statusFilters: string[];
+  setStatusFilters: (statuses: string[]) => void;
   onFilterChange: () => void;
 }
 
-export function StatusFilterModal({ isOpen, onClose, statusFilter, setStatusFilter, onFilterChange }: StatusFilterModalProps) {
-  const [localStatus, setLocalStatus] = useState(statusFilter);
+export function StatusFilterModal({ isOpen, onClose, statusFilters, setStatusFilters, onFilterChange }: StatusFilterModalProps) {
+  const [localStatuses, setLocalStatuses] = useState<string[]>(statusFilters);
 
   useEffect(() => {
     if (isOpen) {
-      setLocalStatus(statusFilter);
+      setLocalStatuses(statusFilters);
     }
-  }, [isOpen, statusFilter]);
+  }, [isOpen, statusFilters]);
 
   const handleApply = () => {
-    setStatusFilter(localStatus);
+    setStatusFilters(localStatuses);
     onFilterChange();
     onClose();
+  };
+
+  const toggleStatus = (value: string) => {
+    if (localStatuses.includes(value)) {
+      setLocalStatuses(localStatuses.filter(s => s !== value));
+    } else {
+      setLocalStatuses([...localStatuses, value]);
+    }
   };
 
   return (
@@ -45,7 +50,7 @@ export function StatusFilterModal({ isOpen, onClose, statusFilter, setStatusFilt
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2">
           {STATUS_OPTIONS.map(option => {
-            const isSelected = localStatus === option.value;
+            const isSelected = localStatuses.includes(option.value);
             const IconComponent = option.icon;
             return (
               <label 
@@ -63,12 +68,11 @@ export function StatusFilterModal({ isOpen, onClose, statusFilter, setStatusFilt
                     className={isSelected ? 'text-brand' : 'text-text-muted'} 
                   />
                   <input 
-                    type="radio" 
-                    name="status_modal" 
+                    type="checkbox" 
                     value={option.value}
                     checked={isSelected}
-                    onChange={(e) => setLocalStatus(e.target.value)}
-                    className="accent-brand w-4 h-4"
+                    onChange={() => toggleStatus(option.value)}
+                    className="accent-brand w-4 h-4 rounded border-border-standard"
                   />
                 </div>
                 <span className={`w-full text-left text-sm font-medium ${isSelected ? 'text-brand' : 'text-text-primary'}`}>

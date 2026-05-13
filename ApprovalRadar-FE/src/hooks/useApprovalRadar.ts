@@ -13,7 +13,7 @@ export function useApprovalRadar() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('대표자변경');
+  const [statusFilters, setStatusFilters] = useState<string[]>(['대표자변경']);
   const [locationFilters, setLocationFilters] = useState<string[]>([]);
   const [industryFilters, setIndustryFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>({
@@ -22,7 +22,7 @@ export function useApprovalRadar() {
   });
 
   const { data: apiResponse, isLoading, isError } = useQuery({
-    queryKey: ['approvals', currentPage, itemsPerPage, searchQuery, statusFilter, locationFilters, industryFilters, dateRange, sortConfig],
+    queryKey: ['approvals', currentPage, itemsPerPage, searchQuery, statusFilters, locationFilters, industryFilters, dateRange, sortConfig],
     queryFn: () => fetchApprovals({
       page: currentPage,
       size: itemsPerPage,
@@ -30,7 +30,7 @@ export function useApprovalRadar() {
       start_date: dateRange?.from ? format(dateRange.from, 'yyyyMMdd') : undefined,
       end_date: dateRange?.to ? format(dateRange.to, 'yyyyMMdd') : undefined,
       regions: locationFilters.length > 0 ? locationFilters.join(',') : undefined,
-      infer_update_type: statusFilter !== '전체' ? statusFilter : undefined,
+      infer_update_type: statusFilters.length > 0 ? statusFilters.join(',') : undefined,
       industry_type: industryFilters.length > 0 ? industryFilters.join(',') : undefined,
       sort_by: sortConfig ? (
         sortConfig.key === 'id' ? 'license_no' :
@@ -87,10 +87,6 @@ export function useApprovalRadar() {
     setSearchQuery(query);
     setCurrentPage(1);
   };
-  const handleStatusFilterChange = (status: string) => {
-    setStatusFilter(status);
-    setCurrentPage(1);
-  };
   const handleLocationFiltersChange = (locations: string[]) => {
     setLocationFilters(locations);
     setCurrentPage(1);
@@ -107,7 +103,7 @@ export function useApprovalRadar() {
       itemsPerPage,
       sortConfig,
       searchQuery,
-      statusFilter,
+      statusFilters,
       locationFilters,
       industryFilters,
       dateRange,
@@ -118,7 +114,10 @@ export function useApprovalRadar() {
       handlePageChange,
       handleItemsPerPageChange,
       handleSearch,
-      handleStatusFilterChange,
+      handleStatusFiltersChange: (statuses: string[]) => {
+        setStatusFilters(statuses);
+        setCurrentPage(1);
+      },
       handleLocationFiltersChange,
       handleIndustryFiltersChange: (industries: string[]) => {
         setIndustryFilters(industries);

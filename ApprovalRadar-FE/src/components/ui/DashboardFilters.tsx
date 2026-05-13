@@ -22,8 +22,8 @@ interface DashboardFiltersProps {
   onSearchChange: (query: string) => void;
   dateRange: { from?: Date; to?: Date } | undefined;
   onDateRangeChange: (range: { from?: Date; to?: Date } | undefined) => void;
-  statusFilter: string;
-  onStatusReset: () => void;
+  statusFilters: string[];
+  onStatusFiltersChange: (statuses: string[]) => void;
   locationFilters: string[];
   onLocationFiltersChange: (locations: string[]) => void;
   industryFilters: string[];
@@ -35,8 +35,8 @@ export function DashboardFilters({
   onSearchChange,
   dateRange,
   onDateRangeChange,
-  statusFilter,
-  onStatusReset,
+  statusFilters,
+  onStatusFiltersChange,
   locationFilters,
   onLocationFiltersChange,
   industryFilters,
@@ -79,27 +79,27 @@ export function DashboardFilters({
       </div>
 
       {/* Active Filters Row */}
-      {(statusFilter !== '전체' || groupedTags.length > 0 || industryFilters.length > 0) && (
+      {(statusFilters.length > 0 || groupedTags.length > 0 || industryFilters.length > 0) && (
         <div className="mb-6 flex flex-wrap items-center gap-2">
-          {statusFilter !== '전체' && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
-              {CATEGORY_ICONS[statusFilter] && (
+          {statusFilters.map(status => (
+            <span key={status} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
+              {CATEGORY_ICONS[status] && (
                 <span className="flex items-center">
                   {(() => {
-                    const Icon = CATEGORY_ICONS[statusFilter];
+                    const Icon = CATEGORY_ICONS[status];
                     return <Icon weight="bold" size={14} />;
                   })()}
                 </span>
               )}
-              변경 타입: {CATEGORY_NAMES[statusFilter] || statusFilter}
+              변경 타입: {CATEGORY_NAMES[status] || status}
               <button 
-                onClick={onStatusReset}
+                onClick={() => onStatusFiltersChange(statusFilters.filter(s => s !== status))}
                 className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
               >
                 <X weight="bold" className="w-3.5 h-3.5" />
               </button>
             </span>
-          )}
+          ))}
           
           {industryFilters.map(industry => (
             <span key={industry} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">

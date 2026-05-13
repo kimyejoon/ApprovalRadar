@@ -31,8 +31,8 @@ export function DashboardPage() {
         onSearchChange={actions.handleSearch}
         dateRange={state.dateRange}
         onDateRangeChange={actions.handleDateRangeChange}
-        statusFilter={state.statusFilter}
-        onStatusReset={() => actions.handleStatusFilterChange('전체')}
+        statusFilters={state.statusFilters}
+        onStatusFiltersChange={actions.handleStatusFiltersChange}
         locationFilters={state.locationFilters}
         onLocationFiltersChange={actions.handleLocationFiltersChange}
         industryFilters={state.industryFilters}
@@ -69,8 +69,8 @@ export function DashboardPage() {
       <StatusFilterModal 
         isOpen={isStatusFilterOpen} 
         onClose={() => setIsStatusFilterOpen(false)} 
-        statusFilter={state.statusFilter} 
-        setStatusFilter={actions.handleStatusFilterChange} 
+        statusFilters={state.statusFilters} 
+        setStatusFilters={actions.handleStatusFiltersChange} 
         onFilterChange={() => actions.handlePageChange(1)} 
       />
 
