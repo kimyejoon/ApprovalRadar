@@ -109,6 +109,7 @@ export function useApprovalRadar() {
       searchQuery,
       statusFilter,
       locationFilters,
+      industryFilters,
       dateRange,
     },
     actions: {
@@ -119,6 +120,10 @@ export function useApprovalRadar() {
       handleSearch,
       handleStatusFilterChange,
       handleLocationFiltersChange,
+      handleIndustryFiltersChange: (industries: string[]) => {
+        setIndustryFilters(industries);
+        setCurrentPage(1);
+      },
       handleDateRangeChange,
     },
     api: {
