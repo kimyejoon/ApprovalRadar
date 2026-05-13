@@ -32,8 +32,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Add more nav items here later if needed */}
         </nav>
         <div className="p-4 border-t border-border-standard">
-          <div className="text-xs text-text-muted">
+          <div className="text-xs text-text-muted mb-1">
             Last Updated: <span className="text-text-secondary font-mono">10 mins ago</span>
+          </div>
+          <div className="text-xs text-text-muted">
+            Developed By Sherpa-z (ceo@sherpa-z.com)
           </div>
         </div>
       </aside>
