@@ -67,22 +67,80 @@ class ApiClient:
 
     @classmethod
     def _mark_key_exhausted_in_db(cls, key: str):
-        """DB에서 해당 키를 exhausted=1로 마크."""
+        """DB에서 해당 키를 exhausted=1, call_count=1000으로 마크."""
         today = datetime.date.today().isoformat()
         masked = f"{key[:5]}***{key[-3:]}" if len(key) > 8 else "***"
         try:
             from database import get_db
             with get_db() as conn:
                 conn.execute(
-                    '''INSERT INTO api_key_usage (key_masked, usage_date, exhausted, last_updated)
-                       VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+                    '''INSERT INTO api_key_usage (key_masked, usage_date, call_count, exhausted, last_updated)
+                       VALUES (?, ?, 1000, 1, CURRENT_TIMESTAMP)
                        ON CONFLICT(key_masked, usage_date)
-                       DO UPDATE SET exhausted = 1, last_updated = CURRENT_TIMESTAMP''',
+                       DO UPDATE SET call_count=1000, exhausted=1, last_updated=CURRENT_TIMESTAMP''',
                     (masked, today)
                 )
                 conn.commit()
         except Exception:
             pass
+
+    @classmethod
+    def recover_exhaustion(cls, active_masked_keys: set[str]) -> None:
+        """
+        소진 상태에서 회복된 키 목록을 받아 서버 습스를 초기화합니다.
+        - _exhausted_until 플래그 클리
+        - 회복된 키들의 DB 레코드를 call_count=0, exhausted=0으로 알기셍시함
+          (일일 한도 리셋 = API 제공업체가 카운터를 0으로 초기화한 것)
+        """
+        today = datetime.date.today().isoformat()
+        with cls._class_lock:
+            cls._exhausted_until = None
+        try:
+            from database import get_db
+            with get_db() as conn:
+                for masked in active_masked_keys:
+                    conn.execute(
+                        '''INSERT INTO api_key_usage (key_masked, usage_date, call_count, exhausted, last_updated)
+                           VALUES (?, ?, 0, 0, CURRENT_TIMESTAMP)
+                           ON CONFLICT(key_masked, usage_date)
+                           DO UPDATE SET call_count=0, exhausted=0, last_updated=CURRENT_TIMESTAMP''',
+                        (masked, today)
+                    )
+                conn.commit()
+        except Exception:
+            pass
+
+    @classmethod
+    def check_key_recovery(cls, api_keys: list, base_url: str, data_type: str, service_id: str = "I2859") -> bool:
+        """
+        소진 상태일 때만 호출. 실제 API를 호출해 회복된 키가 있으면 recover_exhaustion()을 호출.
+        Returns: 회복 여부 (True = 하나 이상 활성 키 발견)
+        """
+        if not cls.is_exhausted():
+            return False  # 소진 상태가 아니면 체크 생략
+
+        import requests as req_lib
+        logger.info("[키 회복 체크] 소진된 키 활성화 여부 확인 중...")
+        active_masked: set[str] = set()
+        for key in api_keys:
+            masked = f"{key[:5]}***{key[-3:]}" if len(key) > 8 else "***"
+            url = f"{base_url}/{key}/{service_id}/{data_type}/1/1"
+            try:
+                res = req_lib.get(url, timeout=7).json()
+                if service_id in res:
+                    code = res[service_id]['RESULT']['CODE']
+                    if code == "INFO-000":
+                        active_masked.add(masked)
+            except Exception:
+                pass
+
+        if active_masked:
+            cls.recover_exhaustion(active_masked)
+            logger.info(f"키 회복: {len(active_masked)}개 키가 정상화됨. 다음 크롤링 주기에 자동 재개됩니다.")
+            return True
+        else:
+            logger.info("[키 회복 체크] 아직 소진 상태 유지 중.")
+            return False
 
     # ─── 인스턴스 초기화 ────────────────────────────────────────────────────
     def __init__(self):

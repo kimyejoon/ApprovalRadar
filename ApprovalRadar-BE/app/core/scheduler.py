@@ -7,11 +7,24 @@ from database import vacuum_db, backup_db
 
 scheduler = BackgroundScheduler()
 
+def _check_api_key_recovery():
+    """30분마다 소진된 API 키 회복 여부를 자동 체크."""
+    from app.clients.foodsafety_api import ApiClient
+    from app.core.config import settings
+    ApiClient.check_key_recovery(
+        settings.API_KEYS,
+        settings.BASE_URL,
+        settings.DATA_TYPE,
+    )
+
 def start_scheduler():
     logger.info("Configuring APScheduler jobs...")
     
     # 10분마다 실행되는 정기 크롤링
     scheduler.add_job(run_all_scrapers, 'interval', minutes=10, id="scraper_job")
+    
+    # 30분마다 소진 키 회복 체크 (소진 상태가 아니면 즉시 반환)
+    scheduler.add_job(_check_api_key_recovery, 'interval', minutes=30, id="key_recovery_job")
     
     # DB 최적화 (일요일 새벽 3시)
     scheduler.add_job(vacuum_db, 'cron', day_of_week='sun', hour=3, minute=0, id="vacuum_job")

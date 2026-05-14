@@ -134,6 +134,14 @@ async def get_key_status():
     results = list(await asyncio.gather(*tasks))
     results.sort(key=lambda x: x.index)
 
+    # 소진 상태였지만 활성 키가 발견된 경우 → 플래그 초기화 + DB 리셋
+    # (프론트엔드에서 key-status 조회만 해도 자동 회복 트리거)
+    if ApiClient.is_exhausted():
+        active_masked = {r.masked_key for r in results if r.status == "active"}
+        if active_masked:
+            ApiClient.recover_exhaustion(active_masked)
+            logger.info(f"[key-status 조회] {len(active_masked)}개 키 회복 감지 → 소진 플래그 초기화")
+
     return KeyStatusResponse(
         total=len(results),
         keys=results,
