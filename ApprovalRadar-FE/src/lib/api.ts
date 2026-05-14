@@ -234,3 +234,23 @@ export async function exportApprovalsExcel(params: ExportApprovalsParams, custom
   a.remove();
   window.URL.revokeObjectURL(downloadUrl);
 }
+export interface KeyStatusItem {
+  index: number;
+  masked_key: string;
+  status: 'active' | 'exhausted' | 'error';
+  status_label: string;
+  code?: string;
+  message?: string;
+}
+
+export interface KeyStatusResponse {
+  total: number;
+  keys: KeyStatusItem[];
+}
+
+export async function fetchKeyStatus(): Promise<KeyStatusResponse> {
+  const url = `${API_BASE_URL}/api/v1/admin/key-status`;
+  const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if (!response.ok) throw new Error('Failed to fetch key status');
+  return response.json();
+}

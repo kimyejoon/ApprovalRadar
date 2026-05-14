@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { DashboardHeader } from '@/components/ui/DashboardHeader';
 import { DashboardIndicators } from '@/components/ui/DashboardIndicators';
 import { DashboardFilters } from '@/components/ui/DashboardFilters';
@@ -21,7 +20,7 @@ export function DashboardPage() {
   const totalCount = api.meta?.total_count || 0;
 
   return (
-    <DashboardLayout>
+    <>
       <DashboardHeader totalCount={totalCount} dateRange={state.dateRange} />
 
       <DashboardIndicators />
@@ -91,6 +90,6 @@ export function DashboardPage() {
         setIndustryFilters={actions.handleIndustryFiltersChange} 
         onFilterChange={() => actions.handlePageChange(1)} 
       />
-    </DashboardLayout>
+    </>
   );
 }
