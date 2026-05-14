@@ -1,0 +1,5 @@
+$kind: http-request
+name: New Request
+url: http://localhost:8000/api/v1/approvals/readInfo/12345
+method: PUT
+order: 2621084489086013

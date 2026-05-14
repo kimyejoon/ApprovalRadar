@@ -200,6 +200,11 @@ def run_scraper_for_service(service_id: str):
         
         total_elapsed = time.time() - start_time
         logger.info(f"✅ [{service_id} 총 소요시간: {total_elapsed:.2f}초] 모든 변경분({len(new_data_rows)}건)의 DB 업데이트 및 커밋 완료.")
+        
+        # 신규 데이터가 있으므로 프론트엔드로 SSE 브로드캐스트 발송
+        from app.core.events import broadcaster
+        update_data = json.dumps({"type": "UPDATE", "message": "신규 업데이트가 발생했다"}, ensure_ascii=False)
+        broadcaster.broadcast_sync(update_data)
             
     except Exception as e:
         logger.error(f"❌ {service_id} 크롤러 스케줄 작업 중 치명적인 오류 발생: {e}")

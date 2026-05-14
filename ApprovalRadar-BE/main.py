@@ -1,14 +1,19 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import asyncio
 from database import init_db
 
 from app.core.logger import logger
 from app.api.router import api_router
 from app.core.scheduler import start_scheduler, shutdown_scheduler
+from app.core.events import broadcaster
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Set the main event loop for broadcaster
+    broadcaster.set_loop(asyncio.get_running_loop())
+
     # Startup logic
     logger.info("Initializing Database...")
     init_db()
