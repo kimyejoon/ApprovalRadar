@@ -28,4 +28,4 @@ def start_scheduler():
 
 def shutdown_scheduler():
     logger.info("Shutting down APScheduler...")
-    scheduler.shutdown()
+    scheduler.shutdown(wait=False)
