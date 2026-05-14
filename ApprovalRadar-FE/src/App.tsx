@@ -3,6 +3,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import type { ActiveTab } from '@/components/layout/DashboardLayout';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { LogPage } from '@/pages/LogPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { ToastProvider } from '@/components/ui/toast';
 import { useSSE } from '@/hooks/useSSE';
 
@@ -15,6 +16,7 @@ export default function App() {
       <DashboardLayout activeTab={activeTab} onTabChange={setActiveTab}>
         {activeTab === 'dashboard' && <DashboardPage />}
         {activeTab === 'logs' && <LogPage />}
+        {activeTab === 'settings' && <SettingsPage />}
       </DashboardLayout>
       <ToastProvider />
     </>

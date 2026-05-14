@@ -39,19 +39,37 @@ class Settings:
         self._load_api_keys()
         
     def _load_api_keys(self):
+        """API 키를 DB(api_keys 테이블) 우선으로 로드합니다. DB에 키가 없으면 env를 fallback으로 사용."""
         self.API_KEYS = []
-        for i in range(1, 10):
-            key = os.getenv(f"FOOD_SAFETY_API_KEY_{i}")
-            if key:
-                self.API_KEYS.append(key)
         
+        # 1차: DB에서 활성 키 로드
+        try:
+            import sqlite3
+            db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "food_safety.db")
+            if os.path.exists(db_path):
+                conn = sqlite3.connect(db_path)
+                rows = conn.execute(
+                    "SELECT key_value FROM api_keys WHERE is_active = 1 ORDER BY id"
+                ).fetchall()
+                conn.close()
+                self.API_KEYS = [row[0] for row in rows if row[0]]
+        except Exception:
+            pass  # DB 미초기화 상태면 env fallback으로 진행
+
+        # 2차 fallback: env에서 로드 (DB 키가 없을 때)
         if not self.API_KEYS:
-            fallback_key = os.getenv("FOOD_SAFETY_API_KEY")
-            if fallback_key:
-                self.API_KEYS.append(fallback_key)
-            else:
-                raise ValueError("환경변수에 등록된 API 키가 없습니다. FOOD_SAFETY_API_KEY_1 을 설정해주세요.")
-        
+            for i in range(1, 10):
+                key = os.getenv(f"FOOD_SAFETY_API_KEY_{i}")
+                if key:
+                    self.API_KEYS.append(key)
+            
+            if not self.API_KEYS:
+                fallback_key = os.getenv("FOOD_SAFETY_API_KEY")
+                if fallback_key:
+                    self.API_KEYS.append(fallback_key)
+                else:
+                    raise ValueError("DB 및 환경변수에 등록된 API 키가 없습니다. api_keys 테이블 또는 FOOD_SAFETY_API_KEY_1 을 설정해주세요.")
+
         # SCRAPER_INTERVAL_MINUTES: env 오버라이드 (.env에서 SCRAPER_INTERVAL_MINUTES=10 식으로 변경 가능)
         interval = os.getenv("SCRAPER_INTERVAL_MINUTES")
         if interval is not None:

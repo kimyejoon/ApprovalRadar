@@ -158,8 +158,59 @@ def init_db():
         )
     ''')
 
+    # API 키 관리 테이블 (DB primary source)
+    cursor.execute('''\
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            key_value   TEXT NOT NULL UNIQUE,
+            memo        TEXT,
+            is_active   INTEGER DEFAULT 1,
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     conn.commit()
     conn.close()
+    
+    # .env에 있는 키를 DB로 자동 마이그레이션 (최초 1회)
+    _migrate_env_keys_to_db()
+
+
+def _migrate_env_keys_to_db():
+    """서버 시작 시 .env의 FOOD_SAFETY_API_KEY_* 값을 api_keys 테이블에 자동 마이그레이션.
+    이미 존재하는 키는 중복 삽입하지 않습니다 (IGNORE)."""
+    import os
+    env_keys = []
+    for i in range(1, 10):
+        key = os.getenv(f"FOOD_SAFETY_API_KEY_{i}")
+        if key:
+            env_keys.append(key)
+    if not env_keys:
+        fallback = os.getenv("FOOD_SAFETY_API_KEY")
+        if fallback:
+            env_keys.append(fallback)
+
+    if not env_keys:
+        return
+
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    try:
+        existing = {row["key_value"] for row in conn.execute("SELECT key_value FROM api_keys").fetchall()}
+        inserted = 0
+        for key in env_keys:
+            if key not in existing:
+                conn.execute(
+                    "INSERT INTO api_keys (key_value, memo, is_active) VALUES (?, ?, 1)",
+                    (key, ".env 자동 마이그레이션")
+                )
+                inserted += 1
+        conn.commit()
+        if inserted > 0:
+            print(f"[DB 마이그레이션] .env 키 {inserted}개를 api_keys 테이블에 등록했습니다.")
+    finally:
+        conn.close()
 
 @contextmanager
 def get_db():
