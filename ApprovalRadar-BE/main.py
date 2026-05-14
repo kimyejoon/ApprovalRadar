@@ -80,9 +80,15 @@ async def lifespan(app: FastAPI):
     init_db()
     
     # 누락된 세부업종 데이터 백그라운드 백필(Backfill) 시작
+    # ✅ fill_missing_industry_types가 async def이므로 스레드 내 asyncio.run()으로 실행
     import threading
+    import asyncio as _asyncio
     from app.services.industry_filler import fill_missing_industry_types
-    threading.Thread(target=fill_missing_industry_types, daemon=True, name="IndustryBackfillThread").start()
+    threading.Thread(
+        target=lambda: _asyncio.run(fill_missing_industry_types()),
+        daemon=True,
+        name="IndustryBackfillThread"
+    ).start()
     
     # 즉시 종료 시그널 핸들러 등록 (Ctrl+C가 SSE 연결로 인해 block되는 현상 방지)
     signal.signal(signal.SIGINT, _handle_sigint)

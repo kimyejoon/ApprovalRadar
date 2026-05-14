@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import json
 import re
@@ -21,7 +22,7 @@ def parse_representatives(rep_str: str) -> List[str]:
     parts = re.split(r'[,/&]|및', rep_str)
     return [p.strip() for p in parts if p.strip()]
 
-def run_scraper_for_service(service_id: str):
+async def run_scraper_for_service(service_id: str):
     import time
     start_time = time.time()
 
@@ -34,217 +35,215 @@ def run_scraper_for_service(service_id: str):
 
     # DB 초기화
     init_db()
-    
-    api_client = ApiClient()
-    crawler = DiffCrawlerEngine(api_client=api_client, service_id=service_id)
-    business_repo = BusinessRepository()
-    raw_repo = RawDataRepository()
-    
-    try:
-        new_data_rows = crawler.scan_for_updates()
-        if not new_data_rows:
-            # 이미 crawler 내부에서 소요시간이 찍히므로 여기선 중복 메시지 생략 또는 최소화
-            return
-            
-        logger.info(f"🚀 {len(new_data_rows)}건의 새로운 인허가 변경분이 {service_id}에서 감지되었습니다. DB 업데이트를 시작합니다...")
-        now = datetime.datetime.now().isoformat()
-        
-        from database import get_db
-        with get_db() as conn:
-            for row in new_data_rows:
-                lcns_no = row.get("LCNS_NO")
-                if not lcns_no:
-                    continue
-                    
-                # 1. 원본 API 응답(JSON) DB 저장 (Repository 사용)
-                raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
-                
-                # 2. Main 테이블(businesses) 파싱 준비
-                if service_id == "I2859":
-                    bssh_nm = row.get("BSSH_NM", "")
-                    addr = row.get("LOCP_ADDR", "")
-                    rep_name = row.get("PRSDNT_NM", "")
-                    business_status = row.get("BSN_STATE_NM", "")
-                    license_date = row.get("PRMS_DT", "")
-                    phone_number = row.get("TELNO", "")
-                    last_updt = row.get("LAST_UPDT_DTM", "")
-                    cret_dtm = row.get("CRET_DTM", "")
-                    event_date = last_updt if last_updt else (cret_dtm if cret_dtm else license_date)
-                    industry_type = row.get("INDUTY_CD_NM", "")
-                elif service_id == "I2861":
-                    # I2861: 음식점업소 인허가변경정보
-                    # ⚠️ I2500(식품 세부정보)은 여기에 오지 않음!
-                    # I2500은 industry_filler.py에서만 Backfill 용도로 건별 단건 조회할 뿐입니다.
-                    bssh_nm = row.get("BSSH_NM", "")
-                    addr = row.get("SITE_ADDR") or row.get("ADDR", "")
-                    rep_name = row.get("PRSDNT_NM", "")
-                    business_status = None # 해당 API 미제공
-                    license_date = row.get("PRMS_DT", "")
-                    phone_number = row.get("TELNO", "")
-                    event_date = row.get("CHNG_DT", "") or license_date
-                    industry_type = row.get("INDUTY_CD_NM", "")
-                else:
-                    logger.warning(f"Unknown service_id: {service_id}. Skipping row mapping.")
-                    continue
 
-                event_time = None
-                if event_date:
-                    orig_event = str(event_date).replace("-", "").replace(" ", "").replace(":", "")
-                    if len(orig_event) >= 14:
-                        event_time = orig_event[8:14]
-                    event_date = orig_event[:8]
-                        
-                license_time = None
-                if license_date:
-                    orig_license = str(license_date).replace("-", "").replace(" ", "").replace(":", "")
-                    if len(orig_license) >= 14:
-                        license_time = orig_license[8:14]
-                    license_date = orig_license[:8]
-                db_record = business_repo.get_business_by_license_no(lcns_no, conn=conn)
-                
-                if not db_record:
-                    # 신규 등록
-                    infer_update_type = "신규등록" if license_date == event_date else "초기수집(과거변경있음)"
-                    infer_update_detail = None
-                    record = {
-                        "license_no": lcns_no,
-                        "business_name": bssh_nm,
-                        "address": addr,
-                        "representative_name": rep_name,
-                        "business_status": business_status,
-                        "license_date": license_date,
-                        "phone_number": phone_number,
-                        "industry_type": industry_type,
-                        "last_event_date": event_date,
-                        "infer_update_type": infer_update_type,
-                        "infer_update_detail": infer_update_detail,
-                        "last_event_time": event_time,
-                        "license_time": license_time
-                    }
-                    business_repo.insert_business(record, conn=conn)
-                else:
-                    prev_rep = db_record.get("representative_name", "")
-                    prev_status = db_record.get("business_status", "")
-                    prev_name = db_record.get("business_name", "")
-                    rep_history = json.loads(db_record.get("representative_history") or "[]")
-                    lic_history = json.loads(db_record.get("licensing_history") or "[]")
-                    
-                    is_updated = False
-                    
-                    update_type = None
-                    prev_business_status_val = None
-                    prev_representative_name_val = None
-                    prev_business_name_val = None
-                    
-                    # 대표자 변경 감지
-                    old_reps = parse_representatives(prev_rep)
-                    new_reps = parse_representatives(rep_name)
-                    
-                    if rep_name and set(old_reps) != set(new_reps):
-                        update_type = "대표자변경"
-                        prev_representative_name_val = prev_rep
-                        rep_history.append({
-                            "date": now,
-                            "prev": prev_rep,
-                            "new": rep_name
-                        })
-                        is_updated = True
-                        
-                    # 영업 상태 변경 감지
-                    if business_status is not None and prev_status != business_status:
-                        update_type = "상태변경"
-                        prev_business_status_val = prev_status
-                        lic_history.append({
-                            "date": now,
-                            "type": "상태변경",
-                            "prev": prev_status,
-                            "new": business_status
-                        })
-                        is_updated = True
-                        
-                    # 업소명 변경 감지 (API에 명칭 변경이 있는 경우 등)
-                    if prev_name != bssh_nm:
-                        update_type = "명칭변경"
-                        prev_business_name_val = prev_name
-                        is_updated = True
-                        
-                    # infer_update_type 결정 로직
-                    infer_update_type = None
-                    infer_update_detail = None
-                    if update_type == "대표자변경":
-                        infer_update_type = "대표자변경"
-                        infer_update_detail = prev_representative_name_val if prev_representative_name_val else None
-                    elif update_type == "명칭변경":
-                        infer_update_type = "명칭변경"
-                        infer_update_detail = prev_business_name_val if prev_business_name_val else None
-                    elif update_type == "상태변경":
-                        infer_update_type = "상태변경"
-                        infer_update_detail = prev_business_status_val if prev_business_status_val else None
+    # ✅ async with 컨텍스트 매니저로 AsyncClient 세션 자동 종료 보장
+    async with ApiClient() as api_client:
+        crawler = DiffCrawlerEngine(api_client=api_client, service_id=service_id)
+        business_repo = BusinessRepository()
+        raw_repo = RawDataRepository()
 
-                    if is_updated or (industry_type and not db_record.get("industry_type")):
-                        updates = {
+        try:
+            new_data_rows = await crawler.scan_for_updates()
+            if not new_data_rows:
+                return
+
+            logger.info(f"🚀 {len(new_data_rows)}건의 새로운 인허가 변경분이 {service_id}에서 감지되었습니다. DB 업데이트를 시작합니다...")
+            now = datetime.datetime.now().isoformat()
+
+            from database import get_db
+            with get_db() as conn:
+                for row in new_data_rows:
+                    lcns_no = row.get("LCNS_NO")
+                    if not lcns_no:
+                        continue
+
+                    # 1. 원본 API 응답(JSON) DB 저장 (Repository 사용)
+                    raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
+
+                    # 2. Main 테이블(businesses) 파싱 준비
+                    if service_id == "I2859":
+                        bssh_nm = row.get("BSSH_NM", "")
+                        addr = row.get("LOCP_ADDR", "")
+                        rep_name = row.get("PRSDNT_NM", "")
+                        business_status = row.get("BSN_STATE_NM", "")
+                        license_date = row.get("PRMS_DT", "")
+                        phone_number = row.get("TELNO", "")
+                        last_updt = row.get("LAST_UPDT_DTM", "")
+                        cret_dtm = row.get("CRET_DTM", "")
+                        event_date = last_updt if last_updt else (cret_dtm if cret_dtm else license_date)
+                        industry_type = row.get("INDUTY_CD_NM", "")
+                    elif service_id == "I2861":
+                        # I2861: 음식점업소 인허가변경정보
+                        # ⚠️ I2500(식품 세부정보)은 여기에 오지 않음!
+                        # I2500은 industry_filler.py에서만 Backfill 용도로 건별 단건 조회할 뿐입니다.
+                        bssh_nm = row.get("BSSH_NM", "")
+                        addr = row.get("SITE_ADDR") or row.get("ADDR", "")
+                        rep_name = row.get("PRSDNT_NM", "")
+                        business_status = None  # 해당 API 미제공
+                        license_date = row.get("PRMS_DT", "")
+                        phone_number = row.get("TELNO", "")
+                        event_date = row.get("CHNG_DT", "") or license_date
+                        industry_type = row.get("INDUTY_CD_NM", "")
+                    else:
+                        logger.warning(f"Unknown service_id: {service_id}. Skipping row mapping.")
+                        continue
+
+                    event_time = None
+                    if event_date:
+                        orig_event = str(event_date).replace("-", "").replace(" ", "").replace(":", "")
+                        if len(orig_event) >= 14:
+                            event_time = orig_event[8:14]
+                        event_date = orig_event[:8]
+
+                    license_time = None
+                    if license_date:
+                        orig_license = str(license_date).replace("-", "").replace(" ", "").replace(":", "")
+                        if len(orig_license) >= 14:
+                            license_time = orig_license[8:14]
+                        license_date = orig_license[:8]
+                    db_record = business_repo.get_business_by_license_no(lcns_no, conn=conn)
+
+                    if not db_record:
+                        # 신규 등록
+                        infer_update_type = "신규등록" if license_date == event_date else "초기수집(과거변경있음)"
+                        infer_update_detail = None
+                        record = {
+                            "license_no": lcns_no,
                             "business_name": bssh_nm,
                             "address": addr,
                             "representative_name": rep_name,
-                            "business_status": business_status if business_status is not None else prev_status,
+                            "business_status": business_status,
+                            "license_date": license_date,
                             "phone_number": phone_number,
-                            "industry_type": industry_type if industry_type else db_record.get("industry_type"),
-                            "representative_history": json.dumps(rep_history, ensure_ascii=False),
-                            "licensing_history": json.dumps(lic_history, ensure_ascii=False),
-                            "update_type": update_type,
-                            "prev_business_status": prev_business_status_val,
-                            "prev_representative_name": prev_representative_name_val,
-                            "prev_business_name": prev_business_name_val,
+                            "industry_type": industry_type,
+                            "last_event_date": event_date,
                             "infer_update_type": infer_update_type,
                             "infer_update_detail": infer_update_detail,
-                            "last_event_date": event_date,
                             "last_event_time": event_time,
-                            "license_time": license_time,
-                            "updated_at": now
+                            "license_time": license_time
                         }
-                        business_repo.update_business(lcns_no, updates, conn=conn)
-            
-            # 모든 처리가 끝난 후 커밋
-            conn.commit()
-        
-        total_elapsed = time.time() - start_time
-        logger.info(f"✅ [{service_id} 총 소요시간: {total_elapsed:.2f}초] 모든 변경분({len(new_data_rows)}건)의 DB 업데이트 및 커밋 완료.")
-        
-        # 신규 데이터가 있으므로 프론트엔드로 SSE 브로드캐스트 발송
-        from app.core.events import broadcaster
-        update_data = json.dumps({"type": "UPDATE", "message": "신규 업데이트가 발생했다"}, ensure_ascii=False)
-        broadcaster.broadcast_sync(update_data)
+                        business_repo.insert_business(record, conn=conn)
+                    else:
+                        prev_rep = db_record.get("representative_name", "")
+                        prev_status = db_record.get("business_status", "")
+                        prev_name = db_record.get("business_name", "")
+                        rep_history = json.loads(db_record.get("representative_history") or "[]")
+                        lic_history = json.loads(db_record.get("licensing_history") or "[]")
 
-        # ✅ [개선] 신규 삽입 건 중 industry_type이 없는 건 즉시 Backfill 트리거
-        # - 6시간 주기 backfill_job을 기다리지 않고 SSE 브로드캐스트 직후 세부업종 채우기 시작
-        # - 데몬 스레드로 실행하여 다음 크롤링 주기 블로킹 방지
-        licenses_needing_industry = [
-            row.get("LCNS_NO")
-            for row in new_data_rows
-            if row.get("LCNS_NO") and not row.get("INDUTY_CD_NM", "")
-        ]
-        if licenses_needing_industry:
-            logger.info(
-                f"[즉시 Backfill 트리거] {len(licenses_needing_industry)}건의 신규 삽입 건에 세부업종 없음 → 즉시 Backfill 데몬 스레드 시작"
-            )
-            import threading
-            from app.services.industry_filler import fill_industry_for_licenses
-            threading.Thread(
-                target=fill_industry_for_licenses,
-                args=(licenses_needing_industry,),
-                daemon=True,
-                name=f"ImmediateBackfillThread-{service_id}"
-            ).start()
+                        is_updated = False
 
-            
-    except Exception as e:
-        logger.error(f"❌ {service_id} 크롤러 스케줄 작업 중 치명적인 오류 발생: {e}")
+                        update_type = None
+                        prev_business_status_val = None
+                        prev_representative_name_val = None
+                        prev_business_name_val = None
 
-def run_all_scrapers():
+                        # 대표자 변경 감지
+                        old_reps = parse_representatives(prev_rep)
+                        new_reps = parse_representatives(rep_name)
+
+                        if rep_name and set(old_reps) != set(new_reps):
+                            update_type = "대표자변경"
+                            prev_representative_name_val = prev_rep
+                            rep_history.append({
+                                "date": now,
+                                "prev": prev_rep,
+                                "new": rep_name
+                            })
+                            is_updated = True
+
+                        # 영업 상태 변경 감지
+                        if business_status is not None and prev_status != business_status:
+                            update_type = "상태변경"
+                            prev_business_status_val = prev_status
+                            lic_history.append({
+                                "date": now,
+                                "type": "상태변경",
+                                "prev": prev_status,
+                                "new": business_status
+                            })
+                            is_updated = True
+
+                        # 업소명 변경 감지 (API에 명칭 변경이 있는 경우 등)
+                        if prev_name != bssh_nm:
+                            update_type = "명칭변경"
+                            prev_business_name_val = prev_name
+                            is_updated = True
+
+                        # infer_update_type 결정 로직
+                        infer_update_type = None
+                        infer_update_detail = None
+                        if update_type == "대표자변경":
+                            infer_update_type = "대표자변경"
+                            infer_update_detail = prev_representative_name_val if prev_representative_name_val else None
+                        elif update_type == "명칭변경":
+                            infer_update_type = "명칭변경"
+                            infer_update_detail = prev_business_name_val if prev_business_name_val else None
+                        elif update_type == "상태변경":
+                            infer_update_type = "상태변경"
+                            infer_update_detail = prev_business_status_val if prev_business_status_val else None
+
+                        if is_updated or (industry_type and not db_record.get("industry_type")):
+                            updates = {
+                                "business_name": bssh_nm,
+                                "address": addr,
+                                "representative_name": rep_name,
+                                "business_status": business_status if business_status is not None else prev_status,
+                                "phone_number": phone_number,
+                                "industry_type": industry_type if industry_type else db_record.get("industry_type"),
+                                "representative_history": json.dumps(rep_history, ensure_ascii=False),
+                                "licensing_history": json.dumps(lic_history, ensure_ascii=False),
+                                "update_type": update_type,
+                                "prev_business_status": prev_business_status_val,
+                                "prev_representative_name": prev_representative_name_val,
+                                "prev_business_name": prev_business_name_val,
+                                "infer_update_type": infer_update_type,
+                                "infer_update_detail": infer_update_detail,
+                                "last_event_date": event_date,
+                                "last_event_time": event_time,
+                                "license_time": license_time,
+                                "updated_at": now
+                            }
+                            business_repo.update_business(lcns_no, updates, conn=conn)
+
+                # 모든 처리가 끝난 후 커밋
+                conn.commit()
+
+            total_elapsed = time.time() - start_time
+            logger.info(f"✅ [{service_id} 총 소요시간: {total_elapsed:.2f}초] 모든 변경분({len(new_data_rows)}건)의 DB 업데이트 및 커밋 완료.")
+
+            # 신규 데이터가 있으므로 프론트엔드로 SSE 브로드캐스트 발송
+            from app.core.events import broadcaster
+            update_data = json.dumps({"type": "UPDATE", "message": "신규 업데이트가 발생했다"}, ensure_ascii=False)
+            broadcaster.broadcast_sync(update_data)
+
+            # ✅ 신규 삽입 건 중 industry_type이 없는 건 즉시 Backfill 트리거
+            # - 6시간 주기 backfill_job을 기다리지 않고 SSE 브로드캐스트 직후 세부업종 채우기 시작
+            # - 스레드에서 asyncio.run()으로 비동기 함수 실행
+            licenses_needing_industry = [
+                row.get("LCNS_NO")
+                for row in new_data_rows
+                if row.get("LCNS_NO") and not row.get("INDUTY_CD_NM", "")
+            ]
+            if licenses_needing_industry:
+                logger.info(
+                    f"[즉시 Backfill 트리거] {len(licenses_needing_industry)}건의 신규 삽입 건에 세부업종 없음 → 즉시 Backfill 데몬 스레드 시작"
+                )
+                import threading
+                from app.services.industry_filler import fill_industry_for_licenses
+                threading.Thread(
+                    target=lambda: asyncio.run(fill_industry_for_licenses(licenses_needing_industry)),
+                    daemon=True,
+                    name=f"ImmediateBackfillThread-{service_id}"
+                ).start()
+
+        except Exception as e:
+            logger.error(f"❌ {service_id} 크롤러 스케줄 작업 중 치명적인 오류 발생: {e}")
+
+async def run_all_scrapers():
     from app.core.config import settings
     services = getattr(settings, "SERVICES", ["I2859", "I2861"])
     for svc in services:
-        run_scraper_for_service(svc)
+        await run_scraper_for_service(svc)
 
 if __name__ == "__main__":
-    run_all_scrapers()
+    asyncio.run(run_all_scrapers())

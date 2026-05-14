@@ -1,6 +1,5 @@
-import time
+import asyncio
 import random
-import concurrent.futures
 from app.core.config import settings
 from app.clients.foodsafety_api import ApiClient
 from app.repositories.state_repository import StateRepository
@@ -24,18 +23,18 @@ class DiffCrawlerEngine:
 
     # ─── 저수준 API 유틸리티 ──────────────────────────────────────────────────
 
-    def _fetch_page(self, start: int, end: int) -> list:
+    async def _fetch_page(self, start: int, end: int) -> list:
         """
-        [start, end] 범위의 레코드를 조회하여 row 리스트를 반환합니다.
+        [start, end] 범위의 레코드를 비동기 조회하여 row 리스트를 반환합니다.
         bulk 응답 지연을 고려해 30초 timeout 사용.
         - INFO-000: 정상 데이터 리스트 반환
         - INFO-200: 빈 페이지(데이터 없음) → [] 반환
         - 기타 오류: [] 반환
         WAF 차단 방지를 위해 호출 후 Jitter(무작위 지연) 적용.
         """
-        res = self.api_client.fetch_data(self.service_id, start, end, timeout=30)
+        res = await self.api_client.fetch_data(self.service_id, start, end, timeout=30)
         # WAF 차단 방지: API 호출 직후 무작위 지연
-        time.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+        await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
         if not res or self.service_id not in res:
             return []
         block = res[self.service_id]
@@ -44,13 +43,13 @@ class DiffCrawlerEngine:
             return block.get('row', [])
         return []
 
-    def _fetch_single(self, idx: int) -> dict | None:
-        """특정 단일 인덱스 1건 조회 (피벗 확인용). 단건이므로 10초 timeout.
+    async def _fetch_single(self, idx: int) -> dict | None:
+        """특정 단일 인덱스 1건 비동기 조회 (피벗 확인용). 단건이므로 10초 timeout.
         WAF 차단 방지를 위해 호출 후 Jitter(무작위 지연) 적용.
         """
-        rows = self.api_client.fetch_data(self.service_id, idx, idx, timeout=10)
+        rows = await self.api_client.fetch_data(self.service_id, idx, idx, timeout=10)
         # WAF 차단 방지: API 호출 직후 무작위 지연
-        time.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+        await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
         if not rows or self.service_id not in rows:
             return None
         block = rows[self.service_id]
@@ -61,7 +60,7 @@ class DiffCrawlerEngine:
 
     # ─── Tail 탐색 ────────────────────────────────────────────────────────────
 
-    def find_true_tail(self, known_tail: int = 0) -> int:
+    async def find_true_tail(self, known_tail: int = 0) -> int:
         """
         실제 데이터 끝(Tail) 위치를 정확하게 탐색합니다.
 
@@ -82,7 +81,7 @@ class DiffCrawlerEngine:
         # ── 전략 A: total_count 신뢰 서비스 (미래 확장용, 현재 비어있음) ────────
         if svc in RELIABLE_TOTAL_COUNT_SERVICES:
             logger.info(f"[{svc}][Bootstrapper] total_count 직접 조회 시도")
-            res = self.api_client.fetch_data(svc, 1, 1, timeout=10)
+            res = await self.api_client.fetch_data(svc, 1, 1, timeout=10)
             if res and svc in res:
                 block = res[svc]
                 if block.get("RESULT", {}).get("CODE") in ("INFO-000", "INFO-200"):
@@ -97,7 +96,7 @@ class DiffCrawlerEngine:
 
         # Step 1: Ping - known_tail 직후 확인 (빠른 경로)
         if known_tail > 0:
-            ping = self._fetch_page(known_tail + 1, known_tail + PAGE_SIZE)
+            ping = await self._fetch_page(known_tail + 1, known_tail + PAGE_SIZE)
             if not ping:
                 logger.info(f"[{svc}][Bootstrapper] Tail Ping: 변동 없음 ({known_tail:,}건)")
                 return known_tail
@@ -107,7 +106,7 @@ class DiffCrawlerEngine:
         pos = max(PAGE_SIZE, known_tail + PAGE_SIZE)
         last_nonempty = pos
         while not shutdown_event.is_set():
-            rows = self._fetch_page(pos, pos + PAGE_SIZE - 1)
+            rows = await self._fetch_page(pos, pos + PAGE_SIZE - 1)
             if rows:
                 last_nonempty = pos
                 logger.info(f"[{svc}][Bootstrapper] 지수점프 {pos:,}: {len(rows)}건")
@@ -124,7 +123,7 @@ class DiffCrawlerEngine:
         best_start = low
         while high - low >= PAGE_SIZE and not shutdown_event.is_set():
             mid = ((low + high) // 2 // PAGE_SIZE) * PAGE_SIZE
-            if self._fetch_page(mid, mid + PAGE_SIZE - 1):
+            if await self._fetch_page(mid, mid + PAGE_SIZE - 1):
                 best_start = mid
                 low = mid + PAGE_SIZE
             else:
@@ -135,7 +134,7 @@ class DiffCrawlerEngine:
         MAX_GAP_PAGES = 3
         pos, final_tail, consecutive_empty = best_start, best_start, 0
         while not shutdown_event.is_set():
-            rows = self._fetch_page(pos, pos + PAGE_SIZE - 1)
+            rows = await self._fetch_page(pos, pos + PAGE_SIZE - 1)
             if rows:
                 final_tail = pos + len(rows) - 1
                 consecutive_empty = 0
@@ -150,29 +149,31 @@ class DiffCrawlerEngine:
 
     # ─── 부트스트랩 ───────────────────────────────────────────────────────────
 
-    def bootstrap(self):
+    async def bootstrap(self):
         """처음부터 피벗을 생성합니다."""
-        total_count = self.find_true_tail(known_tail=0)
+        total_count = await self.find_true_tail(known_tail=0)
         pivots = {}
 
         logger.info(f"[{self.service_id}][Bootstrapper] 피벗 캐싱 시작 (간격: {settings.PIVOT_INTERVAL})...")
         pivot_indices = list(range(settings.PIVOT_INTERVAL, total_count, settings.PIVOT_INTERVAL))
 
-        # 피벗 병렬 조회 (피벗은 단건 조회이므로 _fetch_single 유지)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=settings.MAX_WORKERS) as executor:
-            future_to_idx = {executor.submit(self._fetch_single, idx): idx for idx in pivot_indices}
-            for future in concurrent.futures.as_completed(future_to_idx):
-                idx = future_to_idx[future]
-                row = future.result()
-                if row:
-                    # ✅ [개선] Boundary 양방향 저장: 첫 번째(idx) + 마지막(idx + PAGE_SIZE - 1)
-                    last_row = self._fetch_single(idx + PAGE_SIZE - 1)
-                    pivots[str(idx)] = {
-                        "LCNS_NO": row.get("LCNS_NO", ""),
-                        "LAST_LCNS_NO": last_row.get("LCNS_NO", "") if last_row else "",
-                        "CHNG_DT": row.get("CHNG_DT", ""),
-                        "BSSH_NM": row.get("BSSH_NM", "")
-                    }
+        # ✅ asyncio.gather로 피벗 병렬 조회 (비동기 동시 실행)
+        async def _fetch_pivot(idx: int):
+            row = await self._fetch_single(idx)
+            if row:
+                last_row = await self._fetch_single(idx + PAGE_SIZE - 1)
+                return idx, {
+                    "LCNS_NO": row.get("LCNS_NO", ""),
+                    "LAST_LCNS_NO": last_row.get("LCNS_NO", "") if last_row else "",
+                    "CHNG_DT": row.get("CHNG_DT", ""),
+                    "BSSH_NM": row.get("BSSH_NM", "")
+                }
+            return idx, None
+
+        results = await asyncio.gather(*[_fetch_pivot(idx) for idx in pivot_indices])
+        for idx, pivot_data in results:
+            if pivot_data:
+                pivots[str(idx)] = pivot_data
 
         state = {
             "last_total_count": total_count,
@@ -186,11 +187,11 @@ class DiffCrawlerEngine:
 
     PIVOT_SAMPLE_RATIO = 0.2  # 피벗의 20%를 샘플링
 
-    def _sample_check_pivots(self, pivots: dict) -> bool:
+    async def _sample_check_pivots(self, pivots: dict) -> bool:
         """
         저장된 피벗 중 일부를 무작위로 샘플링하여 API 현재 응답과 비교합니다.
         Delete가 은폐(Insert+Delete 동시 발생)된 경우 피벗의 LCNS_NO가 바뀌어 있습니다.
-        ✅ [개선] Boundary 양방향 보완: LCNS_NO(첫 번째) + LAST_LCNS_NO(마지막) 모두 검증
+        ✅ Boundary 양방향 보완: LCNS_NO(첫 번째) + LAST_LCNS_NO(마지막) 모두 검증
         Returns: True = 불일치 감지(Delete 의심), False = 정상
         """
         if not pivots:
@@ -211,9 +212,9 @@ class DiffCrawlerEngine:
                 expected_last_lcns_no = ""
             try:
                 # 첫 번째 행 검증
-                res = self.api_client.fetch_data(self.service_id, idx, idx)
+                res = await self.api_client.fetch_data(self.service_id, idx, idx)
                 # WAF 차단 방지: 피벗 샘플링 API 호출 직후 Jitter 적용
-                time.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+                await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
                 items = res.get(self.service_id, {}).get("row", [])
                 if not items:
                     continue
@@ -225,11 +226,11 @@ class DiffCrawlerEngine:
                     )
                     return True
 
-                # ✅ [개선] 마지막 행 검증 (LAST_LCNS_NO 저장된 경우만)
+                # ✅ 마지막 행 검증 (LAST_LCNS_NO 저장된 경우만)
                 if expected_last_lcns_no:
-                    last_res = self.api_client.fetch_data(self.service_id, idx + PAGE_SIZE - 1, idx + PAGE_SIZE - 1)
+                    last_res = await self.api_client.fetch_data(self.service_id, idx + PAGE_SIZE - 1, idx + PAGE_SIZE - 1)
                     # WAF 차단 방지: 피벗 샘플링 마지막 행 API 호출 직후 Jitter 적용
-                    time.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+                    await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
                     last_items = last_res.get(self.service_id, {}).get("row", [])
                     if last_items:
                         actual_last_lcns_no = last_items[0].get("LCNS_NO", "")
@@ -247,27 +248,27 @@ class DiffCrawlerEngine:
 
     # ─── 델타 감지 ────────────────────────────────────────────────────────────
 
-    def scan_for_updates(self):
+    async def scan_for_updates(self):
         """주기적으로 실행되어 차분(Delta)을 감지합니다."""
+        import time
         svc = self.service_id
         start_time = time.time()
         state = self.state_repo.load_state(self.service_id)
 
         if state["last_total_count"] == 0:
             logger.info(f"[{svc}] 최초 실행: 베이스라인 부트스트랩을 시작합니다...")
-            state = self.bootstrap()
+            state = await self.bootstrap()
             return []  # 부트스트랩 시에는 데이터를 가져오지 않고 베이스라인만 구축
 
         old_tail = state["last_total_count"]
 
         # find_true_tail 내부에서 Ping → 지수점프 → 이진탐색 → Gap스캔 전체 처리
-        new_tail = self.find_true_tail(known_tail=old_tail)
+        new_tail = await self.find_true_tail(known_tail=old_tail)
 
         if new_tail <= old_tail:
             elapsed = time.time() - start_time
-            # ✅ [개선] Delete 은폐 감지: Tail이 같아도 Insert+Delete가 동시 발생했을 수 있음
-            # 피벗의 일부(PIVOT_SAMPLE_RATIO)를 샘플링하여 내부 Shift 발생 여부 확인
-            changed = self._sample_check_pivots(state.get("pivots", {}))
+            # ✅ Delete 은폐 감지: Tail이 같아도 Insert+Delete가 동시 발생했을 수 있음
+            changed = await self._sample_check_pivots(state.get("pivots", {}))
             if changed:
                 logger.warning(
                     f"[{svc}] ⚠️ [Delete 은폐 감지] Tail 변동 없으나 피벗 불일치! "
@@ -297,7 +298,7 @@ class DiffCrawlerEngine:
             old_data = pivots[str(p_idx)]
             found_offset = current_shift
             for offset in range(current_shift, diff_count + 1):
-                row = self._fetch_single(p_idx + offset)
+                row = await self._fetch_single(p_idx + offset)
                 if row and row.get("LCNS_NO") == old_data["LCNS_NO"] and row.get("CHNG_DT") == old_data["CHNG_DT"]:
                     found_offset = offset
                     break
@@ -331,7 +332,7 @@ class DiffCrawlerEngine:
             current_start = new_start
             while current_start <= new_end:
                 current_end = min(current_start + PAGE_SIZE - 1, new_end)
-                rows = self._fetch_page(current_start, current_end)
+                rows = await self._fetch_page(current_start, current_end)
                 fetched_rows.extend(rows)
                 current_start += PAGE_SIZE
 
@@ -355,10 +356,10 @@ class DiffCrawlerEngine:
             (max_pivot + shift_amounts.get(max_pivot, diff_count)) // settings.PIVOT_INTERVAL + 1
         ) * settings.PIVOT_INTERVAL
         while next_pivot < new_tail:
-            row = self._fetch_single(next_pivot)
+            row = await self._fetch_single(next_pivot)
             if row:
-                # ✅ [개선] Boundary 양방향 저장
-                last_row = self._fetch_single(next_pivot + PAGE_SIZE - 1)
+                # ✅ Boundary 양방향 저장
+                last_row = await self._fetch_single(next_pivot + PAGE_SIZE - 1)
                 new_pivots[str(next_pivot)] = {
                     "LCNS_NO": row.get("LCNS_NO", ""),
                     "LAST_LCNS_NO": last_row.get("LCNS_NO", "") if last_row else "",
