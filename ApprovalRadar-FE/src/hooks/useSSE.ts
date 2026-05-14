@@ -85,7 +85,7 @@ export function useSSE() {
           if (data.type === 'UPDATE') {
             await handleUpdateEvent();
           }
-        } catch (err) {
+        } catch {
           // JSON 파싱 실패 시 기존 텍스트 메시지 방식 호환 처리
           if (event.data === '신규 업데이트가 발생했다') {
             await handleUpdateEvent();
