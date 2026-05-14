@@ -4,8 +4,8 @@ import { useToastStore } from '@/store/useToastStore';
 import { playNotificationSound } from '@/lib/audio';
 import { fetchApprovals } from '@/lib/api';
 import { CATEGORY_NAMES } from '@/lib/constants';
-import { emitSystemAlert } from '@/components/ui/SystemAlertPopup';
-import type { SystemAlertType } from '@/components/ui/SystemAlertPopup';
+import { emitSystemAlert } from '@/lib/systemAlertEmitter';
+import type { SystemAlertType } from '@/lib/systemAlertEmitter';
 
 declare global {
   interface Window {

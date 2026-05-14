@@ -6,7 +6,8 @@ import { LogPage } from '@/pages/LogPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { ToastProvider } from '@/components/ui/toast';
 import { useSSE } from '@/hooks/useSSE';
-import { SystemAlertPopup, emitSystemAlert } from '@/components/ui/SystemAlertPopup';
+import { SystemAlertPopup } from '@/components/ui/SystemAlertPopup';
+import { emitSystemAlert } from '@/lib/systemAlertEmitter';
 
 // 전역 개발자 도구 타입 선언
 declare global {

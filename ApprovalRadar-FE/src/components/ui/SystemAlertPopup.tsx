@@ -1,41 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Warning, XCircle, X } from '@phosphor-icons/react';
+import {
+  _addAlertListener,
+  _removeAlertListener,
+} from '@/lib/systemAlertEmitter';
+import type { SystemAlertItem } from '@/lib/systemAlertEmitter';
 
-// ─── 타입 ──────────────────────────────────────────────────────────────────
-
-export type SystemAlertType = 'WARN' | 'ALERT';
-
-export interface SystemAlertItem {
-  id: number;
-  type: SystemAlertType;
-  message: string;
-}
-
-// ─── 전역 팝업 큐 관리 ─────────────────────────────────────────────────────
-
-type AlertListener = (item: SystemAlertItem) => void;
-let _nextId = 1;
-const _listeners: Set<AlertListener> = new Set();
-
-export function emitSystemAlert(type: SystemAlertType, message: string) {
-  const item: SystemAlertItem = { id: _nextId++, type, message };
-  _listeners.forEach((fn) => fn(item));
-}
+// ─── 팝업 큐 훅 ───────────────────────────────────────────────────────────
 
 function useSystemAlertQueue() {
   const [queue, setQueue] = useState<SystemAlertItem[]>([]);
 
   useEffect(() => {
-    const listener: AlertListener = (item) => {
+    const listener = (item: SystemAlertItem) => {
       setQueue((prev) => [...prev, item]);
-      // 7초 후 자동 소멸
       setTimeout(() => {
         setQueue((prev) => prev.filter((a) => a.id !== item.id));
       }, 7000);
     };
-    _listeners.add(listener);
-    return () => { _listeners.delete(listener); };
+    _addAlertListener(listener);
+    return () => { _removeAlertListener(listener); };
   }, []);
 
   const dismiss = (id: number) => setQueue((prev) => prev.filter((a) => a.id !== id));
@@ -43,7 +28,7 @@ function useSystemAlertQueue() {
   return { queue, dismiss };
 }
 
-// ─── 개별 팝업 ─────────────────────────────────────────────────────────────
+// ─── 개별 팝업 카드 ───────────────────────────────────────────────────────
 
 function AlertPopupCard({
   item,
@@ -55,7 +40,6 @@ function AlertPopupCard({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [progress, setProgress] = useState(100);
 
-  // 프로그레스 바 (7초 카운트다운)
   useEffect(() => {
     const start = Date.now();
     const duration = 7000;
@@ -111,7 +95,7 @@ function AlertPopupCard({
         {styles.icon}
         <div className="flex-1 min-w-0">
           <p className={`text-xs font-bold mb-0.5 ${styles.label}`}>{styles.labelText}</p>
-          <p className="text-xs text-text-secondary leading-relaxed break-words">{item.message}</p>
+          <p className="text-xs text-text-secondary leading-relaxed overflow-wrap-break-word">{item.message}</p>
         </div>
         <button
           onClick={onDismiss}
