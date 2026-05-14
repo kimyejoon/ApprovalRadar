@@ -87,10 +87,11 @@ _shutdown_flag = threading.Event()
 
 def _run_server(port: int) -> None:
     """uvicorn 서버를 현재 스레드에서 실행 (blocking)"""
+    # pyrefly: ignore [missing-import]
     import uvicorn
     from main import app
 
-    loop = "asyncio" if sys.platform == "win32" else "uvloop"
+    loop = "asyncio"  # PyInstaller 번들에서 uvloop 동적 라이브러리 로딩 불안정 → asyncio 고정
 
     config = uvicorn.Config(
         app=app,

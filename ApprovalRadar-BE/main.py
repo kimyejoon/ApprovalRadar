@@ -93,8 +93,11 @@ async def lifespan(app: FastAPI):
     ).start()
     
     # 즉시 종료 시그널 핸들러 등록 (Ctrl+C가 SSE 연결로 인해 block되는 현상 방지)
-    signal.signal(signal.SIGINT, _handle_sigint)
-    signal.signal(signal.SIGTERM, _handle_sigint)
+    # PyInstaller 환경에서 uvicorn이 서브스레드로 실행될 때는 signal 설정 불가
+    import threading as _threading
+    if _threading.current_thread() is _threading.main_thread():
+        signal.signal(signal.SIGINT, _handle_sigint)
+        signal.signal(signal.SIGTERM, _handle_sigint)
     
     start_scheduler()
     
@@ -119,9 +122,6 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the Food Safety Data API"}
 
 # Include API Router
 app.include_router(api_router)
@@ -136,5 +136,11 @@ else:
 
 _dist_dir = _static_base / "dist"
 if _dist_dir.exists():
+    # pyrefly: ignore [missing-import]
     from fastapi.staticfiles import StaticFiles
     app.mount("/", StaticFiles(directory=str(_dist_dir), html=True), name="spa")
+else:
+    # dist/ 없는 개발 환경 폴백
+    @app.get("/")
+    def read_root():
+        return {"message": "Welcome to the Food Safety Data API (dev mode, no FE build)"}

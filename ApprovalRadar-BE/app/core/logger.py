@@ -1,9 +1,22 @@
 import logging
 import os
+import sys
 import json
 import sqlite3
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
+
+
+def _get_app_base_dir() -> str:
+    """실행 환경에 따른 앱 기준 디렉토리 반환.
+    - PyInstaller 번들: exe 옆 폴더 (sys.executable 기준)
+    - 개발 환경: 소스 루트 폴더 (__file__ 기준)
+    """
+    if getattr(sys, 'frozen', False):
+        # PyInstaller: exe 위치 기준 (임시 압축해제 폴더 아님)
+        return os.path.dirname(sys.executable)
+    # 개발: logger.py → app/core/ → app/ → BE루트
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class SQLiteHandler(logging.Handler):
     """
@@ -97,7 +110,7 @@ def setup_logger(name: str = "ApprovalRadar") -> logging.Logger:
         logger.addHandler(console_handler)
         
         # 2. File Handler (물리 파일 저장용)
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        base_dir = _get_app_base_dir()
         log_dir = os.path.join(base_dir, "logs")
         os.makedirs(log_dir, exist_ok=True)
         
@@ -114,7 +127,7 @@ def setup_logger(name: str = "ApprovalRadar") -> logging.Logger:
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
         
-        # 3. DB Handler (SQLite)
+        # 3. DB Handler (SQLite) — database.py와 동일한 경로 로직
         db_path = os.path.join(base_dir, "food_safety.db")
         db_handler = SQLiteHandler(db_path)
         db_handler.setFormatter(db_formatter)

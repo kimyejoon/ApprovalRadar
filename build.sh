@@ -47,6 +47,15 @@ python3 -c "import sys; assert sys.version_info >= (3,11), 'Python 3.11+ 필요'
 
 success "요구사항 충족"
 
+# ── macOS libexpat 충돌 자동 해결 ─────────────────────────────────────────────
+# Python 3.12+ Homebrew 빌드가 macOS 구버전 libexpat과 충돌하는 문제 방지
+# (pyexpat, ensurepip, pip 모두 이 라이브러리에 의존)
+EXPAT_LIB="/opt/homebrew/opt/expat/lib"
+if [ -d "$EXPAT_LIB" ]; then
+    export DYLD_LIBRARY_PATH="$EXPAT_LIB:${DYLD_LIBRARY_PATH}"
+    info "Homebrew expat 경로 적용 → $EXPAT_LIB"
+fi
+
 # ── STEP 1: FE 빌드 ───────────────────────────────────────────────────────────
 step "STEP 1 / 4 — 프론트엔드 빌드"
 
@@ -80,13 +89,16 @@ if [ ! -d "$VENV_DIR" ]; then
     python3 -m venv "$VENV_DIR"
 fi
 
+PYTHON_BIN="$VENV_DIR/bin/python3"
+PIP_BIN="$VENV_DIR/bin/pip"
+
 # shellcheck disable=SC1091
 source "$VENV_DIR/bin/activate"
 
 info "의존성 설치 중..."
-pip install --quiet --upgrade pip
-pip install --quiet -r requirements.txt
-pip install --quiet pyinstaller
+"$PIP_BIN" install --quiet --upgrade pip
+"$PIP_BIN" install --quiet -r requirements.txt
+"$PIP_BIN" install --quiet pyinstaller
 
 success "Python 환경 구성 완료"
 
@@ -95,7 +107,10 @@ step "STEP 4 / 4 — PyInstaller 빌드 (단일 exe)"
 
 cd "$BE_DIR"
 info "PyInstaller 빌드 시작... (수 분 소요될 수 있습니다)"
-pyinstaller ApprovalRadar.spec --clean --noconfirm
+# iCloud Drive 환경에서 --clean 타이밍 문제 방지: 빌드 전 수동 삭제
+rm -rf "$BE_DIR/build" "$BE_DIR/dist"
+"$VENV_DIR/bin/pyinstaller" ApprovalRadar.spec --noconfirm
+
 
 EXE_PATH="$BE_DIR/dist/ApprovalRadar"
 [ -f "$EXE_PATH" ] || error "PyInstaller 빌드 실패: 실행파일이 생성되지 않았습니다."
