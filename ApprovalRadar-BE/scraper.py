@@ -27,7 +27,7 @@ def run_scraper_for_service(service_id: str):
 
     # 키 소진 상태 사전 체크 (10분마다 스케줄러 재실행에서 반복 오류 방지)
     if ApiClient.is_exhausted():
-        logger.info(f"[{service_id}] API 키 소진 상태 → 스킵 (자정 후 자동 재개)")
+        logger.info(f"[{service_id}] API 키 소진 상태 → 스킵 (10분 후 Key Status 재조회 예정)")
         return
 
     logger.info(f"Starting DiffCrawler Delta Sync Job for {service_id}...")

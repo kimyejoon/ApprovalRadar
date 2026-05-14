@@ -9,6 +9,7 @@ Gap 분석 개선사항 #1, #2, #3에 대한 설정 값 검증
 """
 import os
 import importlib
+# pyrefly: ignore [missing-import]
 import pytest
 
 
@@ -17,11 +18,13 @@ class TestHttpxAvailability:
 
     def test_httpx_importable(self):
         """httpx가 임포트 가능한지 확인 (requests 대체)"""
+        # pyrefly: ignore [missing-import]
         import httpx
         assert httpx is not None
 
     def test_httpx_version_sufficient(self):
         """httpx 버전이 0.28 이상인지 확인"""
+        # pyrefly: ignore [missing-import]
         import httpx
         major, minor, *_ = httpx.__version__.split(".")
         assert (int(major), int(minor)) >= (0, 28), f"httpx 버전 부족: {httpx.__version__}"

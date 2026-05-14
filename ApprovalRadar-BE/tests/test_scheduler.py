@@ -80,7 +80,7 @@ class TestSchedulerJobRegistration:
             "backfill_job이 6시간 간격이 아님"
 
     def test_key_recovery_job_registered(self):
-        """key_recovery_job이 30분 간격으로 등록되는지 확인"""
+        """key_recovery_job이 10분 간격으로 등록되는지 확인 (소진 후 10분마다 재시도)"""
         from apscheduler.schedulers.background import BackgroundScheduler
 
         registered_jobs = {}
@@ -97,4 +97,5 @@ class TestSchedulerJobRegistration:
             sched_module.start_scheduler()
 
         assert "key_recovery_job" in registered_jobs, "key_recovery_job 미등록"
-        assert registered_jobs["key_recovery_job"].get("minutes") == 30
+        assert registered_jobs["key_recovery_job"].get("minutes") == 10, \
+            "key_recovery_job이 10분 간격이 아님 (소진 후 10분 재시도 요구사항)"

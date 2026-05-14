@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 import httpx
 import threading
 import datetime
@@ -75,13 +76,11 @@ class ApiClient:
 
     @classmethod
     def mark_exhausted(cls):
-        """오늘 키가 모두 소진됨. 내일 자정까지 소진 상태로 마크."""
+        """모든 키 소진. 10분 후 재시도 가능 상태로 마크 (자정 고정 X → 일찍 회복 시 즉시 재개)."""
         with cls._class_lock:
             now = datetime.datetime.now()
-            tomorrow = (now + datetime.timedelta(days=1)).replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
-            cls._exhausted_until = tomorrow
+            # 10분 후에 다시 체크. key_recovery_job이 10분마다 실제 API 찔러봄
+            cls._exhausted_until = now + datetime.timedelta(minutes=10)
 
     @classmethod
     def _increment_usage(cls, key: str):
@@ -120,6 +119,7 @@ class ApiClient:
         if not cls.is_exhausted():
             return False
 
+        # pyrefly: ignore [missing-import]
         import httpx as req_lib
         logger.info("[키 회복 체크] 소진된 키 활성화 여부 확인 중...")
         active_masked: set[str] = set()
