@@ -59,21 +59,21 @@ function AlertPopupCard({
 
   const styles = isWarn
     ? {
-        border: 'border-yellow-500/40',
-        bg: 'bg-yellow-500/10',
-        icon: <Warning className="w-4 h-4 text-yellow-400 shrink-0" weight="fill" />,
-        bar: 'bg-yellow-400',
-        label: 'text-yellow-300',
-        labelText: '⚠ 경고',
-      }
+      border: 'border-yellow-500/40',
+      bg: 'bg-yellow-500/10',
+      icon: <Warning className="w-4 h-4 text-yellow-400 shrink-0" weight="fill" />,
+      bar: 'bg-yellow-400',
+      label: 'text-yellow-300',
+      labelText: '⚠ 경고',
+    }
     : {
-        border: 'border-red-500/50',
-        bg: 'bg-red-500/10',
-        icon: <XCircle className="w-4 h-4 text-red-400 shrink-0" weight="fill" />,
-        bar: 'bg-red-500',
-        label: 'text-red-300',
-        labelText: '🚨 오류',
-      };
+      border: 'border-red-500/50',
+      bg: 'bg-red-500/10',
+      icon: <XCircle className="w-4 h-4 text-red-400 shrink-0" weight="fill" />,
+      bar: 'bg-red-500',
+      label: 'text-red-300',
+      labelText: '🚨 오류',
+    };
 
   return (
     <motion.div
@@ -115,7 +115,7 @@ export function SystemAlertPopup() {
   const { queue, dismiss } = useSystemAlertQueue();
 
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 items-end pointer-events-none">
+    <div className="fixed bottom-6 right-6 z-9999 flex flex-col gap-2 items-end pointer-events-none">
       <AnimatePresence mode="sync">
         {queue.map((item) => (
           <div key={item.id} className="pointer-events-auto">

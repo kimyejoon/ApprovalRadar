@@ -61,3 +61,28 @@ class IndicatorsData(BaseModel):
 class IndicatorsResponse(BaseModel):
     status: str
     data: IndicatorsData
+
+
+# ─── 메모 스키마 ──────────────────────────────────────────────────────────────
+
+class MemoModel(BaseModel):
+    id: int
+    license_date: str
+    business_name: str
+    content: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+class MemoResponse(BaseModel):
+    status: str
+    data: Optional[MemoModel] = None
+
+class MemoCreateRequest(BaseModel):
+    license_date: str
+    business_name: str
+    content: str
+
+class MemoUpdateRequest(BaseModel):
+    license_date: str
+    business_name: str
+    content: str

@@ -90,6 +90,20 @@ def init_db():
     if "read_at" not in biz_columns:
         cursor.execute("ALTER TABLE businesses ADD COLUMN read_at TEXT")
 
+    # 인허가 변동건 메모 테이블 (license_date + business_name 당 1건)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS business_memos (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            license_date  TEXT NOT NULL,
+            business_name TEXT NOT NULL,
+            content       TEXT NOT NULL,
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(license_date, business_name)
+        )
+    ''')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_business_memos_key ON business_memos (license_date, business_name);')
+
     if has_crawler_state:
         cursor.execute("PRAGMA table_info(crawler_state)")
         columns = [row[1] for row in cursor.fetchall()]
