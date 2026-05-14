@@ -8,6 +8,12 @@ from app.core.events import shutdown_event
 
 PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
 
+# total_count 필드가 신뢰 가능한 서비스 목록
+# → 1회 API 호출로 정확한 Tail을 바로 얻을 수 있음 (페이지 스캔 불필요)
+# I2859/I2500: total_count 신뢰 불가 (API 버그로 9 등 엉뚱한 값 반환)
+# I2861: 음식점업소 인허가변경 - 이벤트 로그 append 구조로 total_count가 정확함
+RELIABLE_TOTAL_COUNT_SERVICES = {"I2861"}
+
 
 class DiffCrawlerEngine:
     def __init__(self, api_client: ApiClient, service_id: str):
@@ -49,19 +55,30 @@ class DiffCrawlerEngine:
 
     def find_true_tail(self, known_tail: int = 0) -> int:
         """
-        페이지 기반으로 실제 마지막 레코드 번호(Tail)를 탐색합니다.
+        서비스별 Tail 탐색 전략을 선택합니다:
+        - RELIABLE_TOTAL_COUNT_SERVICES (I2861 등): total_count 1회 조회로 즉시 확보
+        - I2859/I2500 등: 페이지 기반 스캔 (total_count 신뢰 불가)
 
-        알고리즘:
-        1. known_tail이 있으면 해당 페이지 경계부터 시작 (이미 알려진 꼬리 활용)
-        2. 1000건씩 점프하며 "다음 페이지가 존재하는가?"를 확인
-        3. 빈 페이지가 나타나면 → 직전 페이지의 실제 마지막 인덱스 = Tail
-
-        특성:
-        - API TOTAL_COUNT 필드 사용 안 함 (신뢰 불가)
-        - WAF 친화적: 1000건 단위 벌크 요청만 사용 (개별 건 조회 없음)
-        - DB 저장 tail에서 재개하므로 라이프사이클 간 중복 탐색 없음
+        known_tail: DB에 저장된 이전 tail (0이면 최초 실행)
         """
         svc = self.service_id
+
+        # ── 전략 A: total_count 직접 신뢰 서비스 ─────────────────────────────
+        if svc in RELIABLE_TOTAL_COUNT_SERVICES:
+            logger.info(f"[{svc}][Bootstrapper] 전체 데이터 건수 확인 중... (total_count 직접 조회)")
+            res = self.api_client.fetch_data(svc, 1, 1, timeout=10)
+            if res and svc in res:
+                block = res[svc]
+                code = block['RESULT']['CODE']
+                if code in ("INFO-000", "INFO-200"):
+                    total_count = int(block.get("TOTAL_COUNT", 0))
+                    if total_count > 0:
+                        logger.info(f"[{svc}][Bootstrapper] Tail 확정: {total_count:,}건 (total_count 직접)")
+                        return total_count
+            logger.warning(f"[{svc}][Bootstrapper] total_count 읽기 실패. 페이지 스캔으로 폴백합니다.")
+            # 폴백: 아래 페이지 스캔으로 진행
+
+        # ── 전략 B: 페이지 기반 스캔 (I2859, I2500 등) ───────────────────────
         logger.info(f"[{svc}][Bootstrapper] 전체 데이터 건수 확인 중... (페이지 기반 엔드-페이지 탐색)")
 
         # 알려진 Tail의 마지막 완전 페이지 경계부터 시작
@@ -88,7 +105,6 @@ class DiffCrawlerEngine:
 
             if row_count == 0:
                 # 이 페이지에 데이터가 없음 → 이전 page_start - 1 이 Tail
-                # (직전 페이지가 가득 찼을 때 발생)
                 tail = page_start - 1
                 logger.info(f"[{svc}][Bootstrapper] Tail 확정: {tail:,}건 (빈 페이지 도달)")
                 return tail if tail > 0 else 0

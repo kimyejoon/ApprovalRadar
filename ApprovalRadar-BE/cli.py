@@ -14,9 +14,14 @@ def check_keys():
     client.check_keys_status()
 
 def test_tail():
-    print("현재 데이터의 꼬리(Tail) 지점을 조회합니다 (API TOTAL_COUNT 직접 조회)...")
+    import time
+    print("현재 데이터의 꼬리(Tail) 지점을 조회합니다 (서비스별 최적 전략)...")
     client = ApiClient()
-    for service_id in ["I2859", "I2500"]:
+    services = ["I2859", "I2500", "I2861"]
+    for i, service_id in enumerate(services):
+        if i > 0:
+            print(f"  (다음 서비스 전 3초 대기 - WAF 방지)")
+            time.sleep(3)
         crawler = DiffCrawlerEngine(api_client=client, service_id=service_id)
         tail = crawler.find_true_tail()
         print(f"  [{service_id}] 현재 전체 데이터 건수: {tail:,}건")
