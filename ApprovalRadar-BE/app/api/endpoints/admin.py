@@ -205,23 +205,29 @@ async def websocket_log_stream(websocket: WebSocket):
     - `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
     """
     await websocket.accept()
-    log_broadcaster.connect(websocket)
-    logger.info(f"[WebSocket 로그] 클라이언트 연결됨. 현재 연결 수: {len(log_broadcaster._sockets)}")
+
+    # 이 연결 전용 Queue 생성 후 브로드캐스터에 등록
+    queue: asyncio.Queue = asyncio.Queue()
+    log_broadcaster.add_queue(queue)
+    logger.info(f"[WebSocket 로그] 클라이언트 연결됨. 현재 연결 수: {log_broadcaster.queue_count}")
 
     try:
-        # 연결 유지: 클라이언트가 끊을 때까지 대기
         while True:
-            await asyncio.sleep(30)
-            # Keep-alive ping
-            await websocket.send_text(json.dumps({
-                "timestamp": "",
-                "level": "PING",
-                "message": "keep-alive"
-            }))
+            try:
+                # 큐에서 메시지 대기 (30초 타임아웃 → keep-alive ping)
+                message = await asyncio.wait_for(queue.get(), timeout=30.0)
+                await websocket.send_text(message)
+            except asyncio.TimeoutError:
+                # 30초 동안 로그 없으면 keep-alive ping 전송
+                await websocket.send_text(json.dumps({
+                    "timestamp": "",
+                    "level": "PING",
+                    "message": "keep-alive"
+                }))
     except WebSocketDisconnect:
         pass
     except Exception:
         pass
     finally:
-        log_broadcaster.disconnect(websocket)
+        log_broadcaster.remove_queue(queue)
         logger.info("[WebSocket 로그] 클라이언트 연결 해제.")

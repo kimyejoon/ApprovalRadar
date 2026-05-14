@@ -1,7 +1,6 @@
 import asyncio
 import threading
-from typing import List, Set
-from fastapi import WebSocket
+from typing import List
 
 shutdown_event = threading.Event()
 
@@ -35,57 +34,52 @@ class Broadcaster:
 
 
 class LogBroadcaster:
-    """WebSocket 클라이언트들에게 실시간 로그를 브로드캐스팅하는 클래스."""
+    """
+    Queue 기반 WebSocket 로그 브로드캐스터.
+
+    각 WebSocket 연결마다 독립적인 asyncio.Queue를 사용합니다.
+    - broadcast_log()는 call_soon_threadsafe로 Queue에 메시지를 넣습니다.
+    - WebSocket 엔드포인트는 자신의 Queue에서만 읽어 send_text()를 호출합니다.
+    - 이 분리 덕분에 WebSocket send 동시성 문제와 소켓 상태 추적 문제가 모두 해소됩니다.
+    """
+
     def __init__(self):
-        self._sockets: Set[WebSocket] = set()
+        self._queues: List[asyncio.Queue] = []
         self._lock = threading.Lock()
         self.loop = None
 
     def set_loop(self, loop: asyncio.AbstractEventLoop):
         self.loop = loop
 
-    def connect(self, ws: WebSocket):
+    def add_queue(self, queue: asyncio.Queue) -> None:
         with self._lock:
-            self._sockets.add(ws)
+            self._queues.append(queue)
 
-    def disconnect(self, ws: WebSocket):
+    def remove_queue(self, queue: asyncio.Queue) -> None:
         with self._lock:
-            self._sockets.discard(ws)
+            if queue in self._queues:
+                self._queues.remove(queue)
 
-    def broadcast_log(self, message: str):
-        """
-        동기 컨텍스트(Logger 핸들러)에서 호출.
-        연결된 모든 WebSocket 클라이언트에게 로그를 전송합니다.
+    @property
+    def queue_count(self) -> int:
+        with self._lock:
+            return len(self._queues)
 
-        호출 컨텍스트가 두 가지이므로 분기 처리:
-        - Event loop 내부 (FastAPI async 코드): create_task 사용
-        - 백그라운드 스레드 (크롤러, APScheduler): run_coroutine_threadsafe 사용
+    def broadcast_log(self, message: str) -> None:
         """
-        if not self.loop or not self._sockets:
+        로거 핸들러에서 호출됩니다 (동기 컨텍스트).
+
+        call_soon_threadsafe(q.put_nowait, message)를 사용해
+        이벤트 루프 스레드/백그라운드 스레드 어디서 호출해도 안전합니다.
+        """
+        if not self.loop:
             return
-        sockets_snapshot = list(self._sockets)
-
-        async def _send_all():
-            disconnected = set()
-            for ws in sockets_snapshot:
-                try:
-                    await ws.send_text(message)
-                except Exception:
-                    disconnected.add(ws)
-            with self._lock:
-                self._sockets -= disconnected
-
-        try:
-            running_loop = asyncio.get_running_loop()
-            if running_loop is self.loop:
-                # 이미 이벤트 루프 안 → create_task로 즉시 스케줄
-                self.loop.create_task(_send_all())
-            else:
-                # 다른 루프가 있는 경우 (거의 발생 안 함)
-                asyncio.run_coroutine_threadsafe(_send_all(), self.loop)
-        except RuntimeError:
-            # 실행 중인 루프 없음 = 백그라운드 스레드 → threadsafe 방식
-            asyncio.run_coroutine_threadsafe(_send_all(), self.loop)
+        with self._lock:
+            queues_snapshot = list(self._queues)
+        if not queues_snapshot:
+            return
+        for q in queues_snapshot:
+            self.loop.call_soon_threadsafe(q.put_nowait, message)
 
 
 broadcaster = Broadcaster()
