@@ -2,12 +2,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
+import signal
+import os as _os
 from database import init_db
 
 from app.core.logger import logger
 from app.api.router import api_router
 from app.core.scheduler import start_scheduler, shutdown_scheduler
-from app.core.events import broadcaster
+from app.core.events import broadcaster, shutdown_event
+
+def _handle_sigint(signum, frame):
+    """Ctrl+C 즉시 강제 종료 핸들러. SSE 연결이 uvicorn을 block하는 경우를 방지."""
+    logger.info("SIGINT/SIGTERM 수신: 모든 스레드를 즉시 강제 종료합니다.")
+    shutdown_event.set()
+    _os._exit(0)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,18 +31,17 @@ async def lifespan(app: FastAPI):
     from app.services.industry_filler import fill_missing_industry_types
     threading.Thread(target=fill_missing_industry_types, daemon=True, name="IndustryBackfillThread").start()
     
+    # 즉시 종료 시그널 핸들러 등록 (Ctrl+C가 SSE 연결로 인해 block되는 현상 방지)
+    signal.signal(signal.SIGINT, _handle_sigint)
+    signal.signal(signal.SIGTERM, _handle_sigint)
+    
     start_scheduler()
     
     yield
     
-    # Shutdown logic
-    from app.core.events import shutdown_event
+    # Shutdown logic (시그널 핸들러가 먼저 잡아서 이 코드는 거의 실행되지 않음)
     shutdown_event.set()
     shutdown_scheduler()
-    
-    logger.info("Forcefully terminating process to prevent thread hangs...")
-    import os
-    os._exit(0)
 
 app = FastAPI(title="Food Safety Data API", lifespan=lifespan)
 
