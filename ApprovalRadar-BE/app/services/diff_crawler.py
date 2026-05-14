@@ -1,4 +1,5 @@
 import time
+import random
 import concurrent.futures
 from app.core.config import settings
 from app.clients.foodsafety_api import ApiClient
@@ -184,13 +185,17 @@ class DiffCrawlerEngine:
         if not pivots:
             return False
 
-        import random as _random
         pivot_items = list(pivots.items())
         sample_size = max(1, int(len(pivot_items) * self.PIVOT_SAMPLE_RATIO))
-        sampled = _random.sample(pivot_items, min(sample_size, len(pivot_items)))
+        sampled = random.sample(pivot_items, min(sample_size, len(pivot_items)))
 
-        for idx_str, expected_lcns_no in sampled:
+        for idx_str, pivot_data in sampled:
             idx = int(idx_str)
+            # pivot_data는 dict(신규) 또는 str(레거시) 형태일 수 있음
+            if isinstance(pivot_data, dict):
+                expected_lcns_no = pivot_data.get("LCNS_NO", "")
+            else:
+                expected_lcns_no = str(pivot_data)  # 레거시 문자열 포맷 호환
             try:
                 res = self.api_client.fetch_data(self.service_id, idx, idx)
                 items = res.get(self.service_id, {}).get("row", [])
@@ -200,7 +205,7 @@ class DiffCrawlerEngine:
                 if actual_lcns_no != expected_lcns_no:
                     logger.warning(
                         f"[{self.service_id}][피벗 샘플링] idx={idx} 불일치! "
-                        f"저장값={expected_lcns_no}, 현재값={actual_lcns_no}"
+                        f"저장값(LCNS_NO)={expected_lcns_no}, 현재값={actual_lcns_no}"
                     )
                     return True  # 첫 불일치 발견 즉시 반환
             except Exception as e:

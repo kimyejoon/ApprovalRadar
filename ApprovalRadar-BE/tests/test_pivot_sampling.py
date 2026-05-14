@@ -8,6 +8,7 @@ Gap 분석 개선사항 #6에 대한 Delete 은폐 감지 검증
 - 빈 pivots 시 False 반환 (안전)
 - API 오류 시 예외 미전파 (방어적 동작)
 """
+# pyrefly: ignore [missing-import]
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -63,7 +64,7 @@ class TestPivotSamplingLogic:
             "I2859": {"row": [{"LCNS_NO": "ABC-123"}]}
         }
         engine = make_engine(fetch_response=api_response)
-        pivots = {"100": "ABC-123"}  # idx=100 → LCNS_NO="ABC-123" 저장
+        pivots = {"100": {"LCNS_NO": "ABC-123", "CHNG_DT": "20250101", "BSSH_NM": "테스트업소"}}  # dict 포맷 (bootstrap과 동일)
 
         result = engine._sample_check_pivots(pivots)
         assert result is False, "피벗 일치인데 True 반환 → 오탐"
@@ -74,7 +75,7 @@ class TestPivotSamplingLogic:
             "I2859": {"row": [{"LCNS_NO": "XYZ-999"}]}  # 다른 값
         }
         engine = make_engine(fetch_response=api_response)
-        pivots = {"100": "ABC-123"}  # 저장값: ABC-123, 실제: XYZ-999
+        pivots = {"100": {"LCNS_NO": "ABC-123", "CHNG_DT": "20250101", "BSSH_NM": "서로다른업소"}}  # 저장값: ABC-123, 실제: XYZ-999
 
         result = engine._sample_check_pivots(pivots)
         assert result is True, "피벗 불일치인데 False 반환 → Delete 감지 실패"
@@ -82,7 +83,7 @@ class TestPivotSamplingLogic:
     def test_api_error_does_not_raise(self):
         """API 조회 실패 시 예외가 전파되지 않고 False(건너뜀) 처리되어야 함"""
         engine = make_engine(fetch_side_effect=Exception("API 오류"))
-        pivots = {"100": "ABC-123"}
+        pivots = {"100": {"LCNS_NO": "ABC-123", "CHNG_DT": "20250101", "BSSH_NM": "테스트"}}
 
         # 예외 없이 실행되어야 함
         result = engine._sample_check_pivots(pivots)
@@ -94,8 +95,8 @@ class TestPivotSamplingLogic:
 
         api_response = {"I2859": {"row": [{"LCNS_NO": "MATCH"}]}}
         engine = make_engine(fetch_response=api_response)
-        # 피벗 LCNS_NO를 모두 MATCH로 세팅 (전부 일치)
-        pivots = {str(i): "MATCH" for i in range(100, 200)}  # 100개
+        # 피벗 LCNS_NO를 모두 MATCH로 세팅 (전부 일치) — dict 포맷
+        pivots = {str(i): {"LCNS_NO": "MATCH", "CHNG_DT": "20250101", "BSSH_NM": ""} for i in range(100, 200)}  # 100개
 
         engine._sample_check_pivots(pivots)
 
@@ -108,7 +109,7 @@ class TestPivotSamplingLogic:
         """API 응답에 row가 없으면 해당 피벗은 건너뛰고 False 반환"""
         api_response = {"I2859": {"row": []}}  # 빈 row
         engine = make_engine(fetch_response=api_response)
-        pivots = {"100": "ABC-123"}
+        pivots = {"100": {"LCNS_NO": "ABC-123", "CHNG_DT": "20250101", "BSSH_NM": ""}}  # dict 포맷
 
         result = engine._sample_check_pivots(pivots)
         assert result is False, "빈 row에서 오탐 발생"
