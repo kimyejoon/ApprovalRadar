@@ -16,6 +16,10 @@ export function useLogStream() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // onclose에서 connect를 직접 참조하면 useCallback deps 자기참조 lint 오류 발생
+  // → ref를 통해 간접 참조하여 해결
+  const connectRef = useRef<(() => void) | null>(null);
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
@@ -42,14 +46,17 @@ export function useLogStream() {
 
     ws.onclose = () => {
       setIsConnected(false);
-      // 5초 후 자동 재연결
-      reconnectTimerRef.current = setTimeout(connect, 5000);
+      // connectRef로 간접 참조 → 자기참조 없이 재연결
+      reconnectTimerRef.current = setTimeout(() => connectRef.current?.(), 5000);
     };
 
     ws.onerror = () => {
       ws.close();
     };
   }, []);
+
+  // connectRef를 항상 최신 connect 함수로 유지
+  connectRef.current = connect;
 
   const disconnect = useCallback(() => {
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
