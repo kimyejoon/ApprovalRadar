@@ -30,12 +30,25 @@ def run_backfill():
     from app.services.industry_filler import fill_missing_industry_types
     fill_missing_industry_types()
 
+def test_stream_update():
+    print("가상의 SSE 업데이트 이벤트를 트리거합니다...")
+    try:
+        import requests
+        response = requests.post("http://localhost:8000/api/v1/stream/test-trigger")
+        if response.status_code == 200:
+            print("✅ SSE 이벤트 브로드캐스트 트리거 성공!")
+        else:
+            print(f"❌ 트리거 실패 (Status: {response.status_code})")
+    except Exception as e:
+        print(f"❌ 요청 중 오류 발생: {e}\n(서버가 http://localhost:8000 에서 켜져있는지 확인해주세요)")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ApprovalRadar Backend CLI Tools")
     parser.add_argument("--check-keys", action="store_true", help="등록된 API 키들의 유효성 및 한도 초과 여부를 점검합니다.")
     parser.add_argument("--test-tail", action="store_true", help="현재 외부 API 데이터의 총 건수(Tail) 위치를 이진 탐색으로 확인합니다.")
     parser.add_argument("--run-sync", action="store_true", help="수동으로 1회 크롤링(차분 동기화)을 실행하여 DB에 반영합니다.")
     parser.add_argument("--backfill", action="store_true", help="누락된 세부업종(industry_type) 데이터를 공공API 단건 조회를 통해 채웁니다.")
+    parser.add_argument("--test-stream-update", action="store_true", help="로컬 서버에 가상의 업데이트 신호를 발생시켜 SSE 이벤트를 테스트합니다.")
     
     args = parser.parse_args()
     
@@ -47,5 +60,7 @@ if __name__ == "__main__":
         run_sync()
     elif args.backfill:
         run_backfill()
+    elif args.test_stream_update:
+        test_stream_update()
     else:
         parser.print_help()

@@ -39,3 +39,34 @@
 * 사용자의 요청에 따라 엑셀의 '인허가시각' 항목이 DB의 `last_event_date`(최종변경일자)와 매핑되도록 연결값을 수정하여, 파라미터 필터 조건과 엑셀 결과값이 일치하도록 조치함.
 * 대시보드와 동일한 데이터가 추출되도록 `/export` API 엔드포인트와 내부 엑셀 생성 로직(`generate_excel_export`)에 `search` (검색 키워드) 및 `regions` (지역) 파라미터 연동을 추가함.
 * 엑셀 다운로드 시 직관적인 확인을 위해 기존 '인허가시각' 컬럼을 '최초인허가일'(`license_date`)과 '변동인허가일'(`last_event_date`) 두 개의 컬럼으로 분리하여 표기하도록 수정함.
+* 데이터베이스 `businesses` 테이블에 `update_type`을 기반으로 추론된 데이터를 저장하는 `infer_update_type` 컬럼을 추가하고, 기존 데이터를 규칙에 맞게 업데이트함 (상태변경, 변경민원 등). 기타 다른 update_type 값들의 존재도 확인하여 보고함.
+* `update_type`이 '변경민원'인 데이터 중 `prev_business_name`을 분석하여 '변경민원-성함:[성함]', '변경민원-주소:[주소]', '변경민원-상호명:[상호명]'으로 분류하여 `infer_update_type`에 저장하는 스크립트 작성 및 적용. 정규표현식을 사용하여 지역명 포함 상호명(예: 상계동 블루스)과 실제 주소를 정확히 구분하도록 알고리즘 설계.
+* `update_type`이 NULL인 데이터 중 `last_event_date`와 `license_date`가 일치하는 1,312건에 대해 변경 이력이 없는 최초 등록 건으로 판단하여 `infer_update_type`을 '신규등록'으로 일괄 업데이트하는 로직 추가 및 실행 완료.
+- 2026-05-13: 크롤러(scraper.py)가 향후 새로운 데이터를 수집할 때 자동으로 `infer_update_type`을 채워넣도록 로직 개선 반영 (신규등록, 초기수집, 명칭/대표자/상태 변경 자동 추론).
+- 2026-05-13: scraper.py 에서 YYYY-MM-DD 형태의 날짜 데이터가 YYYY-MM- 으로 뒷부분이 잘리는 이슈(글자수 8자 자르기 로직 오류) 원인 분석 및 하이픈 제거 후 YYYYMMDD 포맷으로 변환되도록 수정.
+- 2026-05-13: DB 스키마에 `last_event_time`, `license_time` 컬럼 추가 및 scraper.py에서 날짜 데이터의 상세 시각(시분초)을 추출해 개별 컬럼으로 저장하도록 수정.
+- 2026-05-13: 가 비어있던 나머지 1,264건의 과거 데이터에 대해 추론 규칙(초기수집, 상속, 기타 등)을 일괄 적용하여 NULL 값을 모두 제거함.
+- 2026-05-13: `infer_update_type`가 비어있던 나머지 1,264건의 과거 데이터에 대해 추론 규칙(초기수집, 상속, 기타 등)을 일괄 적용하여 NULL 값을 모두 제거함.
+- 2026-05-13: 백엔드 프로젝트(ApprovalRadar-BE)의 전반적인 API 통신 방식과 데이터베이스(SQLite) 테이블 구조, 아키텍처 특이사항 등을 상세히 분석하여 유저에게 리포트함.
+- 2026-05-13: DB의 `infer_update_type` 컬럼 값의 실제 분포를 조회하고, 정규화(카테고리/상세내용 분리) 및 지위승계 용어 통일에 대한 피드백 제공.
+- 2026-05-13: `infer_update_type` 컬럼의 정규화(분류와 상세값을 `infer_update_type`과 `infer_update_detail`로 분리)를 수행하고 기존 3,421건의 데이터를 100% 보존하며 안전하게 마이그레이션 및 적용 완료함.
+- 2026-05-13: `.gitignore`를 업데이트하여 로컬 SQLite DB 파일(`*.db`, `*.db-wal` 등)이 Git에 추적되지 않도록 설정하고 캐시를 제거함.
+- 2026-05-13: `/approvals` API의 `sort_by` 파라미터가 `phone`, `date`로 들어올 경우 각각 `phone_number`, `last_event_date`로 자동 매핑되도록 정렬 로직을 수정함.
+- 2026-05-13: Swagger(OpenAPI) 문서에서 `sort_by`, `sort_order` 파라미터가 드롭다운 메뉴로 제공되도록 Python `Enum`을 도입하여 명세를 고도화하고, `representative_name`, `business_status`, `license_no` 등 누락된 정렬 필드를 추가 허용하여 422 에러를 해결함.
+- 2026-05-13: 식품안전나라 API 일일 호출 한도 초과로 인한 크롤러 자동 중단 로그의 원인 및 해결 방안(자정 리셋 또는 추가 키 발급)을 안내함.
+- 2026-05-13: 프론트엔드 API 응답(`BusinessModel`)에서 `business_status` 필드를 제거하고 정규화된 `infer_update_type`, `infer_update_detail`을 기본으로 전달하도록 수정함.
+- 2026-05-13: `/approvals/indicators` API 응답에 전체 누적 건수(`total_approvals`), 최근 1개월 건수(`monthly_approvals`), 오늘 건수(`today_approvals`)를 각각 분리하여 제공하도록 지표 산출 로직을 개선함.
+- 2026-05-13: DB에서 `last_event_date` 기준 특정 일자(20260507, 20260508)의 데이터 수집 행(row) 개수를 조회하여 확인함.
+- 2026-05-13: `/approvals` API 응답 스키마(`BusinessModel`)에 `industry_type`(업태명) 필드를 추가하여 클라이언트에 제공되도록 수정함.
+- 2026-05-13: `/approvals` API의 `sort_by` 쿼리 파라미터 및 DB 정렬 기준에 `industry_type`을 추가하여 업태명 기준의 문자열 이름 정렬이 정상 작동하도록 허용함.
+- 2026-05-13: `/approvals` 및 `/approvals/export` API에 `infer_update_type` 쿼리 파라미터를 추가하여 프론트엔드에서 데이터 유형(신규등록, 상태변경 등)별 필터링이 가능하도록 지원함. Swagger 문서에 허용되는 값 명세 완료.
+- 2026-05-13: `GET /api/v1/approvals/detail` 라우트 신설 (`/{approval_id}` 삭제) 및 `license_date`, `business_name` 파라미터 기반 배열 조회 적용.
+- 2026-05-13: `GET /api/v1/approvals` 및 `/export` API에 `industry_type`, `infer_update_type` 다중 필터(리스트 또는 콤마 구분자) 적용 및 Swagger 명세 강화.
+- 2026-05-13: Swagger UI에서 배열 타입(`List[str]`) 파라미터가 비정상적으로 노출되거나 사라지는 이슈를 해결하기 위해 `regions` 파라미터와 동일한 의존성 파싱 구조(`Depends`)로 변경하여 단일 텍스트(콤마 구분) 입력 방식으로 수정함.
+- 2026-05-13: `/api/v1/approvals` 응답 스키마(`BusinessModel`)에 `business_status`를 다시 추가하여 요청 시 정상적으로 반환되도록 수정함.
+- 2026-05-13: `industry_type`(업종) 파라미터의 Swagger 문서 명세에 실제 데이터베이스에 존재하는 모든 업종(일반음식점, 휴게음식점, 제과점영업, 유흥주점영업, 단란주점, 위탁급식영업, 식품제조가공업)을 허용값으로 명시하도록 수정함.
+- 2026-05-13: `businesses` 테이블에 사용자의 확인 여부를 나타내는 `is_read` (기본값 0) 컬럼과 읽은 시각을 기록하는 `read_at` 컬럼을 추가하고, 이를 상태로 업데이트할 수 있는 `PUT /api/v1/readInfo` API를 생성함. 또한 Swagger 문서에 명세를 추가하고 응답 스키마에도 반영함.
+- 2026-05-13: 프론트엔드의 요청에 따라 `PUT /api/v1/readInfo` API를 `PUT /api/v1/readInfo/{license_no}` 형태의 Path 파라미터 방식으로 변경하여 RESTful 설계 규칙에 부합하도록 개선함.
+- 2026-05-13: 프론트엔드가 실시간으로 크롤러의 업데이트를 감지할 수 있도록 `GET /api/v1/stream/updates` SSE(Server-Sent Events) 엔드포인트를 구축함. 크롤러(`APScheduler`)와 FastAPI 간의 메모리 공유를 활용하여 `asyncio.Queue`와 `call_soon_threadsafe`를 통해 동기-비동기 스레드 간 충돌 없이 신규 알림("신규 업데이트가 발생했다")을 즉각 전송하도록 브로드캐스터(Broadcaster) 아키텍처를 도입함. 또한 업데이트가 없을 시 5초마다 연결 정상 시그널("현재 정상 연결중임 (보낼 업데이트 없음)")을 보내는 Heartbeat 기능과 `cli.py --test-stream-update` 명령을 통한 가상 트리거 테스트 로직을 추가함.
+- 2026-05-13: 프론트엔드 개발자가 SSE 연동 시 참고할 수 있도록 `GET /api/v1/stream/updates` API의 Swagger 문서에 시그널의 종류(Heartbeat 핑 및 신규 업데이트 알림), 발생 조건, 데이터 포맷, 프론트엔드 측 처리 방법 등을 상세하게 명세함.
+- 2026-05-13: 프론트엔드의 요청에 따라 SSE 응답 데이터를 단순 문자열(Raw Text)에서 파싱하기 쉬운 JSON 포맷(`{"type": "...", "message": "..."}`)으로 변경함.

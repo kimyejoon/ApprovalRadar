@@ -26,7 +26,13 @@ env/
 
 # SQLite
 *.db
-*.db.bak
-*.db-shm
 *.db-wal
+*.db-shm
+*.db.bak
+*.sqlite
+*.sqlite3
 backups/
+
+# Logs
+*.log
+logs/

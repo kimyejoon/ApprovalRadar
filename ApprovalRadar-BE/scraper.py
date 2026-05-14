@@ -78,13 +78,25 @@ def run_scraper_for_service(service_id: str):
                     logger.warning(f"Unknown service_id: {service_id}. Skipping row mapping.")
                     continue
 
-                if event_date and len(event_date) > 8:
-                    event_date = event_date[:8]
-                    
+                event_time = None
+                if event_date:
+                    orig_event = str(event_date).replace("-", "").replace(" ", "").replace(":", "")
+                    if len(orig_event) >= 14:
+                        event_time = orig_event[8:14]
+                    event_date = orig_event[:8]
+                        
+                license_time = None
+                if license_date:
+                    orig_license = str(license_date).replace("-", "").replace(" ", "").replace(":", "")
+                    if len(orig_license) >= 14:
+                        license_time = orig_license[8:14]
+                    license_date = orig_license[:8]
                 db_record = business_repo.get_business_by_license_no(lcns_no, conn=conn)
                 
                 if not db_record:
                     # 신규 등록
+                    infer_update_type = "신규등록" if license_date == event_date else "초기수집(과거변경있음)"
+                    infer_update_detail = None
                     record = {
                         "license_no": lcns_no,
                         "business_name": bssh_nm,
@@ -94,7 +106,11 @@ def run_scraper_for_service(service_id: str):
                         "license_date": license_date,
                         "phone_number": phone_number,
                         "industry_type": industry_type,
-                        "last_event_date": event_date
+                        "last_event_date": event_date,
+                        "infer_update_type": infer_update_type,
+                        "infer_update_detail": infer_update_detail,
+                        "last_event_time": event_time,
+                        "license_time": license_time
                     }
                     business_repo.insert_business(record, conn=conn)
                 else:
@@ -143,6 +159,19 @@ def run_scraper_for_service(service_id: str):
                         prev_business_name_val = prev_name
                         is_updated = True
                         
+                    # infer_update_type 결정 로직
+                    infer_update_type = None
+                    infer_update_detail = None
+                    if update_type == "대표자변경":
+                        infer_update_type = "대표자변경"
+                        infer_update_detail = prev_representative_name_val if prev_representative_name_val else None
+                    elif update_type == "명칭변경":
+                        infer_update_type = "명칭변경"
+                        infer_update_detail = prev_business_name_val if prev_business_name_val else None
+                    elif update_type == "상태변경":
+                        infer_update_type = "상태변경"
+                        infer_update_detail = prev_business_status_val if prev_business_status_val else None
+
                     if is_updated or (industry_type and not db_record.get("industry_type")):
                         updates = {
                             "business_name": bssh_nm,
@@ -157,7 +186,11 @@ def run_scraper_for_service(service_id: str):
                             "prev_business_status": prev_business_status_val,
                             "prev_representative_name": prev_representative_name_val,
                             "prev_business_name": prev_business_name_val,
+                            "infer_update_type": infer_update_type,
+                            "infer_update_detail": infer_update_detail,
                             "last_event_date": event_date,
+                            "last_event_time": event_time,
+                            "license_time": license_time,
                             "updated_at": now
                         }
                         business_repo.update_business(lcns_no, updates, conn=conn)
@@ -167,6 +200,11 @@ def run_scraper_for_service(service_id: str):
         
         total_elapsed = time.time() - start_time
         logger.info(f"✅ [{service_id} 총 소요시간: {total_elapsed:.2f}초] 모든 변경분({len(new_data_rows)}건)의 DB 업데이트 및 커밋 완료.")
+        
+        # 신규 데이터가 있으므로 프론트엔드로 SSE 브로드캐스트 발송
+        from app.core.events import broadcaster
+        update_data = json.dumps({"type": "UPDATE", "message": "신규 업데이트가 발생했다"}, ensure_ascii=False)
+        broadcaster.broadcast_sync(update_data)
             
     except Exception as e:
         logger.error(f"❌ {service_id} 크롤러 스케줄 작업 중 치명적인 오류 발생: {e}")

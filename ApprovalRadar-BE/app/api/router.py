@@ -1,6 +1,7 @@
 from fastapi import APIRouter
-from app.api.endpoints import approvals, health
+from app.api.endpoints import approvals, health, stream
 
 api_router = APIRouter()
 api_router.include_router(approvals.router, prefix="/api/v1/approvals", tags=["approvals"])
+api_router.include_router(stream.router, prefix="/api/v1/stream", tags=["stream"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])

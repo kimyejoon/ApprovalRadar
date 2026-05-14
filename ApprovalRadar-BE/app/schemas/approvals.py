@@ -17,6 +17,11 @@ class BusinessModel(BaseModel):
     prev_business_status: Optional[str] = None
     prev_representative_name: Optional[str] = None
     prev_business_name: Optional[str] = None
+    infer_update_type: Optional[str] = None
+    infer_update_detail: Optional[str] = None
+    industry_type: Optional[str] = None
+    is_read: Optional[int] = 0
+    read_at: Optional[str] = None
 
 class PaginationMeta(BaseModel):
     total_count: int
@@ -33,6 +38,10 @@ class SingleBusinessResponse(BaseModel):
     status: str
     data: BusinessModel
 
+class DetailListResponse(BaseModel):
+    status: str
+    data: List[BusinessModel]
+
 class IndicatorStatusDistribution(BaseModel):
     name: str
     value: int
@@ -43,6 +52,7 @@ class IndicatorTrendChart(BaseModel):
 
 class IndicatorsData(BaseModel):
     total_approvals: int
+    monthly_approvals: int
     today_approvals: int
     status_distribution: List[IndicatorStatusDistribution]
     trend_chart: List[IndicatorTrendChart]
