@@ -111,3 +111,69 @@ def fill_missing_industry_types():
 
 if __name__ == "__main__":
     fill_missing_industry_types()
+
+
+def fill_industry_for_licenses(license_nos: list[str]) -> None:
+    """
+    신규 삽입 건에 한정한 즉시(Immediate) 세부업종 Backfill.
+
+    scraper.py에서 신규 Row를 DB에 삽입한 직후 호출되어, industry_type이 비어있는
+    license_no 목록을 대상으로 I2500 API를 호출하여 세부업종을 즉시 채웁니다.
+    - 전체 DB를 재조회하지 않고 대상 license_no만 처리 (효율적)
+    - 키 소진/네트워크 오류 발생 시 6시간 주기 backfill_job에서 자동 재시도됨
+    """
+    if not license_nos:
+        return
+
+    if ApiClient.is_exhausted():
+        logger.info(
+            f"[즉시 Backfill] API 키 소진 → 스킵 ({len(license_nos)}건은 6시간 주기 backfill_job에서 재시도됩니다)"
+        )
+        return
+
+    logger.info(f"[즉시 Backfill] 신규 삽입 {len(license_nos)}건에 대해 세부업종 즉시 채우기 시작...")
+    business_repo = BusinessRepository()
+    api_client = ApiClient()
+    success_count = 0
+    fail_count = 0
+
+    for lcns_no in license_nos:
+        try:
+            res = api_client.fetch_data("I2500", 1, 1000, LCNS_NO=lcns_no)
+            if res and "I2500" in res:
+                code = res["I2500"]["RESULT"]["CODE"]
+                if code == "INFO-000":
+                    rows = res["I2500"].get("row", [])
+                    if rows:
+                        industry_type = rows[0].get("INDUTY_CD_NM", "")
+                        if industry_type:
+                            business_repo.update_industry_type(lcns_no, industry_type)
+                            success_count += 1
+                            logger.info(f"[즉시 Backfill] ✅ {lcns_no} → {industry_type}")
+                        else:
+                            fail_count += 1
+                            logger.debug(f"[즉시 Backfill] ⚠️ {lcns_no} → INDUTY_CD_NM 필드 비어있음")
+                    else:
+                        fail_count += 1
+                        logger.debug(f"[즉시 Backfill] ⚠️ {lcns_no} → I2500 응답에 데이터 없음")
+                else:
+                    fail_count += 1
+            else:
+                fail_count += 1
+        except ApiKeysExhaustedError:
+            logger.warning(
+                f"[즉시 Backfill] API 키 소진 → 작업 중단. "
+                f"잔여 {len(license_nos) - success_count - fail_count}건은 6시간 주기 backfill_job에서 재시도됩니다."
+            )
+            break
+        except Exception as e:
+            fail_count += 1
+            logger.error(f"[즉시 Backfill] ❌ {lcns_no} 처리 실패: {e}")
+
+        # WAF 차단 방지 Jitter
+        time.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+
+    logger.info(
+        f"[즉시 Backfill] 완료. 총 {len(license_nos)}건 중 성공: {success_count}건, 실패: {fail_count}건"
+    )
+

@@ -205,6 +205,8 @@ class DiffCrawlerEngine:
                 expected_lcns_no = str(pivot_data)  # 레거시 문자열 포맷 호환
             try:
                 res = self.api_client.fetch_data(self.service_id, idx, idx)
+                # WAF 차단 방지: 피벗 샘플링 API 호출 직후 Jitter 적용
+                time.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
                 items = res.get(self.service_id, {}).get("row", [])
                 if not items:
                     continue

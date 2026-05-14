@@ -214,6 +214,28 @@ def run_scraper_for_service(service_id: str):
         from app.core.events import broadcaster
         update_data = json.dumps({"type": "UPDATE", "message": "신규 업데이트가 발생했다"}, ensure_ascii=False)
         broadcaster.broadcast_sync(update_data)
+
+        # ✅ [개선] 신규 삽입 건 중 industry_type이 없는 건 즉시 Backfill 트리거
+        # - 6시간 주기 backfill_job을 기다리지 않고 SSE 브로드캐스트 직후 세부업종 채우기 시작
+        # - 데몬 스레드로 실행하여 다음 크롤링 주기 블로킹 방지
+        licenses_needing_industry = [
+            row.get("LCNS_NO")
+            for row in new_data_rows
+            if row.get("LCNS_NO") and not row.get("INDUTY_CD_NM", "")
+        ]
+        if licenses_needing_industry:
+            logger.info(
+                f"[즉시 Backfill 트리거] {len(licenses_needing_industry)}건의 신규 삽입 건에 세부업종 없음 → 즉시 Backfill 데몬 스레드 시작"
+            )
+            import threading
+            from app.services.industry_filler import fill_industry_for_licenses
+            threading.Thread(
+                target=fill_industry_for_licenses,
+                args=(licenses_needing_industry,),
+                daemon=True,
+                name=f"ImmediateBackfillThread-{service_id}"
+            ).start()
+
             
     except Exception as e:
         logger.error(f"❌ {service_id} 크롤러 스케줄 작업 중 치명적인 오류 발생: {e}")
