@@ -195,7 +195,7 @@ function AddKeyForm({ onSuccess }: { onSuccess: () => void }) {
   });
 
   return (
-    <div className="bg-surface-secondary/40 border border-border-standard rounded-xl p-5 space-y-4">
+    <div className="bg-surface/40 border border-border-standard rounded-xl p-5 space-y-4">
       <h3 className="text-sm font-medium text-text-primary flex items-center gap-2">
         <Plus className="w-4 h-4 text-brand" />
         새 API 키 등록
@@ -260,30 +260,30 @@ const NOTIFICATION_CHANNELS = [
     id: 'email',
     label: '이메일 알림',
     description: '인허가 변동 감지 시 등록된 이메일로 즉시 발송합니다.',
-    icon: <EnvelopeSimple className="w-4 h-4 text-sky-400" weight="fill" />,
+    icon: <EnvelopeSimple className="w-4 h-4 text-text-muted" weight="fill" />,
   },
   {
     id: 'slack',
     label: 'Slack 알림',
     description: 'Webhook URL을 통해 지정한 Slack 채널로 알림을 발송합니다.',
-    icon: <SlackLogo className="w-4 h-4 text-purple-400" weight="fill" />,
+    icon: <SlackLogo className="w-4 h-4 text-text-muted" weight="fill" />,
   },
   {
     id: 'kakao',
     label: '카카오 알림톡',
     description: '카카오 비즈 채널을 통해 알림톡으로 발송합니다.',
-    icon: <ChatCircle className="w-4 h-4 text-yellow-400" weight="fill" />,
+    icon: <ChatCircle className="w-4 h-4 text-text-muted" weight="fill" />,
   },
 ] as const;
 
 function NotificationSection() {
   return (
-    <Card className="border-border-standard bg-surface-primary">
+    <Card className="border-border-standard bg-surface">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-medium flex items-center gap-2">
           <Bell className="w-4 h-4 text-brand" weight="fill" />
           알림 설정
-          <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-brand/10 border border-brand/30 text-brand tracking-wide">
+          <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand/10 border border-brand/30 text-brand tracking-wide">
             준비중
           </span>
         </CardTitle>
@@ -291,7 +291,6 @@ function NotificationSection() {
       <CardContent className="space-y-3">
         <p className="text-xs text-text-muted leading-relaxed">
           인허가 변동 감지 시 원하는 채널로 즉시 알림을 받을 수 있습니다.{' '}
-          <span className="text-brand/80">현재 준비중인 기능으로, 곧 제공될 예정입니다.</span>
         </p>
 
         <div className="rounded-xl border border-border-standard overflow-hidden divide-y divide-border-standard">
@@ -312,7 +311,7 @@ function NotificationSection() {
 
               {/* 토글 + 준비중 뱃지 */}
               <div className="flex items-center gap-3 shrink-0 ml-4">
-                <span className="text-[10px] font-semibold text-text-muted/70 border border-border-standard px-2 py-0.5 rounded-full whitespace-nowrap">
+                <span className="text-[10px] font-medium text-text-muted/70 border border-border-standard px-2 py-0.5 rounded-full whitespace-nowrap">
                   준비중인 기능입니다
                 </span>
                 {/* 항상 Off 상태, disabled */}
@@ -367,40 +366,40 @@ export function SettingsPage() {
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-3 gap-4">
-        <Card className="border-border-standard bg-surface-primary">
+        <Card className="border-border-standard bg-surface">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-medium text-text-muted flex items-center gap-2">
               <Key className="w-4 h-4" />전체 키
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-text-primary">{data?.total ?? '-'}</div>
+            <div className="text-3xl font-medium text-text-primary">{data?.total ?? '-'}</div>
           </CardContent>
         </Card>
-        <Card className="border-border-standard bg-surface-primary">
+        <Card className="border-border-standard bg-surface">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-medium text-text-muted flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-brand" />활성 키
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-brand">{activeCount}</div>
+            <div className="text-3xl font-medium text-brand">{activeCount}</div>
           </CardContent>
         </Card>
-        <Card className="border-border-standard bg-surface-primary">
+        <Card className="border-border-standard bg-surface">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-medium text-text-muted flex items-center gap-2">
               <XCircle className="w-4 h-4 text-yellow-400" />소진 키
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-400">{exhaustedCount}</div>
+            <div className="text-3xl font-medium text-yellow-400">{exhaustedCount}</div>
           </CardContent>
         </Card>
       </div>
 
       {/* API 키 관리 카드 */}
-      <Card className="border-border-standard bg-surface-primary">
+      <Card className="border-border-standard bg-surface">
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-medium flex items-center justify-between">
             <span className="flex items-center gap-2">

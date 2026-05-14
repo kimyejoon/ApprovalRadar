@@ -159,7 +159,7 @@ function MemoSection({ licenseDate, businessName }: MemoSectionProps) {
         <div className="text-xs text-text-muted py-1">불러오는 중...</div>
       ) : mode === 'view' && memo ? (
         <div className="space-y-1">
-          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap break-words">
+          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap wrap-break-words">
             {memo.content}
           </p>
           <p className="text-[11px] text-text-muted">
@@ -239,8 +239,8 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
   const historyData = detailResponse?.data || [];
 
   return (
-    <Modal 
-      isOpen={isOpen} 
+    <Modal
+      isOpen={isOpen}
       onClose={onClose}
       title="인허가 이력 및 상세 정보"
       maxWidth="max-w-5xl"
@@ -254,7 +254,7 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
               <div className="text-lg font-bold text-text-primary">{selectedItem.name}</div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <a 
+              <a
                 href={`https://www.diningcode.com/list.dc?query=${encodeURIComponent(selectedItem.name)}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -264,7 +264,7 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
                 <img src="/dining_code.jpg" alt="Dining Code" className="w-4 h-4 object-contain rounded-sm" />
                 다이닝코드 검색결과
               </a>
-              <a 
+              <a
                 href={`https://map.naver.com/p/search/${encodeURIComponent(selectedItem.name)}?c=15.00,0,0,0,dh`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -345,10 +345,10 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col items-start gap-1">
-                          <span 
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border" 
-                            style={{ 
-                              color: CATEGORY_COLORS[item.infer_update_type || ''] || '#9ca3af', 
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border"
+                            style={{
+                              color: CATEGORY_COLORS[item.infer_update_type || ''] || '#9ca3af',
                               borderColor: CATEGORY_COLORS[item.infer_update_type || ''] || '#9ca3af',
                               backgroundColor: 'transparent'
                             }}
@@ -369,10 +369,10 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
                             </span>
                           )}
                           {item.business_status && (
-                             <span className="text-[11px] text-text-muted leading-tight mt-0.5">
-                               {item.business_status}
-                               {item.prev_business_status && ` (이전: ${item.prev_business_status})`}
-                             </span>
+                            <span className="text-[11px] text-text-muted leading-tight mt-0.5">
+                              {item.business_status}
+                              {item.prev_business_status && ` (이전: ${item.prev_business_status})`}
+                            </span>
                           )}
                         </div>
                       </TableCell>
@@ -398,7 +398,7 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
               </TableBody>
             </Table>
           </div>
-          
+
           <div className="pt-4 flex justify-end">
             <Button variant="ghost" onClick={onClose}>닫기</Button>
           </div>
