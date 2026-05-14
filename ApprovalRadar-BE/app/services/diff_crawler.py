@@ -71,7 +71,7 @@ class DiffCrawlerEngine:
                 block = res[svc]
                 code = block['RESULT']['CODE']
                 if code in ("INFO-000", "INFO-200"):
-                    total_count = int(block.get("TOTAL_COUNT", 0))
+                    total_count = int(block.get("total_count") or block.get("TOTAL_COUNT") or 0)
                     if total_count > 0:
                         logger.info(f"[{svc}][Bootstrapper] Tail 확정: {total_count:,}건 (total_count 직접)")
                         return total_count
