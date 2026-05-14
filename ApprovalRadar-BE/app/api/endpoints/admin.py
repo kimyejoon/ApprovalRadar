@@ -1,7 +1,10 @@
 import asyncio
 import json
+import os
 import requests as http_requests
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from datetime import datetime
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -140,6 +143,36 @@ async def get_crawler_status():
         logger.error(f"[crawler-status] DB 조회 오류: {e}")
 
     return CrawlerStatusResponse(services=services)
+
+
+# ─── 로그 파일 다운로드 엔드포인트 ──────────────────────────────────────────
+
+@router.get(
+    "/logs/download",
+    summary="오늘 날짜 로그 파일 다운로드",
+    description="오늘 날짜(YYYYMMDD) 기준 서버 로그 파일(app_YYYYMMDD.log)을 다운로드합니다.",
+)
+async def download_today_log():
+    """오늘 날짜 로그 파일을 텍스트 파일로 다운로드합니다."""
+    today = datetime.now().strftime("%Y%m%d")
+    # admin.py 기준 프로젝트 루트 탐색: app/api/endpoints/admin.py → 루트
+    base_dir = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    )
+    log_dir = os.path.join(base_dir, "logs")
+    log_file = os.path.join(log_dir, f"app_{today}.log")
+
+    if not os.path.isfile(log_file):
+        raise HTTPException(
+            status_code=404,
+            detail=f"오늘({today}) 날짜의 로그 파일이 없습니다. (경로: {log_file})"
+        )
+
+    return FileResponse(
+        path=log_file,
+        filename=f"approvalradar_{today}.log",
+        media_type="text/plain; charset=utf-8",
+    )
 
 
 # ─── 실시간 로그 WebSocket 엔드포인트 ────────────────────────────────────────

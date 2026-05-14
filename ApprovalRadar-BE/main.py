@@ -27,6 +27,21 @@ async def lifespan(app: FastAPI):
     log_broadcaster.set_loop(loop)
     logger.info("LogBroadcaster main event loop initialized.")
 
+    # uvicorn access/error 로거도 WebSocket으로 전달
+    # → "INFO: 127.0.0.1:... GET /..." 같은 uvicorn 로그가 프론트 터미널에 표시됨
+    import logging
+    from app.core.logger import WebSocketLogHandler
+    _ws_handler = WebSocketLogHandler()
+    _ws_handler.setFormatter(
+        logging.Formatter("%(asctime)s [%(levelname)s] %(name)s - %(message)s")
+    )
+    for _log_name in ("uvicorn.access", "uvicorn.error", "uvicorn"):
+        _uv_logger = logging.getLogger(_log_name)
+        # 중복 추가 방지
+        if not any(isinstance(h, WebSocketLogHandler) for h in _uv_logger.handlers):
+            _uv_logger.addHandler(_ws_handler)
+    logger.info("uvicorn 로거 → WebSocket 핸들러 연결 완료.")
+
     # Startup logic
     logger.info("Initializing Database...")
     init_db()

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Terminal,
   WifiX,
@@ -11,12 +11,15 @@ import {
   Warning,
   Database,
   ArrowsClockwise,
+  DownloadSimple,
+  FileText,
 } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { LogEntry } from '@/hooks/useLogStream';
 import { useLogStream } from '@/hooks/useLogStream';
-import { fetchKeyStatus, fetchCrawlerStatus } from '@/lib/api';
+import { fetchKeyStatus, fetchCrawlerStatus, API_BASE_URL } from '@/lib/api';
+
 
 // ─── 로그 레벨 스타일 ──────────────────────────────────────────────────────
 
@@ -157,6 +160,72 @@ function CrawlerStatusCard() {
   );
 }
 
+// ─── 로그 파일 다운로드 카드 ──────────────────────────────────────────────
+
+function DownloadLogCard() {
+  const [downloading, setDownloading] = useState(false);
+  const [lastDownload, setLastDownload] = useState<string | null>(null);
+  const today = new Date().toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace('. ', '/').replace('.', '');
+  const todayStr = new Date().toISOString().slice(0,10).replace(/-/g, '');
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/logs/download`);
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.detail || '로그 파일을 찾을 수 없습니다.');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `approvalradar_${todayStr}.log`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setLastDownload(new Date().toLocaleTimeString('ko-KR'));
+    } catch {
+      alert('다운로드 중 오류가 발생했습니다.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <Card className="border-border-standard bg-surface">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm font-medium text-text-muted flex items-center gap-2">
+          <FileText className="w-4 h-4" />
+          로그 파일
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs px-2 py-1 rounded bg-background border border-border-subtle text-text-muted">
+            app_{todayStr}.log
+          </span>
+          <span className="text-xs text-text-muted">{today}</span>
+        </div>
+        <button
+          id="log-download-btn"
+          onClick={handleDownload}
+          disabled={downloading}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-brand/30 text-brand text-xs font-medium hover:bg-brand/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <DownloadSimple className={`w-4 h-4 ${downloading ? 'animate-bounce' : ''}`} />
+          {downloading ? '다운로드 중...' : '오늘 로그 다운로드'}
+        </button>
+        {lastDownload && (
+          <p className="text-[10px] text-text-muted text-center">
+            마지막 다운로드: {lastDownload}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── 메인 로그 페이지 ─────────────────────────────────────────────────────
 
 export function LogPage() {
@@ -171,9 +240,10 @@ export function LogPage() {
     <div className="flex flex-col h-full gap-4">
 
       {/* 인디케이터 카드 영역 */}
-      <div className="grid grid-cols-2 gap-4 shrink-0">
+      <div className="grid grid-cols-3 gap-4 shrink-0">
         <KeyStatusCard />
         <CrawlerStatusCard />
+        <DownloadLogCard />
       </div>
 
       {/* 터미널 헤더 */}

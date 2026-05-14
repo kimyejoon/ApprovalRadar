@@ -64,7 +64,8 @@ export interface FetchApprovalsParams {
   sort_order?: 'asc' | 'desc';
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
 export async function fetchApprovals(params: FetchApprovalsParams): Promise<ApprovalsResponse> {
   const url = new URL(`${API_BASE_URL}/api/v1/approvals`);
