@@ -100,7 +100,8 @@ export function useSSE() {
         setTimeout(connect, timeout);
       };
 
-      if (typeof window !== 'undefined') {
+      // 개발 환경에서만 테스트 트리거 노출 (프로덕션 빌드 시 제거됨)
+      if (import.meta.env.DEV && typeof window !== 'undefined') {
         window.triggerTestNotification = async () => {
           await handleUpdateEvent(true);
         };
@@ -114,7 +115,7 @@ export function useSSE() {
         eventSourceRef.current.close();
         console.log('SSE Connection Closed');
       }
-      if (typeof window !== 'undefined') {
+      if (import.meta.env.DEV && typeof window !== 'undefined') {
         delete window.triggerTestNotification;
       }
     };

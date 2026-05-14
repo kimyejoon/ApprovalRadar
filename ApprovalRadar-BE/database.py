@@ -1,8 +1,34 @@
 import sqlite3
 import os
+import threading
 from contextlib import contextmanager
 
 DB_FILE = "food_safety.db"
+
+# 스레드별 독립 커넥션 캐싱 (Connection Pool)
+# - 동일 스레드 내에서는 커넥션을 재사용하여 open/close 오버헤드 제거
+# - 크롤러 스레드 / FastAPI 요청 스레드가 각자 독립 커넥션을 보유하여 lock 충돌 방지
+_thread_local = threading.local()
+
+
+def _get_thread_conn() -> sqlite3.Connection:
+    """현재 스레드의 커넥션을 반환합니다. 없으면 새로 생성합니다."""
+    conn = getattr(_thread_local, "conn", None)
+    if conn is None:
+        conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        _thread_local.conn = conn
+    return conn
+
+
+def close_thread_conn() -> None:
+    """현재 스레드의 커넥션을 닫고 캐시에서 제거합니다. (테스트용)"""
+    conn = getattr(_thread_local, "conn", None)
+    if conn is not None:
+        conn.close()
+        _thread_local.conn = None
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -137,12 +163,15 @@ def init_db():
 
 @contextmanager
 def get_db():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row # To access columns by name
+    """스레드 로컬 커넥션을 반환하는 컨텍스트 매니저.
+    커넥션은 스레드별로 캐싱되어 재사용됩니다.
+    """
+    conn = _get_thread_conn()
     try:
         yield conn
-    finally:
-        conn.close()
+    except Exception:
+        conn.rollback()
+        raise
 
 def backup_db():
     from app.core.logger import logger

@@ -127,7 +127,7 @@ async def get_key_status():
         except Exception as e:
             return KeyStatusItem(index=idx, masked_key=masked, status="error", status_label="통신 오류", message=str(e), call_count_today=call_count)
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     tasks = [
         loop.run_in_executor(None, _check_key, idx + 1, key)
         for idx, key in enumerate(settings.API_KEYS)

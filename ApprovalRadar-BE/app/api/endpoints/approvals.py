@@ -2,7 +2,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends, Path
 from typing import List, Optional
 import math
-import time
 from datetime import datetime
 import urllib.parse
 # pyrefly: ignore [missing-import]
@@ -36,8 +35,12 @@ from app.schemas.approvals import (
 
 router = APIRouter()
 
-INDICATORS_CACHE = {}
-CACHE_TTL = 600  # 10 minutes
+from cachetools import TTLCache
+
+# maxsize=64: 날짜 기반 key 수 상한 (1년 운영해도 365개 이하)
+# ttl=600: 기존 CACHE_TTL(10분)과 동일, 만료된 항목은 자동 제거
+_INDICATORS_CACHE: TTLCache = TTLCache(maxsize=64, ttl=600)
+
 
 def parse_comma_separated_list(regions: Optional[str] = Query(None, description="콤마(,)로 구분된 지역 목록 (예: 서울,강원,경기)")) -> Optional[List[str]]:
     if not regions:
@@ -101,10 +104,11 @@ def get_approval_indicators(
         end_date = today.strftime('%Y%m%d')
 
         cache_key = f"indicators_fixed_30d_{start_date}_{end_date}"
-        cached = INDICATORS_CACHE.get(cache_key)
+        # TTLCache가 만료 여부를 자동 관리하므로 time.time() 비교 불필요
+        cached = _INDICATORS_CACHE.get(cache_key)
         
-        if cached and time.time() - cached['time'] < CACHE_TTL:
-            return cached['data']
+        if cached is not None:
+            return cached
             
         total_approvals, monthly_approvals, today_approvals, status_distribution, trend_chart = repo.get_indicators(start_date, end_date)
             
@@ -119,7 +123,7 @@ def get_approval_indicators(
             }
         }
         
-        INDICATORS_CACHE[cache_key] = {"time": time.time(), "data": response_data}
+        _INDICATORS_CACHE[cache_key] = response_data
         return response_data
     except Exception as e:
         logger.error(f"Database error in get_approval_indicators: {e}")
