@@ -1,6 +1,10 @@
+interface WindowWithWebkit extends Window {
+  webkitAudioContext: typeof AudioContext;
+}
+
 export const playNotificationSound = () => {
   try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContext = window.AudioContext || (window as WindowWithWebkit).webkitAudioContext;
     if (!AudioContext) return;
     
     const audioCtx = new AudioContext();

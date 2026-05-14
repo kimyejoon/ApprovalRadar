@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 
 export interface LogEntry {
   timestamp: string;
@@ -55,8 +55,10 @@ export function useLogStream() {
     };
   }, []);
 
-  // connectRef를 항상 최신 connect 함수로 유지
-  connectRef.current = connect;
+  // connectRef를 항상 최신 connect 함수로 유지 (렌더 외부, 페인트 전 동기 실행)
+  useLayoutEffect(() => {
+    connectRef.current = connect;
+  });
 
   const disconnect = useCallback(() => {
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);

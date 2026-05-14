@@ -23,7 +23,8 @@ export function StatusFilterModal({ isOpen, onClose, statusFilters, setStatusFil
 
   useEffect(() => {
     if (isOpen) {
-      setLocalStatuses(statusFilters);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLocalStatuses(statusFilters); // 모달 열릴 때 외부 상태 동기화 (정당한 패턴)
     }
   }, [isOpen, statusFilters]);
 

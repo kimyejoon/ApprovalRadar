@@ -22,7 +22,8 @@ export function useKeyStatus() {
   }, []);
 
   useEffect(() => {
-    load();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(); // load()는 async - setState는 비동기 콜백 내에서 호출됨 (false positive)
     const interval = setInterval(load, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [load]);
