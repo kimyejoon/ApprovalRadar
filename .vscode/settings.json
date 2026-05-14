@@ -1,0 +1,5 @@
+{
+  // Pyrefly의 가상 인메모리 파일 오진단을 방지하기 위해 비활성화
+  // Python 타입 체크는 Pylance(ms-python.vscode-pylance)가 담당
+  "pyrefly.enable": false
+}

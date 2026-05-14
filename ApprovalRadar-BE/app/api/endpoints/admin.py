@@ -28,11 +28,14 @@ class KeyStatusItem(BaseModel):
     status_label: str
     code: Optional[str] = None
     message: Optional[str] = None
+    call_count_today: int = 0   # 오늘 사용량
+    limit: int = 1000            # 키별 일일 한도
 
 
 class KeyStatusResponse(BaseModel):
     total: int
     keys: List[KeyStatusItem]
+    all_exhausted: bool = False  # 전체 키 소진 여부
 
 
 class CrawlerServiceStatus(BaseModel):
@@ -84,11 +87,28 @@ class CrawlerStatusResponse(BaseModel):
 )
 async def get_key_status():
     """모든 API 키의 상태를 비동기적으로 점검합니다."""
+    from app.clients.foodsafety_api import ApiClient
+    import datetime
     service_id = "I2859"
     results: List[KeyStatusItem] = []
+    today = datetime.date.today().isoformat()
+
+    # DB에서 오늘 키별 사용량 미리 로드
+    usage_map: dict[str, int] = {}
+    try:
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT key_masked, call_count FROM api_key_usage WHERE usage_date = ?",
+                (today,)
+            ).fetchall()
+            for row in rows:
+                usage_map[row["key_masked"]] = row["call_count"]
+    except Exception:
+        pass
 
     def _check_key(idx: int, key: str) -> KeyStatusItem:
         masked = f"{key[:5]}***{key[-3:]}" if len(key) > 8 else "***"
+        call_count = usage_map.get(masked, 0)
         url = f"{settings.BASE_URL}/{key}/{service_id}/{settings.DATA_TYPE}/1/1"
         try:
             res = http_requests.get(url, timeout=7).json()
@@ -96,15 +116,15 @@ async def get_key_status():
                 code = res[service_id]['RESULT']['CODE']
                 msg = res[service_id]['RESULT']['MSG']
                 if code == "INFO-000":
-                    return KeyStatusItem(index=idx, masked_key=masked, status="active", status_label="정상 동작", code=code, message=msg)
+                    return KeyStatusItem(index=idx, masked_key=masked, status="active", status_label="정상 동작", code=code, message=msg, call_count_today=call_count)
                 elif code in ["INFO-300", "INFO-333"] or "유효 호출건수" in msg:
-                    return KeyStatusItem(index=idx, masked_key=masked, status="exhausted", status_label="일일 한도 초과", code=code, message=msg)
+                    return KeyStatusItem(index=idx, masked_key=masked, status="exhausted", status_label="일일 한도 초과", code=code, message=msg, call_count_today=call_count)
                 else:
-                    return KeyStatusItem(index=idx, masked_key=masked, status="error", status_label=f"오류 ({code})", code=code, message=msg)
+                    return KeyStatusItem(index=idx, masked_key=masked, status="error", status_label=f"오류 ({code})", code=code, message=msg, call_count_today=call_count)
             else:
-                return KeyStatusItem(index=idx, masked_key=masked, status="error", status_label="알 수 없는 응답")
+                return KeyStatusItem(index=idx, masked_key=masked, status="error", status_label="알 수 없는 응답", call_count_today=call_count)
         except Exception as e:
-            return KeyStatusItem(index=idx, masked_key=masked, status="error", status_label=f"통신 오류", message=str(e))
+            return KeyStatusItem(index=idx, masked_key=masked, status="error", status_label="통신 오류", message=str(e), call_count_today=call_count)
 
     loop = asyncio.get_event_loop()
     tasks = [
@@ -114,7 +134,11 @@ async def get_key_status():
     results = list(await asyncio.gather(*tasks))
     results.sort(key=lambda x: x.index)
 
-    return KeyStatusResponse(total=len(results), keys=results)
+    return KeyStatusResponse(
+        total=len(results),
+        keys=results,
+        all_exhausted=ApiClient.is_exhausted()
+    )
 
 
 

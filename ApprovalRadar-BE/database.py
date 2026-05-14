@@ -120,6 +120,18 @@ def init_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs (level);')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs (created_at);')
     
+    # API 키별 일일 사용량 추적 테이블
+    cursor.execute('''\
+        CREATE TABLE IF NOT EXISTS api_key_usage (
+            key_masked    TEXT NOT NULL,
+            usage_date    TEXT NOT NULL,
+            call_count    INTEGER DEFAULT 0,
+            exhausted     INTEGER DEFAULT 0,
+            last_updated  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (key_masked, usage_date)
+        )
+    ''')
+
     conn.commit()
     conn.close()
 

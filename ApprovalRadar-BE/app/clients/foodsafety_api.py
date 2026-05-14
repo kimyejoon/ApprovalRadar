@@ -1,6 +1,7 @@
 import requests
 import threading
 import time
+import datetime
 from app.core.config import settings
 from app.core.logger import logger
 from app.core.events import shutdown_event
@@ -10,18 +11,90 @@ class ApiKeysExhaustedError(Exception):
     pass
 
 class ApiClient:
+    # ─── 클래스 레벨 공유 상태 (모든 인스턴스 공유) ──────────────────────────
+    _exhausted_until: datetime.datetime | None = None
+    _class_lock = threading.Lock()
+    # key_masked → {"date": "YYYY-MM-DD", "count": int}
+    _usage: dict[str, dict] = {}
+
+    @classmethod
+    def is_exhausted(cls) -> bool:
+        """소진 상태인지 확인. 자정이 지났으면 자동 초기화."""
+        with cls._class_lock:
+            if cls._exhausted_until is None:
+                return False
+            if datetime.datetime.now() >= cls._exhausted_until:
+                cls._exhausted_until = None
+                logger.info("🔄 자정이 지나 API 키 소진 상태가 초기화되었습니다. 크롤링을 재개합니다.")
+                return False
+            return True
+
+    @classmethod
+    def mark_exhausted(cls):
+        """오늘 키가 모두 소진됨. 내일 자정까지 소진 상태로 마크."""
+        with cls._class_lock:
+            now = datetime.datetime.now()
+            tomorrow = (now + datetime.timedelta(days=1)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            cls._exhausted_until = tomorrow
+
+    @classmethod
+    def _increment_usage(cls, key: str):
+        """키별 오늘 사용량 +1. DB에도 upsert."""
+        today = datetime.date.today().isoformat()
+        masked = f"{key[:5]}***{key[-3:]}" if len(key) > 8 else "***"
+        with cls._class_lock:
+            entry = cls._usage.setdefault(masked, {"date": today, "count": 0})
+            if entry["date"] != today:
+                entry["date"] = today
+                entry["count"] = 0
+            entry["count"] += 1
+            count = entry["count"]
+        try:
+            from database import get_db
+            with get_db() as conn:
+                conn.execute(
+                    '''INSERT INTO api_key_usage (key_masked, usage_date, call_count, last_updated)
+                       VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+                       ON CONFLICT(key_masked, usage_date)
+                       DO UPDATE SET call_count = call_count + 1, last_updated = CURRENT_TIMESTAMP''',
+                    (masked, today)
+                )
+                conn.commit()
+        except Exception:
+            pass  # 사용량 기록 실패는 크롤링에 영향 없음
+
+    @classmethod
+    def _mark_key_exhausted_in_db(cls, key: str):
+        """DB에서 해당 키를 exhausted=1로 마크."""
+        today = datetime.date.today().isoformat()
+        masked = f"{key[:5]}***{key[-3:]}" if len(key) > 8 else "***"
+        try:
+            from database import get_db
+            with get_db() as conn:
+                conn.execute(
+                    '''INSERT INTO api_key_usage (key_masked, usage_date, exhausted, last_updated)
+                       VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+                       ON CONFLICT(key_masked, usage_date)
+                       DO UPDATE SET exhausted = 1, last_updated = CURRENT_TIMESTAMP''',
+                    (masked, today)
+                )
+                conn.commit()
+        except Exception:
+            pass
+
+    # ─── 인스턴스 초기화 ────────────────────────────────────────────────────
     def __init__(self):
         self.api_keys = settings.API_KEYS.copy()
         self.current_key_idx = 0
-        self.key_lock = threading.Lock()       # 키 인덱스 교체용 Lock
+        self.key_lock = threading.Lock()
         self.exhausted_keys = set()
         # WAF 동시 접근 방지: 키별 요청 직렬화 Lock
-        # 동일 키로 동시에 2개 이상 요청하면 "현재 접속 중인 인증키입니다" WAF 차단 발생
         self._key_locks: dict[str, threading.Lock] = {
             key: threading.Lock() for key in self.api_keys
         }
-        # HTTP Keep-Alive 연결 재사용 (TCP 연결 비용 절감)
-        # requests.get() 매 호출 시 새 TCP 연결 → Session 사용 시 연결 재사용으로 1초 이하 단축
+        # HTTP Keep-Alive 연결 재사용
         self._session = requests.Session()
         self._session.headers.update({
             'Connection': 'keep-alive',
@@ -34,11 +107,11 @@ class ApiClient:
             
     def rotate_key(self, failed_key: str):
         with self.key_lock:
-            # 실패한 키를 소진 목록에 추가
             self.exhausted_keys.add(failed_key)
+            ApiClient._mark_key_exhausted_in_db(failed_key)
             
-            # 모든 키가 소진되었는지 확인
             if len(self.exhausted_keys) >= len(self.api_keys):
+                ApiClient.mark_exhausted()
                 logger.error("🚨 [긴급] 오늘자 식품나라 API 키가 모두 소진되었습니다. 크롤링이 중단됩니다.")
                 raise ApiKeysExhaustedError("All API keys are exhausted for today.")
                 
@@ -49,7 +122,6 @@ class ApiClient:
             self.current_key_idx = next_idx
             new_key = self.api_keys[self.current_key_idx]
             logger.info(f"[키 회전] API 한도 초과! 새로운 키로 교체: {new_key[:5]}***")
-            # 새 키로 전환 시 Session 재생성 (새 TCP 연결로 WAF 우회)
             self._session = requests.Session()
             self._session.headers.update({'Connection': 'keep-alive', 'Accept': 'application/json'})
 
@@ -62,10 +134,9 @@ class ApiClient:
             self.current_key_idx = next_idx
             new_key = self.api_keys[self.current_key_idx]
             logger.info(f"[키 전환] 일시적 오류(WAF/Timeout)로 임시 키 전환: {new_key[:5]}***")
-            # 새 키로 전환 시 Session 재생성 (새 TCP 연결로 WAF 우회)
             self._session = requests.Session()
             self._session.headers.update({'Connection': 'keep-alive', 'Accept': 'application/json'})
-                
+
     def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5, timeout: int = 30, **kwargs) -> dict:
         """
         주어진 구간의 데이터를 조회합니다.
@@ -74,6 +145,10 @@ class ApiClient:
         """
         attempt = 0
         backoff = 1
+
+        # 소진 상태 조기 체크: 반복 오류 방지
+        if ApiClient.is_exhausted():
+            raise ApiKeysExhaustedError("All API keys are exhausted for today.")
         
         while attempt < max_retries and not shutdown_event.is_set():
             api_key = self.get_current_key()
@@ -102,6 +177,7 @@ class ApiClient:
                         msg = res[service_id]['RESULT']['MSG']
                         
                         if code == "INFO-000" or code == "INFO-200":
+                            ApiClient._increment_usage(api_key)  # 성공 호출 카운트
                             return res
                         elif code in ["INFO-300", "INFO-333"] or "유효 호출건수" in msg:
                             self.rotate_key(api_key)

@@ -4,7 +4,7 @@ import re
 from typing import List
 
 from database import init_db
-from app.clients.foodsafety_api import ApiClient
+from app.clients.foodsafety_api import ApiClient, ApiKeysExhaustedError
 from app.services.diff_crawler import DiffCrawlerEngine
 from app.core.logger import logger
 
@@ -24,9 +24,15 @@ def parse_representatives(rep_str: str) -> List[str]:
 def run_scraper_for_service(service_id: str):
     import time
     start_time = time.time()
+
+    # 키 소진 상태 사전 체크 (10분마다 스케줄러 재실행에서 반복 오류 방지)
+    if ApiClient.is_exhausted():
+        logger.info(f"[{service_id}] API 키 소진 상태 → 스킵 (자정 후 자동 재개)")
+        return
+
     logger.info(f"Starting DiffCrawler Delta Sync Job for {service_id}...")
-    
-    # DB 초기화 (테이블 없으면 생성, WAL 모드 적용 등)
+
+    # DB 초기화
     init_db()
     
     api_client = ApiClient()
