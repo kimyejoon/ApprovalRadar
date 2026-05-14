@@ -6,9 +6,6 @@ import {
   Trash,
   PlugsConnected,
   Key,
-  CheckCircle,
-  XCircle,
-  Warning,
   Database,
   ArrowsClockwise,
   DownloadSimple,
@@ -58,50 +55,49 @@ function KeyStatusCard() {
     refetchInterval: 30_000,
   });
 
-  const activeCount = data?.keys.filter(k => k.status === 'active').length ?? 0;
+  const activeCount   = data?.keys.filter(k => k.status === 'active').length ?? 0;
   const exhaustedCount = data?.keys.filter(k => k.status === 'exhausted').length ?? 0;
-  const errorCount = data?.keys.filter(k => k.status === 'error').length ?? 0;
+  const errorCount    = data?.keys.filter(k => k.status === 'error').length ?? 0;
   const total = data?.total ?? 0;
 
   const overallStatus = errorCount > 0 ? 'error' : exhaustedCount > 0 ? 'warning' : 'ok';
+  const accentClass = overallStatus === 'ok' ? 'text-brand' : overallStatus === 'warning' ? 'text-yellow-400' : 'text-red-500';
 
   return (
-    <Card className="border-border-standard bg-surface">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm font-medium text-text-muted flex items-center gap-2">
-          <Key className="w-4 h-4" />
-          API 키 상태
+    <Card className="flex flex-col justify-center border-border-standard shadow-sm bg-surface-primary relative overflow-hidden min-h-[130px]">
+      <CardHeader className="pb-1">
+        <CardTitle className="text-sm font-medium text-text-muted flex items-center justify-between">
+          <span className="flex items-center gap-2"><Key className="w-4 h-4" />API 키 상태</span>
+          <button onClick={() => refetch()} className="text-text-muted hover:text-text-primary transition-colors" title="새로고침">
+            <ArrowsClockwise className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+          </button>
         </CardTitle>
-        <button onClick={() => refetch()} className="text-text-muted hover:text-text-primary transition-colors" title="새로고침">
-          <ArrowsClockwise className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-        </button>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent>
         {isLoading ? (
           <div className="text-xs text-text-muted">점검 중...</div>
         ) : (
           <>
-            <div className={`flex items-center gap-2 ${overallStatus === 'ok' ? 'text-brand' : overallStatus === 'warning' ? 'text-yellow-400' : 'text-red-500'}`}>
-              {overallStatus === 'ok' && <CheckCircle weight="fill" className="w-5 h-5" />}
-              {overallStatus === 'warning' && <Warning weight="fill" className="w-5 h-5" />}
-              {overallStatus === 'error' && <XCircle weight="fill" className="w-5 h-5" />}
-              <span className="text-2xl font-bold text-text-primary">{activeCount}</span>
-              <span className="text-sm text-text-muted">/ {total} 활성</span>
+            <div className={`text-4xl font-bold ${accentClass}`}>
+              {activeCount}
+              <span className="text-sm font-normal text-text-muted ml-2">/ {total} Active</span>
             </div>
-            <div className="grid grid-cols-3 gap-1 pt-1">
-              <div className="text-center p-1.5 rounded-lg bg-brand/10 border border-brand/20">
-                <div className="text-sm font-bold text-brand">{activeCount}</div>
-                <div className="text-[10px] text-text-muted">Active</div>
+            {(exhaustedCount > 0 || errorCount > 0) && (
+              <div className="flex gap-3 mt-1.5">
+                {exhaustedCount > 0 && (
+                  <span className="text-xs text-yellow-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 inline-block" />
+                    소진 {exhaustedCount}
+                  </span>
+                )}
+                {errorCount > 0 && (
+                  <span className="text-xs text-red-500 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                    오류 {errorCount}
+                  </span>
+                )}
               </div>
-              <div className="text-center p-1.5 rounded-lg bg-yellow-400/10 border border-yellow-400/20">
-                <div className="text-sm font-bold text-yellow-400">{exhaustedCount}</div>
-                <div className="text-[10px] text-text-muted">소진</div>
-              </div>
-              <div className="text-center p-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
-                <div className="text-sm font-bold text-red-500">{errorCount}</div>
-                <div className="text-[10px] text-text-muted">오류</div>
-              </div>
-            </div>
+            )}
           </>
         )}
       </CardContent>
@@ -120,37 +116,33 @@ function CrawlerStatusCard() {
 
   const formatTime = (iso: string | null) => {
     if (!iso) return '-';
-    return new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
   };
 
   return (
-    <Card className="border-border-standard bg-surface">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm font-medium text-text-muted flex items-center gap-2">
-          <Database className="w-4 h-4" />
-          크롤러 Tail 상태
+    <Card className="flex flex-col justify-center border-border-standard shadow-sm bg-surface-primary relative overflow-hidden min-h-[130px]">
+      <CardHeader className="pb-1">
+        <CardTitle className="text-sm font-medium text-text-muted flex items-center justify-between">
+          <span className="flex items-center gap-2"><Database className="w-4 h-4" />크롤러 Tail</span>
+          <button onClick={() => refetch()} className="text-text-muted hover:text-text-primary transition-colors" title="새로고침">
+            <ArrowsClockwise className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+          </button>
         </CardTitle>
-        <button onClick={() => refetch()} className="text-text-muted hover:text-text-primary transition-colors" title="새로고침">
-          <ArrowsClockwise className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-        </button>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent>
         {isLoading ? (
           <div className="text-xs text-text-muted">조회 중...</div>
-        ) : data?.services.length === 0 ? (
-          <div className="text-xs text-text-muted">데이터 없음 (부트스트랩 미완료)</div>
+        ) : !data?.services.length ? (
+          <div className="text-xs text-text-muted">부트스트랩 미완료</div>
         ) : (
-          <div className="space-y-2">
-            {data?.services.map(svc => (
-              <div key={svc.service_id} className="p-2 rounded-lg bg-background border border-border-subtle">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-semibold text-brand">{svc.service_id}</span>
-                  <span className="text-xs text-text-muted">{formatTime(svc.updated_at)}</span>
-                </div>
-                <div className="text-xl font-bold text-text-primary mt-0.5">
+          <div className="space-y-1.5">
+            {data.services.map(svc => (
+              <div key={svc.service_id} className="flex items-baseline justify-between">
+                <span className="font-mono text-xs font-medium text-brand">{svc.service_id}</span>
+                <span className="text-xl font-bold text-text-primary">
                   {svc.last_total_count.toLocaleString()}
-                  <span className="text-sm font-normal text-text-muted ml-1">건</span>
-                </div>
+                  <span className="text-xs font-normal text-text-muted ml-1">{formatTime(svc.updated_at)}</span>
+                </span>
               </div>
             ))}
           </div>
@@ -165,13 +157,12 @@ function CrawlerStatusCard() {
 function DownloadLogCard() {
   const [downloading, setDownloading] = useState(false);
   const [lastDownload, setLastDownload] = useState<string | null>(null);
-  const today = new Date().toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace('. ', '/').replace('.', '');
-  const todayStr = new Date().toISOString().slice(0,10).replace(/-/g, '');
+  const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/logs/download`);
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/logs/download`);
       if (!res.ok) {
         const err = await res.json();
         alert(err.detail || '로그 파일을 찾을 수 없습니다.');
@@ -193,33 +184,26 @@ function DownloadLogCard() {
   };
 
   return (
-    <Card className="border-border-standard bg-surface">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+    <Card className="flex flex-col justify-center border-border-standard shadow-sm bg-surface-primary relative overflow-hidden min-h-[130px]">
+      <CardHeader className="pb-1">
         <CardTitle className="text-sm font-medium text-text-muted flex items-center gap-2">
           <FileText className="w-4 h-4" />
           로그 파일
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs px-2 py-1 rounded bg-background border border-border-subtle text-text-muted">
-            app_{todayStr}.log
-          </span>
-          <span className="text-xs text-text-muted">{today}</span>
-        </div>
+      <CardContent className="space-y-2.5">
+        <div className="font-mono text-xs text-text-muted">app_{todayStr}.log</div>
         <button
           id="log-download-btn"
           onClick={handleDownload}
           disabled={downloading}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-brand/30 text-brand text-xs font-medium hover:bg-brand/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand/30 text-brand text-xs font-medium hover:bg-brand/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <DownloadSimple className={`w-4 h-4 ${downloading ? 'animate-bounce' : ''}`} />
+          <DownloadSimple className={`w-3.5 h-3.5 ${downloading ? 'animate-bounce' : ''}`} />
           {downloading ? '다운로드 중...' : '오늘 로그 다운로드'}
         </button>
         {lastDownload && (
-          <p className="text-[10px] text-text-muted text-center">
-            마지막 다운로드: {lastDownload}
-          </p>
+          <p className="text-[10px] text-text-muted">마지막: {lastDownload}</p>
         )}
       </CardContent>
     </Card>

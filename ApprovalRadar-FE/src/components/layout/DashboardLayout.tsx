@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Broadcast, Sun, Moon, SquaresFour, Terminal } from '@phosphor-icons/react';
 import { Button } from '../ui/button';
-import { KeyStatusIndicator } from '../ui/KeyStatusIndicator';
 
 export type ActiveTab = 'dashboard' | 'logs';
 
@@ -85,9 +84,6 @@ export function DashboardLayout({ children, activeTab, onTabChange }: DashboardL
           <h1 className="font-sans text-xl tracking-tight m-0">{PAGE_TITLES[activeTab]}</h1>
           
           <div className="flex items-center gap-3">
-            {/* API 키 상태 인디케이터 */}
-            <KeyStatusIndicator />
-
             {/* 다크모드 토글 */}
             <Button variant="ghost" size="sm" className="w-10 h-10 p-0 rounded-full" onClick={() => setIsDark(!isDark)}>
               {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
