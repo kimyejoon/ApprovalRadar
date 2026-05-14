@@ -3,11 +3,12 @@ import json
 import requests as http_requests
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 from app.core.logger import logger
 from app.core.config import settings
 from app.core.events import log_broadcaster
+from database import get_db
 
 router = APIRouter()
 
@@ -19,13 +20,23 @@ class KeyStatusItem(BaseModel):
     masked_key: str
     status: str  # "active" | "exhausted" | "error"
     status_label: str
-    code: str | None = None
-    message: str | None = None
+    code: Optional[str] = None
+    message: Optional[str] = None
 
 
 class KeyStatusResponse(BaseModel):
     total: int
     keys: List[KeyStatusItem]
+
+
+class CrawlerServiceStatus(BaseModel):
+    service_id: str
+    last_total_count: int
+    updated_at: Optional[str] = None
+
+
+class CrawlerStatusResponse(BaseModel):
+    services: List[CrawlerServiceStatus]
 
 
 # ─── 키 상태 조회 REST 엔드포인트 ────────────────────────────────────────────
@@ -98,6 +109,37 @@ async def get_key_status():
     results.sort(key=lambda x: x.index)
 
     return KeyStatusResponse(total=len(results), keys=results)
+
+
+
+# ─── 크롤러 Tail 상태 조회 REST 엔드포인트 ──────────────────────────────────
+
+@router.get(
+    "/crawler-status",
+    response_model=CrawlerStatusResponse,
+    summary="크롤러 상태 조회",
+    description="DB에 저장된 서비스별 마지막 전체 건수(Tail)와 갱신 시각을 반환합니다.",
+)
+async def get_crawler_status():
+    """현재 DB에 저장된 서비스별 크롤러 상태(Tail)를 반환합니다."""
+    services: List[CrawlerServiceStatus] = []
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT service_id, last_total_count, updated_at FROM crawler_state ORDER BY service_id"
+            )
+            rows = cursor.fetchall()
+            for row in rows:
+                services.append(CrawlerServiceStatus(
+                    service_id=row["service_id"],
+                    last_total_count=row["last_total_count"],
+                    updated_at=row["updated_at"],
+                ))
+    except Exception as e:
+        logger.error(f"[crawler-status] DB 조회 오류: {e}")
+
+    return CrawlerStatusResponse(services=services)
 
 
 # ─── 실시간 로그 WebSocket 엔드포인트 ────────────────────────────────────────

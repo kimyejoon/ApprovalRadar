@@ -254,3 +254,22 @@ export async function fetchKeyStatus(): Promise<KeyStatusResponse> {
   if (!response.ok) throw new Error('Failed to fetch key status');
   return response.json();
 }
+
+// ─── Crawler Status ────────────────────────────────────────────────────────
+
+export interface CrawlerServiceStatus {
+  service_id: string;
+  last_total_count: number;
+  updated_at: string | null;
+}
+
+export interface CrawlerStatusResponse {
+  services: CrawlerServiceStatus[];
+}
+
+export async function fetchCrawlerStatus(): Promise<CrawlerStatusResponse> {
+  const url = `${API_BASE_URL}/api/v1/admin/crawler-status`;
+  const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if (!response.ok) throw new Error('Failed to fetch crawler status');
+  return response.json();
+}

@@ -14,11 +14,13 @@ def check_keys():
     client.check_keys_status()
 
 def test_tail():
-    print("현재 데이터의 꼬리(Tail) 지점을 탐색합니다 (이진 탐색)...")
+    print("현재 데이터의 꼬리(Tail) 지점을 조회합니다 (API TOTAL_COUNT 직접 조회)...")
     client = ApiClient()
-    crawler = DiffCrawlerEngine(api_client=client)
-    tail = crawler.find_true_tail()
-    print(f"\n✅ 탐색 완료: 현재 실제 마지막 데이터(Tail)는 {tail}건 입니다.")
+    for service_id in ["I2859", "I2500"]:
+        crawler = DiffCrawlerEngine(api_client=client, service_id=service_id)
+        tail = crawler.find_true_tail()
+        print(f"  [{service_id}] 현재 전체 데이터 건수: {tail:,}건")
+    print("\n✅ 조회 완료")
 
 def run_sync():
     print("수동으로 차분 동기화(Delta Sync)를 1회 실행합니다...")
