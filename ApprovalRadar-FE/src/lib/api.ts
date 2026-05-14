@@ -8,22 +8,35 @@ export interface ApprovalData {
   phone_number: string;
   representative_history: unknown[];
   licensing_history: unknown[];
+  industry_type?: string | null;
   last_event_date: string;
   created_at: string;
   updated_at: string;
   is_new: number;
+  update_type?: string;
+  prev_business_status?: string | null;
+  prev_representative_name?: string | null;
+  prev_business_name?: string | null;
+  infer_update_type?: string;
+  infer_update_detail?: string;
+  is_read?: number;
+  read_at?: string | null;
 }
 
 export interface ApprovalMappedItem {
   id: string;
   name: string;
+  prevName?: string | null;
   type: string;
   location: string;
   owner: string;
+  prevOwner?: string | null;
   status: string;
+  updateDetail?: string;
   approvalDate: string;
   phone: string;
   isTransfer: boolean;
+  isRead: boolean;
   raw: ApprovalData;
 }
 
@@ -45,7 +58,8 @@ export interface FetchApprovalsParams {
   start_date?: string;
   end_date?: string;
   regions?: string;
-  statuses?: string;
+  infer_update_type?: string;
+  industry_type?: string;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
 }
@@ -75,6 +89,50 @@ export async function fetchApprovals(params: FetchApprovalsParams): Promise<Appr
   return response.json();
 }
 
+export interface ApprovalDetailParams {
+  license_date: string;
+  business_name: string;
+}
+
+export interface ApprovalDetailResponse {
+  status: string;
+  data: ApprovalData[];
+}
+
+export async function fetchApprovalDetail(params: ApprovalDetailParams): Promise<ApprovalDetailResponse> {
+  const url = new URL(`${API_BASE_URL}/api/v1/approvals/detail`);
+  url.searchParams.append('license_date', params.license_date);
+  url.searchParams.append('business_name', params.business_name);
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch approval detail');
+  }
+
+  return response.json();
+}
+
+export async function markApprovalAsRead(license_no: string): Promise<{ status: string }> {
+  const url = new URL(`${API_BASE_URL}/api/v1/approvals/readInfo/${license_no}`);
+  const response = await fetch(url.toString(), {
+    method: 'PUT',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to mark approval as read');
+  }
+
+  return response.json();
+}
+
 export interface FetchIndicatorsParams {
   search?: string;
   start_date?: string;
@@ -94,6 +152,8 @@ export interface TrendChart {
 
 export interface IndicatorData {
   total_approvals: number;
+  monthly_approvals: number;
+  today_approvals: number;
   status_distribution: StatusDistribution[];
   trend_chart: TrendChart[];
 }

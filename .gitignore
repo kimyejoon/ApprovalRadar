@@ -22,4 +22,11 @@ env/
 .env.test.local
 .env.production.local
 
-.conversation.md*.db
+.conversation.md
+
+# SQLite
+*.db
+*.db.bak
+*.db-shm
+*.db-wal
+backups/

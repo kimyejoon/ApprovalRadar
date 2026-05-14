@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCod
 import { formatApprovalDate } from '@/lib/utils';
 import type { ApprovalMappedItem } from '@/lib/api';
 import type { SortKey } from '@/hooks/useApprovalRadar';
+import { CATEGORY_COLORS, CATEGORY_ICONS, INDUSTRY_ICONS } from '@/lib/constants';
 
 interface SortableHeadProps {
   label: string;
@@ -41,6 +42,7 @@ interface ApprovalTableProps {
   onRowClick: (item: ApprovalMappedItem) => void;
   onLocationClick: () => void;
   onStatusClick: () => void;
+  onIndustryClick: () => void;
 }
 
 export function ApprovalTable({
@@ -52,6 +54,7 @@ export function ApprovalTable({
   onRowClick,
   onLocationClick,
   onStatusClick,
+  onIndustryClick,
 }: ApprovalTableProps) {
   return (
     <Table>
@@ -72,9 +75,18 @@ export function ApprovalTable({
           <TableHead>
             <button 
               className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
+              onClick={onIndustryClick}
+            >
+              업종
+              <CaretDown weight="bold" className="w-4 h-4" />
+            </button>
+          </TableHead>
+          <TableHead>
+            <button 
+              className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
               onClick={onStatusClick}
             >
-              영업상태
+              변경 타입
               <CaretDown weight="bold" className="w-4 h-4" />
             </button>
           </TableHead>
@@ -85,37 +97,84 @@ export function ApprovalTable({
       <TableBody>
         {isLoading ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-text-muted">데이터를 불러오는 중입니다...</TableCell>
+            <TableCell colSpan={8} className="text-center py-8 text-text-muted">데이터를 불러오는 중입니다...</TableCell>
           </TableRow>
         ) : isError ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-text-muted">데이터를 불러오는데 실패했습니다.</TableCell>
+            <TableCell colSpan={8} className="text-center py-8 text-text-muted">데이터를 불러오는데 실패했습니다.</TableCell>
           </TableRow>
         ) : data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-text-muted">검색 결과가 없습니다.</TableCell>
+            <TableCell colSpan={8} className="text-center py-8 text-text-muted">검색 결과가 없습니다.</TableCell>
           </TableRow>
         ) : (
           data.map((item, index) => (
             <TableRow 
               key={item.id + '-' + index} 
               onClick={() => onRowClick(item)}
-              className="cursor-pointer group"
+              className={`cursor-pointer group ${!item.isRead ? 'bg-brand/5 hover:bg-brand/10' : ''}`}
             >
               <TableCell className="font-medium text-text-primary group-hover:text-brand transition-colors">
-                {item.name}
+                <div className="flex flex-col">
+                  <span>{item.name}</span>
+                  {item.prevName && (
+                    <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
+                      (이전: {item.prevName})
+                    </span>
+                  )}
+                </div>
               </TableCell>
-              <TableCell className="max-w-[200px] truncate">{item.location}</TableCell>
+              <TableCell>{item.location}</TableCell>
               <TableCodeCell>{item.id}</TableCodeCell>
-              <TableCell>{item.owner}</TableCell>
               <TableCell>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  item.status.includes('정상') || item.status.includes('영업') 
-                    ? 'bg-brand/10 text-brand' 
-                    : 'bg-border-prominent text-text-muted'
-                }`}>
-                  {item.status}
-                </span>
+                <div className="flex flex-col">
+                  <span>{item.owner}</span>
+                  {item.prevOwner && (
+                    <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
+                      (이전: {item.prevOwner})
+                    </span>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell className="text-sm text-text-muted">
+                <div className="flex items-center gap-1.5">
+                  {INDUSTRY_ICONS[item.type] && (
+                    <span className="flex items-center text-text-secondary">
+                      {(() => {
+                        const Icon = INDUSTRY_ICONS[item.type];
+                        return <Icon weight="regular" size={14} />;
+                      })()}
+                    </span>
+                  )}
+                  <span>{item.type}</span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-col items-start">
+                  <span 
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border" 
+                    style={{ 
+                      color: CATEGORY_COLORS[item.raw.infer_update_type || ''] || '#9ca3af', 
+                      borderColor: CATEGORY_COLORS[item.raw.infer_update_type || ''] || '#9ca3af',
+                      backgroundColor: 'transparent'
+                    }}
+                  >
+                    {CATEGORY_ICONS[item.raw.infer_update_type || ''] && (
+                      <span className="flex items-center">
+                        {(() => {
+                          const Icon = CATEGORY_ICONS[item.raw.infer_update_type || ''];
+                          return <Icon weight="bold" size={12} />;
+                        })()}
+                      </span>
+                    )}
+                    {item.status}
+                  </span>
+                  {item.updateDetail && (
+                    <span className="text-[11px] text-text-muted mt-1 ml-1 leading-tight break-keep">
+                      {item.updateDetail}
+                    </span>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="text-xs text-text-muted">{formatApprovalDate(item.approvalDate)}</TableCell>
               <TableCell className="font-mono text-xs">{item.phone}</TableCell>

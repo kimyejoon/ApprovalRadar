@@ -1,5 +1,5 @@
 
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfToday } from "date-fns"
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfToday, subDays, startOfYear, endOfYear } from "date-fns"
 import { ko } from "date-fns/locale"
 import { Calendar as CalendarIcon } from "lucide-react"
 
@@ -44,27 +44,48 @@ export function DatePickerWithPresets({ date, setDate }: DatePickerWithPresetsPr
         </Button>
       </PopoverTrigger>
       <PopoverContent className="flex w-auto p-0" align="start">
-        <div className="flex flex-col gap-3 p-4 border-r border-border-standard">
+        <div className="flex flex-col gap-1 p-4 border-r border-border-standard">
           <Button
             variant="ghost"
-            className="justify-start font-normal"
+            className="justify-start font-normal h-8 px-3"
             onClick={() => setDate({ from: startOfToday(), to: startOfToday() })}
           >
             오늘
           </Button>
           <Button
             variant="ghost"
-            className="justify-start font-normal"
+            className="justify-start font-normal h-8 px-3"
+            onClick={() => setDate({ from: subDays(startOfToday(), 6), to: startOfToday() })}
+          >
+            최근 7일
+          </Button>
+          <Button
+            variant="ghost"
+            className="justify-start font-normal h-8 px-3"
+            onClick={() => setDate({ from: subDays(startOfToday(), 29), to: startOfToday() })}
+          >
+            최근 30일
+          </Button>
+          <Button
+            variant="ghost"
+            className="justify-start font-normal h-8 px-3"
             onClick={() => setDate({ from: startOfWeek(startOfToday(), { weekStartsOn: 1 }), to: endOfWeek(startOfToday(), { weekStartsOn: 1 }) })}
           >
             이번 주
           </Button>
           <Button
             variant="ghost"
-            className="justify-start font-normal"
+            className="justify-start font-normal h-8 px-3"
             onClick={() => setDate({ from: startOfMonth(startOfToday()), to: endOfMonth(startOfToday()) })}
           >
             이번 달
+          </Button>
+          <Button
+            variant="ghost"
+            className="justify-start font-normal h-8 px-3"
+            onClick={() => setDate({ from: startOfYear(startOfToday()), to: endOfYear(startOfToday()) })}
+          >
+            올해
           </Button>
         </div>
         <div className="p-4">

@@ -8,7 +8,7 @@ interface DashboardHeaderProps {
   dateRange?: { from?: Date; to?: Date };
 }
 
-export function DashboardHeader({ totalCount, dateRange }: DashboardHeaderProps) {
+export function DashboardHeader({ dateRange }: DashboardHeaderProps) {
   const todayNewCount = useIndicatorStore(s => s.todayNewCount);
   const { isExporting, handleExportExcel } = useExcelExport(dateRange);
 
@@ -17,7 +17,7 @@ export function DashboardHeader({ totalCount, dateRange }: DashboardHeaderProps)
       <div>
         <h2 className="text-2xl font-sans font-medium text-text-primary tracking-tight">금일 변동 내역</h2>
         <p className="text-text-muted mt-1 text-sm">
-          오늘 발생한 새로운 변동: <span className="text-brand font-medium">{todayNewCount.toLocaleString()}</span>건 / 필터링된 총 {totalCount.toLocaleString()}건의 데이터가 조회되었습니다.
+          오늘 발생한 새로운 변동: <span className="text-brand font-medium">{todayNewCount.toLocaleString()}</span>건
         </p>
       </div>
       <div className="flex gap-2">

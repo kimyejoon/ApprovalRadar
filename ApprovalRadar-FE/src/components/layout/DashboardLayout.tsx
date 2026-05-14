@@ -7,7 +7,7 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
     if (isDark) {
@@ -33,7 +33,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </nav>
         <div className="p-4 border-t border-border-standard">
           <div className="text-xs text-text-muted">
-            Last Updated: <span className="text-text-secondary font-mono">10 mins ago</span>
+            Developed By <span className="text-text-secondary font-mono">Sherpa-z</span>
+          </div>
+          <div className="text-xs text-text-muted">
+            ceo@sherpa-z.com
           </div>
         </div>
       </aside>

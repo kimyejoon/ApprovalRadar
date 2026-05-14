@@ -8,12 +8,14 @@ import { DataTablePagination } from '@/components/ui/DataTablePagination';
 import { ApprovalDetailModal } from '@/components/features/ApprovalDetailModal';
 import { StatusFilterModal } from '@/components/features/StatusFilterModal';
 import { LocationFilterModal } from '@/components/features/LocationFilterModal';
+import { IndustryFilterModal } from '@/components/features/IndustryFilterModal';
 import { useApprovalRadar } from '@/hooks/useApprovalRadar';
 
 export function DashboardPage() {
   const { state, actions, api } = useApprovalRadar();
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [isLocationFilterOpen, setIsLocationFilterOpen] = useState(false);
+  const [isIndustryFilterOpen, setIsIndustryFilterOpen] = useState(false);
 
   const totalPages = api.meta?.total_pages || 1;
   const totalCount = api.meta?.total_count || 0;
@@ -22,20 +24,19 @@ export function DashboardPage() {
     <DashboardLayout>
       <DashboardHeader totalCount={totalCount} dateRange={state.dateRange} />
 
-      <DashboardIndicators 
-        searchQuery={state.searchQuery}
-        locationFilters={state.locationFilters}
-      />
+      <DashboardIndicators />
 
       <DashboardFilters 
         searchQuery={state.searchQuery}
         onSearchChange={actions.handleSearch}
         dateRange={state.dateRange}
         onDateRangeChange={actions.handleDateRangeChange}
-        statusFilter={state.statusFilter}
-        onStatusReset={() => actions.handleStatusFilterChange('전체')}
+        statusFilters={state.statusFilters}
+        onStatusFiltersChange={actions.handleStatusFiltersChange}
         locationFilters={state.locationFilters}
-        onLocationRemove={(loc) => actions.handleLocationFiltersChange(state.locationFilters.filter(l => l !== loc))}
+        onLocationFiltersChange={actions.handleLocationFiltersChange}
+        industryFilters={state.industryFilters}
+        onIndustryFiltersChange={actions.handleIndustryFiltersChange}
       />
 
       <ApprovalTable 
@@ -44,9 +45,13 @@ export function DashboardPage() {
         isError={api.isError}
         sortConfig={state.sortConfig}
         onSort={actions.handleSort}
-        onRowClick={actions.setSelectedItem}
+        onRowClick={(item) => {
+          actions.setSelectedItem(item);
+          actions.handleMarkAsRead(item.id, item.isRead);
+        }}
         onLocationClick={() => setIsLocationFilterOpen(true)}
         onStatusClick={() => setIsStatusFilterOpen(true)}
+        onIndustryClick={() => setIsIndustryFilterOpen(true)}
       />
 
       <DataTablePagination 
@@ -67,8 +72,8 @@ export function DashboardPage() {
       <StatusFilterModal 
         isOpen={isStatusFilterOpen} 
         onClose={() => setIsStatusFilterOpen(false)} 
-        statusFilter={state.statusFilter} 
-        setStatusFilter={actions.handleStatusFilterChange} 
+        statusFilters={state.statusFilters} 
+        setStatusFilters={actions.handleStatusFiltersChange} 
         onFilterChange={() => actions.handlePageChange(1)} 
       />
 
@@ -77,6 +82,14 @@ export function DashboardPage() {
         onClose={() => setIsLocationFilterOpen(false)} 
         initialLocations={state.locationFilters} 
         onApply={actions.handleLocationFiltersChange} 
+      />
+
+      <IndustryFilterModal 
+        isOpen={isIndustryFilterOpen} 
+        onClose={() => setIsIndustryFilterOpen(false)} 
+        industryFilters={state.industryFilters} 
+        setIndustryFilters={actions.handleIndustryFiltersChange} 
+        onFilterChange={() => actions.handlePageChange(1)} 
       />
     </DashboardLayout>
   );
