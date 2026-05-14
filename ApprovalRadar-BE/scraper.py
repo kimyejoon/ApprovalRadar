@@ -65,11 +65,13 @@ def run_scraper_for_service(service_id: str):
                     cret_dtm = row.get("CRET_DTM", "")
                     event_date = last_updt if last_updt else (cret_dtm if cret_dtm else license_date)
                     industry_type = row.get("INDUTY_CD_NM", "")
-                elif service_id == "I2500":
+                elif service_id in ("I2500", "I2861"):
+                    # I2500: 식품 인허가 변동정보
+                    # I2861: 음식점업소 인허가변경정보 (동일 필드 구조)
                     bssh_nm = row.get("BSSH_NM", "")
                     addr = row.get("SITE_ADDR") or row.get("ADDR", "")
                     rep_name = row.get("PRSDNT_NM", "")
-                    business_status = None # 데이터 무결성을 위해 비워둠
+                    business_status = None # 해당 API 미제공
                     license_date = row.get("PRMS_DT", "")
                     phone_number = row.get("TELNO", "")
                     event_date = row.get("CHNG_DT", "") or license_date

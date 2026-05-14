@@ -7,7 +7,11 @@ class Settings:
     # Food Safety OpenAPI
     BASE_URL = "http://openapi.foodsafetykorea.go.kr/api"
     SERVICE_ID = "I2859"
-    SERVICES = ["I2859", "I2500"]
+    # 추적 대상 서비스 목록
+    # I2859: 식품업소 인허가변경정보 (LOCP_ADDR 주소, BSN_STATE_NM 상태, PRSDNT_NM 대표자)
+    # I2500: 식품 인허가 변동정보 (SITE_ADDR 주소, CHNG_DT 변동일, 상태 없음)
+    # I2861: 음식점업소 인허가변경정보 (I2500과 동일 필드 구조: SITE_ADDR, CHNG_DT)
+    SERVICES = ["I2859", "I2500", "I2861"]
     DATA_TYPE = "json"
     
     # Crawler Settings

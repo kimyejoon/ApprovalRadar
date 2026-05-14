@@ -61,7 +61,8 @@ class DiffCrawlerEngine:
         - WAF 친화적: 1000건 단위 벌크 요청만 사용 (개별 건 조회 없음)
         - DB 저장 tail에서 재개하므로 라이프사이클 간 중복 탐색 없음
         """
-        logger.info("[Bootstrapper] 전체 데이터 건수 확인 중... (페이지 기반 엔드-페이지 탐색)")
+        svc = self.service_id
+        logger.info(f"[{svc}][Bootstrapper] 전체 데이터 건수 확인 중... (페이지 기반 엔드-페이지 탐색)")
 
         # 알려진 Tail의 마지막 완전 페이지 경계부터 시작
         # 예: known_tail=22416 → 마지막 완전 페이지 = 22001 (22000+1)
@@ -76,7 +77,7 @@ class DiffCrawlerEngine:
             rows = self._fetch_page(page_start, page_start + PAGE_SIZE - 1)
             if len(rows) == known_tail - (page_start - 1):
                 # 마지막 페이지의 레코드 수가 이전과 동일 → tail 변화 없음
-                logger.info(f"[Bootstrapper] 전체 데이터 건수 확인 완료: {known_tail:,}건 (변동 없음)")
+                logger.info(f"[{svc}][Bootstrapper] Tail 변동 없음: {known_tail:,}건 (저장된 페이지 그대로)")
                 return known_tail
 
         # Step 2: 가득 찬 페이지를 따라 앞으로 점프
@@ -89,13 +90,13 @@ class DiffCrawlerEngine:
                 # 이 페이지에 데이터가 없음 → 이전 page_start - 1 이 Tail
                 # (직전 페이지가 가득 찼을 때 발생)
                 tail = page_start - 1
-                logger.info(f"[Bootstrapper] 전체 데이터 건수 확인 완료: {tail:,}건")
+                logger.info(f"[{svc}][Bootstrapper] Tail 확정: {tail:,}건 (빈 페이지 도달)")
                 return tail if tail > 0 else 0
 
             if row_count < PAGE_SIZE:
                 # 마지막 페이지 발견: page_start - 1 + row_count
                 tail = (page_start - 1) + row_count
-                logger.info(f"[Bootstrapper] 전체 데이터 건수 확인 완료: {tail:,}건")
+                logger.info(f"[{svc}][Bootstrapper] Tail 확정: {tail:,}건 (마지막 페이지 {page_start}~{page_start+PAGE_SIZE-1}, {row_count}건 수록)")
                 return tail
 
             # 가득 찬 페이지 → 다음 페이지로
@@ -110,7 +111,7 @@ class DiffCrawlerEngine:
         total_count = self.find_true_tail(known_tail=0)
         pivots = {}
 
-        logger.info(f"[Bootstrapper] 피벗 캐싱 시작 (간격: {settings.PIVOT_INTERVAL})...")
+        logger.info(f"[{self.service_id}][Bootstrapper] 피벗 캐싱 시작 (간격: {settings.PIVOT_INTERVAL})...")
         pivot_indices = list(range(settings.PIVOT_INTERVAL, total_count, settings.PIVOT_INTERVAL))
 
         # 피벗 병렬 조회 (피벗은 단건 조회이므로 _fetch_single 유지)
@@ -131,18 +132,19 @@ class DiffCrawlerEngine:
             "pivots": pivots
         }
         self.state_repo.save_state(self.service_id, state)
-        logger.info(f"[Bootstrapper] 부트스트랩 완료! 총 {len(pivots)}개의 피벗 색인 생성됨.")
+        logger.info(f"[{self.service_id}][Bootstrapper] 부트스트랩 완료! 총 {len(pivots)}개 피벗 색인 생성. (Tail: {total_count:,}건)")
         return state
 
     # ─── 델타 감지 ────────────────────────────────────────────────────────────
 
     def scan_for_updates(self):
         """주기적으로 실행되어 차분(Delta)을 감지합니다."""
+        svc = self.service_id
         start_time = time.time()
         state = self.state_repo.load_state(self.service_id)
 
         if state["last_total_count"] == 0:
-            logger.info("최초 실행: 베이스라인 부트스트랩을 시작합니다...")
+            logger.info(f"[{svc}] 최초 실행: 베이스라인 부트스트랩을 시작합니다...")
             state = self.bootstrap()
             return []  # 부트스트랩 시에는 데이터를 가져오지 않고 베이스라인만 구축
 
@@ -156,8 +158,7 @@ class DiffCrawlerEngine:
         if not ping_rows:
             elapsed = time.time() - start_time
             logger.info(
-                f"✨ [소요시간: {elapsed:.2f}초] "
-                f"새로운 데이터가 감지되지 않았습니다. (현재 전체 데이터: {old_tail:,}건)"
+                f"[{svc}] ✨ [소요: {elapsed:.2f}초] Tail 변동 없음. (현재 tail: {old_tail:,}건)"
             )
             return []
 
@@ -169,13 +170,12 @@ class DiffCrawlerEngine:
         if new_tail <= old_tail:
             # 이론상 발생하지 않지만 방어 코드
             elapsed = time.time() - start_time
-            logger.info(f"✨ [소요시간: {elapsed:.2f}초] 변동 없음 확인. (현재 전체 데이터: {old_tail:,}건)")
+            logger.info(f"[{svc}] ✨ [소요: {elapsed:.2f}초] Tail Ping 변동 없음. (현재 tail: {old_tail:,}건)")
             return []
 
         diff_count = new_tail - old_tail
         logger.info(
-            f"🔍 [Tail 탐색] 인덱스가 {old_tail:,}에서 {new_tail:,}로 증가했습니다. "
-            f"(총 {diff_count:,}건의 신규 삽입 감지)"
+            f"[{svc}] 🔍 [Delta 감지] Tail {old_tail:,} → {new_tail:,} (+{diff_count:,}건 신규 삽입)"
         )
 
         # ── Step 3: Pivot 검사 (Shift 오프셋 확인) ─────────────────────────
@@ -185,7 +185,7 @@ class DiffCrawlerEngine:
         shift_amounts = {}  # pivot_idx -> shift_amount
         current_shift = 0
 
-        logger.info(f"⚙️ 총 {len(pivot_indices)}개의 피벗 지점에서 Shift 오프셋 보정을 시작합니다...")
+        logger.info(f"[{svc}] ⚙️ 피벗 {len(pivot_indices)}개 Shift 오프셋 보정 시작...")
         for p_idx in pivot_indices:
             old_data = pivots[str(p_idx)]
             found_offset = current_shift
