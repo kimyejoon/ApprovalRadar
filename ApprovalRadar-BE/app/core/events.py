@@ -53,10 +53,18 @@ class LogBroadcaster:
             self._sockets.discard(ws)
 
     def broadcast_log(self, message: str):
-        """동기 스레드(Logger)에서 호출. 연결된 모든 WebSocket 클라이언트에게 전송."""
+        """
+        동기 컨텍스트(Logger 핸들러)에서 호출.
+        연결된 모든 WebSocket 클라이언트에게 로그를 전송합니다.
+
+        호출 컨텍스트가 두 가지이므로 분기 처리:
+        - Event loop 내부 (FastAPI async 코드): create_task 사용
+        - 백그라운드 스레드 (크롤러, APScheduler): run_coroutine_threadsafe 사용
+        """
         if not self.loop or not self._sockets:
             return
         sockets_snapshot = list(self._sockets)
+
         async def _send_all():
             disconnected = set()
             for ws in sockets_snapshot:
@@ -66,7 +74,18 @@ class LogBroadcaster:
                     disconnected.add(ws)
             with self._lock:
                 self._sockets -= disconnected
-        asyncio.run_coroutine_threadsafe(_send_all(), self.loop)
+
+        try:
+            running_loop = asyncio.get_running_loop()
+            if running_loop is self.loop:
+                # 이미 이벤트 루프 안 → create_task로 즉시 스케줄
+                self.loop.create_task(_send_all())
+            else:
+                # 다른 루프가 있는 경우 (거의 발생 안 함)
+                asyncio.run_coroutine_threadsafe(_send_all(), self.loop)
+        except RuntimeError:
+            # 실행 중인 루프 없음 = 백그라운드 스레드 → threadsafe 방식
+            asyncio.run_coroutine_threadsafe(_send_all(), self.loop)
 
 
 broadcaster = Broadcaster()
