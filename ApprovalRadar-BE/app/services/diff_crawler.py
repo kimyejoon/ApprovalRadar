@@ -10,8 +10,8 @@ PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
 
 # total_count 필드가 신뢰 가능한 서비스 목록
 # → 1회 API 호출로 정확한 Tail을 바로 얻을 수 있음 (페이지 스캔 불필요)
-# I2859/I2500: total_count 신뢰 불가 (API 버그로 9 등 엉뚱한 값 반환)
-# I2861: 음식점업소 인허가변경 - 이벤트 로그 append 구조로 total_count가 정확함
+# I2859: total_count 신뢰 불가 (API 버그로 9 등 엉뚱한 값 반환) → 페이지 스캔 사용
+# I2861: 음식점업소 인허가변경 - 이벤트 로그 append 구조로 total_count가 정확
 RELIABLE_TOTAL_COUNT_SERVICES = {"I2861"}
 
 
@@ -57,7 +57,7 @@ class DiffCrawlerEngine:
         """
         서비스별 Tail 탐색 전략을 선택합니다:
         - RELIABLE_TOTAL_COUNT_SERVICES (I2861 등): total_count 1회 조회로 즉시 확보
-        - I2859/I2500 등: 페이지 기반 스캔 (total_count 신뢰 불가)
+        - I2859 등: 페이지 기반 스캔 (total_count 신뢰 불가)
 
         known_tail: DB에 저장된 이전 tail (0이면 최초 실행)
         """
@@ -78,7 +78,7 @@ class DiffCrawlerEngine:
             logger.warning(f"[{svc}][Bootstrapper] total_count 읽기 실패. 페이지 스캔으로 폴백합니다.")
             # 폴백: 아래 페이지 스캔으로 진행
 
-        # ── 전략 B: 페이지 기반 스캔 (I2859, I2500 등) ───────────────────────
+        # ── 전략 B: 페이지 기반 스캔 (I2859 등) ───────────────────────
         logger.info(f"[{svc}][Bootstrapper] 전체 데이터 건수 확인 중... (페이지 기반 엔드-페이지 탐색)")
 
         # 알려진 Tail의 마지막 완전 페이지 경계부터 시작

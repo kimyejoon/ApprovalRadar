@@ -7,11 +7,17 @@ class Settings:
     # Food Safety OpenAPI
     BASE_URL = "http://openapi.foodsafetykorea.go.kr/api"
     SERVICE_ID = "I2859"
-    # 추적 대상 서비스 목록
-    # I2859: 식품업소 인허가변경정보 (LOCP_ADDR 주소, BSN_STATE_NM 상태, PRSDNT_NM 대표자)
-    # I2500: 식품 인허가 변동정보 (SITE_ADDR 주소, CHNG_DT 변동일, 상태 없음)
-    # I2861: 음식점업소 인허가변경정보 (I2500과 동일 필드 구조: SITE_ADDR, CHNG_DT)
-    SERVICES = ["I2859", "I2500", "I2861"]
+    # ─── 스캐닝 대상 서비스 (인허가 변동 실시간 감지) ────────────────────────
+    # I2859: 식품업소 인허가변경정보 (LOCP_ADDR, BSN_STATE_NM, PRSDNT_NM)
+    # I2861: 음식점업소 인허가변경정보 (SITE_ADDR, CHNG_DT - I2500과 동일 필드)
+    # → DiffCrawlerEngine이 주기적으로 tail을 비교하여 신규 변동을 감지
+    SERVICES = ["I2859", "I2861"]
+
+    # ─── Backfill 전용 서비스 (스캐닝 ❌, 건별 단건 조회 ⭕) ──────────────────
+    # I2500: 식품 인허가 세부정보 (LCNS_NO 필터로 특정 업소의 '세부업종'만 조회)
+    # → industry_filler.py에서만 사용. DiffCrawler/SERVICES와 무관.
+    # → fetch_data('I2500', 1, 1000, LCNS_NO=lcns_no) 형태로 단건 조회
+    BACKFILL_SERVICE_ID = "I2500"
     DATA_TYPE = "json"
     
     # Crawler Settings
