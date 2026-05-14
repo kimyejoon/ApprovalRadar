@@ -1,0 +1,146 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════════════════════════════════
+#  ApprovalRadar — macOS/Linux 빌드 스크립트
+#  사용법: bash build.sh
+#  실행 전 요구사항: Python 3.11+, Node.js 18+
+# ═══════════════════════════════════════════════════════════════════════════════
+
+set -e  # 오류 발생 시 즉시 중단
+
+# ── 색상 출력 유틸리티 ─────────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'  # No Color
+
+info()    { echo -e "${CYAN}[INFO]${NC}  $*"; }
+success() { echo -e "${GREEN}[OK]${NC}    $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
+error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+step()    { echo -e "\n${BLUE}━━━━━  $*  ━━━━━${NC}"; }
+
+# ── 경로 설정 ──────────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BE_DIR="$SCRIPT_DIR/ApprovalRadar-BE"
+FE_DIR="$SCRIPT_DIR/ApprovalRadar-FE"
+RELEASE_DIR="$SCRIPT_DIR/dist_release"
+
+echo -e "${BLUE}"
+echo "  ╔══════════════════════════════════════════╗"
+echo "  ║     ApprovalRadar — Build Script         ║"
+echo "  ║     macOS / Linux                        ║"
+echo "  ╚══════════════════════════════════════════╝"
+echo -e "${NC}"
+
+# ── 사전 요구사항 체크 ─────────────────────────────────────────────────────────
+step "사전 요구사항 확인"
+
+command -v python3 &>/dev/null || error "Python 3가 설치되지 않았습니다. https://python.org 에서 설치해주세요."
+command -v node   &>/dev/null || error "Node.js가 설치되지 않았습니다. https://nodejs.org 에서 설치해주세요."
+command -v npm    &>/dev/null || error "npm이 설치되지 않았습니다."
+
+PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+NODE_VER=$(node --version | sed 's/v//')
+info "Python $PYTHON_VER / Node.js $NODE_VER"
+
+# Python 최소 버전 체크 (3.11+)
+python3 -c "import sys; assert sys.version_info >= (3,11), 'Python 3.11+ 필요'" \
+  || error "Python 3.11 이상이 필요합니다. 현재: $PYTHON_VER"
+
+success "요구사항 충족"
+
+# ── STEP 1: FE 빌드 ───────────────────────────────────────────────────────────
+step "STEP 1 / 4 — 프론트엔드 빌드"
+
+cd "$FE_DIR"
+info "npm 패키지 설치 중..."
+npm install --silent
+
+info "React 앱 빌드 중... (production 모드)"
+npm run build
+
+FE_DIST="$FE_DIR/dist"
+[ -d "$FE_DIST" ] || error "FE 빌드 실패: dist/ 폴더가 생성되지 않았습니다."
+success "프론트엔드 빌드 완료 → $FE_DIST"
+
+# ── STEP 2: FE dist를 BE 폴더로 복사 ─────────────────────────────────────────
+step "STEP 2 / 4 — 빌드 파일 복사"
+
+BE_DIST="$BE_DIR/dist"
+rm -rf "$BE_DIST"
+cp -r "$FE_DIST" "$BE_DIST"
+success "FE dist 복사 완료 → $BE_DIST"
+
+# ── STEP 3: Python 가상환경 & 의존성 설치 ─────────────────────────────────────
+step "STEP 3 / 4 — Python 환경 구성"
+
+cd "$BE_DIR"
+
+VENV_DIR="$BE_DIR/venv"
+if [ ! -d "$VENV_DIR" ]; then
+    info "가상환경 생성 중..."
+    python3 -m venv "$VENV_DIR"
+fi
+
+# shellcheck disable=SC1091
+source "$VENV_DIR/bin/activate"
+
+info "의존성 설치 중..."
+pip install --quiet --upgrade pip
+pip install --quiet -r requirements.txt
+pip install --quiet pyinstaller
+
+success "Python 환경 구성 완료"
+
+# ── STEP 4: PyInstaller 빌드 ──────────────────────────────────────────────────
+step "STEP 4 / 4 — PyInstaller 빌드 (단일 exe)"
+
+cd "$BE_DIR"
+info "PyInstaller 빌드 시작... (수 분 소요될 수 있습니다)"
+pyinstaller ApprovalRadar.spec --clean --noconfirm
+
+EXE_PATH="$BE_DIR/dist/ApprovalRadar"
+[ -f "$EXE_PATH" ] || error "PyInstaller 빌드 실패: 실행파일이 생성되지 않았습니다."
+
+# ── 배포 패키지 정리 ──────────────────────────────────────────────────────────
+step "배포 패키지 정리"
+
+rm -rf "$RELEASE_DIR"
+mkdir -p "$RELEASE_DIR"
+
+# 실행 파일
+cp "$EXE_PATH" "$RELEASE_DIR/ApprovalRadar"
+chmod +x "$RELEASE_DIR/ApprovalRadar"
+
+# .env (API 키 — 유저 편집 가능)
+cp "$BE_DIR/.env" "$RELEASE_DIR/.env"
+
+# 실행 안내 텍스트
+cat > "$RELEASE_DIR/실행방법.txt" << 'EOF'
+═══════════════════════════════════════════════════
+  ApprovalRadar — 실행 방법 (macOS)
+═══════════════════════════════════════════════════
+
+1. 이 폴더에서 'ApprovalRadar' 파일을 더블클릭합니다.
+2. 처음 실행 시 macOS 보안 경고가 뜰 수 있습니다:
+   시스템 환경설정 → 개인정보 보호 및 보안 → '확인 없이 열기' 클릭
+3. 런처 창이 뜨고, 브라우저가 자동으로 열립니다.
+4. 종료 시 런처 창의 [종료] 버튼을 클릭합니다.
+
+───────────────────────────────────────────────────
+API 키 설정: .env 파일을 텍스트 편집기로 열어 수정
+───────────────────────────────────────────────────
+EOF
+
+success "배포 패키지 생성 완료!"
+
+echo -e "\n${GREEN}╔══════════════════════════════════════════════════════╗"
+echo    "║  ✅  빌드 성공!                                      ║"
+echo    "║                                                      ║"
+echo -e "║  📦  배포 폴더: ${NC}dist_release/${GREEN}                        ║"
+echo    "║  📂  포함 파일:                                      ║"
+echo    "║       • ApprovalRadar  (실행 파일)                   ║"
+echo    "║       • .env           (API 키 설정)                 ║"
+echo    "║       • 실행방법.txt   (안내 문서)                   ║"
+echo    "╚══════════════════════════════════════════════════════╝"
+echo -e "${NC}"
+
+deactivate

@@ -1,9 +1,18 @@
 import sqlite3
 import os
+import sys
 import threading
 from contextlib import contextmanager
 
-DB_FILE = "food_safety.db"
+# PyInstaller 번들 실행 시: exe 옆에 DB 파일 위치
+# 개발 환경: 소스 파일과 같은 디렉토리에 위치
+if getattr(sys, 'frozen', False):
+    # 실행 중인 exe 경로의 부모 디렉토리 (exe 옆)
+    _BASE_DIR = os.path.dirname(sys.executable)
+else:
+    _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DB_FILE = os.path.join(_BASE_DIR, "food_safety.db")
 
 # 스레드별 독립 커넥션 캐싱 (Connection Pool)
 # - 동일 스레드 내에서는 커넥션을 재사용하여 open/close 오버헤드 제거

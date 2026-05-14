@@ -26,3 +26,5 @@ uvicorn==0.46.0
 uvloop==0.22.1
 watchfiles==1.1.1
 websockets==16.0
+# ── 배포 패키징 (개발자 빌드 전용) ──
+pyinstaller>=6.0.0

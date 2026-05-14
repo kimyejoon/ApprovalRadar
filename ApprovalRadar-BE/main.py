@@ -9,6 +9,8 @@ import asyncio
 import time as _time
 import signal
 import os as _os
+import sys as _sys
+import pathlib as _pathlib
 from database import init_db
 
 from app.core.logger import logger
@@ -124,3 +126,15 @@ def read_root():
 # Include API Router
 app.include_router(api_router)
 
+# ── 프론트엔드 정적 파일 서빙 ────────────────────────────────────────────────
+# 배포 빌드 시 FE dist/ 를 FastAPI 동일 포트에서 제공
+# PyInstaller 번들: sys._MEIPASS 기준, 개발 환경: BE 폴더 내 dist/ 참조
+if getattr(_sys, 'frozen', False):
+    _static_base = _pathlib.Path(_sys._MEIPASS)  # type: ignore[attr-defined]
+else:
+    _static_base = _pathlib.Path(__file__).parent
+
+_dist_dir = _static_base / "dist"
+if _dist_dir.exists():
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=str(_dist_dir), html=True), name="spa")

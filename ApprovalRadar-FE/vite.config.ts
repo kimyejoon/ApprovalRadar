@@ -9,6 +9,8 @@ const __dirname = path.dirname(__filename)
 
 // https://vite.dev/config/
 export default defineConfig({
+  // 배포 빌드: FastAPI StaticFiles로 서빙 시 상대경로 에셋 보장
+  base: './',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
