@@ -4,7 +4,6 @@ import {
   WifiX,
   WifiHigh,
   Trash,
-  PlugsConnected,
   Key,
   Database,
   ArrowsClockwise,
@@ -197,7 +196,7 @@ function DownloadLogCard() {
 // ─── 메인 로그 페이지 ─────────────────────────────────────────────────────
 
 export function LogPage() {
-  const { logs, isConnected, connect, disconnect, clearLogs } = useLogStream();
+  const { logs, isConnected, clearLogs } = useLogStream();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -229,20 +228,9 @@ export function LogPage() {
             }`}>
             {isConnected
               ? <><WifiHigh className="w-3.5 h-3.5" /> 연결됨</>
-              : <><WifiX className="w-3.5 h-3.5" /> 연결 안됨</>
+              : <><WifiX className="w-3.5 h-3.5" /> 재연결 중...</>
             }
           </div>
-          <button
-            id="log-connect-toggle"
-            onClick={isConnected ? disconnect : connect}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${isConnected
-              ? 'border-border-standard text-text-muted hover:text-red-400 hover:border-red-400/30'
-              : 'border-brand/30 text-brand hover:bg-brand/10'
-              }`}
-          >
-            <PlugsConnected className="w-3.5 h-3.5" />
-            {isConnected ? '연결 해제' : '연결'}
-          </button>
           <button
             id="log-clear-btn"
             onClick={clearLogs}

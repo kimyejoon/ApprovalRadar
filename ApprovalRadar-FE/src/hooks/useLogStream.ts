@@ -59,11 +59,12 @@ export function useLogStream() {
   }, []);
 
   useEffect(() => {
+    connect(); // 마운트 시 자동 연결
     return () => {
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       wsRef.current?.close();
     };
-  }, []);
+  }, [connect]);
 
   const clearLogs = useCallback(() => setLogs([]), []);
 
