@@ -18,6 +18,9 @@ class ApiClient:
     _class_lock = threading.Lock()
     # key_masked → {"date": "YYYY-MM-DD", "count": int}
     _usage: dict[str, dict] = {}
+    # ✅ [개선] 키 회복 체크용 공유 세션 – 매번 새 TCP 연결 생성 막음
+    _recovery_session: "httpx.Client | None" = None
+
 
     # ─── 내부 유틸리티 ──────────────────────────────────────────────────────
 
@@ -114,19 +117,26 @@ class ApiClient:
     def check_key_recovery(cls, api_keys: list, base_url: str, data_type: str, service_id: str = "I2859") -> bool:
         """
         소진 상태일 때만 호출. 실제 API를 호출해 회복된 키가 있으면 recover_exhaustion()을 호출.
+        ✅ [개선] 클래스 레벨 _recovery_session 재사용으로 TCP 핵드셰이크 오버헤드 제거.
         Returns: 회복 여부 (True = 하나 이상 활성 키 발견)
         """
         if not cls.is_exhausted():
             return False
 
-        # pyrefly: ignore [missing-import]
-        import httpx as req_lib
+        # 회복 세션 재사용: 없거나 closed 상태면 새로 생성
+        with cls._class_lock:
+            if cls._recovery_session is None or cls._recovery_session.is_closed:
+                cls._recovery_session = httpx.Client(
+                    headers={'Connection': 'keep-alive', 'Accept': 'application/json'},
+                    follow_redirects=True,
+                )
+
         logger.info("[키 회복 체크] 소진된 키 활성화 여부 확인 중...")
         active_masked: set[str] = set()
         for key in api_keys:
             url = f"{base_url}/{key}/{service_id}/{data_type}/1/1"
             try:
-                res = req_lib.get(url, timeout=7).json()
+                res = cls._recovery_session.get(url, timeout=7).json()
                 if service_id in res:
                     code = res[service_id]['RESULT']['CODE']
                     if code == "INFO-000":
