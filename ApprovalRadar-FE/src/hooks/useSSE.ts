@@ -29,6 +29,10 @@ export function useSSE() {
 
       eventSource.onopen = () => {
         console.log('SSE Connection Opened:', url);
+        // 이전에 크롤러 이상 팝업이 발생한 이력이 있을 때만 복구 알림 표시
+        if (reconnectAttempts.current >= 5) {
+          emitSystemAlert('WARN', '서버와의 연결이 복구되었습니다. 정상적으로 모니터링을 재개합니다.');
+        }
         reconnectAttempts.current = 0;
       };
 
@@ -102,6 +106,15 @@ export function useSSE() {
         eventSource.close();
         const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
         reconnectAttempts.current += 1;
+
+        // 5회 이상 연속 실패 시 크롤러 이상 팝업 (중복 방지: 최초 1회만 표시)
+        if (reconnectAttempts.current === 5) {
+          emitSystemAlert(
+            'ALERT',
+            '서버와의 연결이 끊겼습니다. 크롤링 로직에 이상이 발생한 것 같습니다.\n프로그램을 재시작하거나, 로그 화면을 캡처하여 개발자에게 문의해주세요.'
+          );
+        }
+
         setTimeout(connect, timeout);
       };
 
