@@ -7,6 +7,7 @@ import datetime
 from app.core.config import settings
 from app.core.logger import logger
 from app.core.events import shutdown_event
+from app.clients import key_usage_repository as key_usage_repo
 
 
 class ApiKeysExhaustedError(Exception):
@@ -29,40 +30,6 @@ class ApiClient:
     def _mask_key(key: str) -> str:
         """API 키를 마스킹하여 반환합니다."""
         return f"{key[:5]}***{key[-3:]}" if len(key) > 8 else "***"
-
-    @classmethod
-    def _upsert_key_usage(cls, masked: str, today: str, *, exhausted: bool = False, reset: bool = False):
-        """api_key_usage 테이블에 사용량을 upsert합니다."""
-        try:
-            from database import get_db
-            with get_db() as conn:
-                if exhausted:
-                    conn.execute(
-                        '''INSERT INTO api_key_usage (key_masked, usage_date, call_count, exhausted, last_updated)
-                           VALUES (?, ?, 1000, 1, CURRENT_TIMESTAMP)
-                           ON CONFLICT(key_masked, usage_date)
-                           DO UPDATE SET call_count=1000, exhausted=1, last_updated=CURRENT_TIMESTAMP''',
-                        (masked, today)
-                    )
-                elif reset:
-                    conn.execute(
-                        '''INSERT INTO api_key_usage (key_masked, usage_date, call_count, exhausted, last_updated)
-                           VALUES (?, ?, 0, 0, CURRENT_TIMESTAMP)
-                           ON CONFLICT(key_masked, usage_date)
-                           DO UPDATE SET call_count=0, exhausted=0, last_updated=CURRENT_TIMESTAMP''',
-                        (masked, today)
-                    )
-                else:
-                    conn.execute(
-                        '''INSERT INTO api_key_usage (key_masked, usage_date, call_count, last_updated)
-                           VALUES (?, ?, 1, CURRENT_TIMESTAMP)
-                           ON CONFLICT(key_masked, usage_date)
-                           DO UPDATE SET call_count = call_count + 1, last_updated = CURRENT_TIMESTAMP''',
-                        (masked, today)
-                    )
-                conn.commit()
-        except Exception:
-            pass  # 사용량 기록 실패는 크롤링에 영향 없음
 
     # ─── 클래스 레벨 상태 관리 ──────────────────────────────────────────────
 
@@ -97,13 +64,13 @@ class ApiClient:
                 entry["date"] = today
                 entry["count"] = 0
             entry["count"] += 1
-        cls._upsert_key_usage(masked, today)
+        key_usage_repo.increment(masked, today)
 
     @classmethod
     def _mark_key_exhausted_in_db(cls, key: str):
         """DB에서 해당 키를 exhausted=1, call_count=1000으로 마크."""
         today = datetime.date.today().isoformat()
-        cls._upsert_key_usage(cls._mask_key(key), today, exhausted=True)
+        key_usage_repo.mark_exhausted(cls._mask_key(key), today)
 
     @classmethod
     def recover_exhaustion(cls, active_masked_keys: set[str]) -> None:
@@ -112,7 +79,7 @@ class ApiClient:
         with cls._class_lock:
             cls._exhausted_until = None
         for masked in active_masked_keys:
-            cls._upsert_key_usage(masked, today, reset=True)
+            key_usage_repo.reset(masked, today)
 
     @classmethod
     async def check_key_recovery(cls, api_keys: list, base_url: str, data_type: str, service_id: str = "I2859") -> bool:
@@ -127,10 +94,7 @@ class ApiClient:
         # 회복 클라이언트 재사용: 없거나 closed 상태면 새로 생성
         with cls._class_lock:
             if cls._recovery_client is None or cls._recovery_client.is_closed:
-                cls._recovery_client = httpx.AsyncClient(
-                    headers={'Connection': 'keep-alive', 'Accept': 'application/json'},
-                    follow_redirects=True,
-                )
+                cls._recovery_client = cls._create_session()
 
         logger.info("[키 회복 체크] 소진된 키 활성화 여부 확인 중...")
         active_masked: set[str] = set()
@@ -266,6 +230,12 @@ class ApiClient:
         if "현재 접속 중인 인증키입니다" in raw_text:
             logger.warning("WAF 임시 차단 감지! 키를 즉시 전환합니다.")
 
+    @staticmethod
+    async def _sleep_backoff(backoff: float) -> float:
+        """지수 백오프 sleep 후 다음 backoff 값(최대 10초)을 반환합니다."""
+        await asyncio.sleep(backoff)
+        return min(backoff * 2, 10)
+
     async def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5, timeout: int = 30, **kwargs) -> dict:
         """
         주어진 구간의 데이터를 비동기로 조회합니다.
@@ -276,7 +246,7 @@ class ApiClient:
             raise ApiKeysExhaustedError("All API keys are exhausted for today.")
 
         attempt = 0
-        backoff = 1
+        backoff = 1.0
         response = None
 
         while attempt < max_retries and not shutdown_event.is_set():
@@ -313,27 +283,23 @@ class ApiClient:
                         # None → 재시도 (서버 오류)
                         if shutdown_event.is_set():
                             return {}
-                        await asyncio.sleep(backoff)
-                        backoff = min(backoff * 2, 10)
+                        backoff = await self._sleep_backoff(backoff)
                         attempt += 1
                     else:
                         logger.warning(f"알 수 없는 응답 형식입니다. {backoff}초 후 재시도합니다...")
-                        await asyncio.sleep(backoff)
-                        backoff = min(backoff * 2, 10)
+                        backoff = await self._sleep_backoff(backoff)
                         attempt += 1
 
                 except ValueError as e:
                     self._handle_value_error(e, api_key, service_id, kwargs, response)
                     await self.switch_key(api_key)
-                    await asyncio.sleep(backoff)
-                    backoff = min(backoff * 2, 10)
+                    backoff = await self._sleep_backoff(backoff)
                     attempt += 1
 
                 except httpx.TimeoutException:
                     ctx = f"서비스:{service_id}, 범위:{start_idx}~{end_idx}"
                     logger.warning(f"[읽기 타임아웃] {ctx} | 서버 응답 지연 ({timeout}초 초과). {backoff}초 후 재시도합니다.")
-                    await asyncio.sleep(backoff)
-                    backoff = min(backoff * 2, 10)
+                    backoff = await self._sleep_backoff(backoff)
                     attempt += 1
 
                 except httpx.HTTPError as e:
@@ -342,8 +308,7 @@ class ApiClient:
                         ctx += f", 추가:{kwargs}"
                     logger.warning(f"[네트워크 통신 오류] {ctx} | 사유: {str(e)}. 연결 오류로 인해 키를 전환합니다.")
                     await self.switch_key(api_key)
-                    await asyncio.sleep(backoff)
-                    backoff = min(backoff * 2, 10)
+                    backoff = await self._sleep_backoff(backoff)
                     attempt += 1
 
         logger.error(f"❌ 최대 재시도 횟수({max_retries}) 초과. API 요청 완전 실패: {start_idx}~{end_idx}")

@@ -2,14 +2,13 @@
 test_pivot_sampling.py
 ──────────────────────
 Gap 분석 개선사항 #6에 대한 Delete 은폐 감지 검증
-- _sample_check_pivots 메서드 존재 여부
+- pivot_manager.sample_check 함수 존재 여부
 - 피벗 일치 시 False 반환
 - 피벗 불일치 시 True 반환 (Delete 감지)
 - 빈 pivots 시 False 반환 (안전)
 - API 오류 시 예외 미전파 (방어적 동작)
 
-✅ [async 전환] _sample_check_pivots가 async def로 변경됨에 따라
-pytest-asyncio 기반으로 모든 I/O 테스트를 async 방식으로 수정.
+✅ [리팩토링] _sample_check_pivots가 pivot_manager.sample_check로 이관됨.
 """
 # pyrefly: ignore [missing-import]
 import asyncio
@@ -44,88 +43,105 @@ class TestPivotSamplingExists:
     """#6 코드 구조 확인"""
 
     def test_sample_check_pivots_method_exists(self):
-        """DiffCrawlerEngine에 _sample_check_pivots 메서드가 존재하는지"""
-        from app.services.diff_crawler import DiffCrawlerEngine
-        assert hasattr(DiffCrawlerEngine, "_sample_check_pivots"), \
-            "_sample_check_pivots 메서드 없음"
+        """pivot_manager 모듈에 sample_check 함수가 존재하는지"""
+        from app.services import pivot_manager
+        assert hasattr(pivot_manager, "sample_check"), \
+            "pivot_manager.sample_check 함수 없음"
 
     def test_pivot_sample_ratio_defined(self):
-        """PIVOT_SAMPLE_RATIO 클래스 변수가 정의되어 있는지"""
-        from app.services.diff_crawler import DiffCrawlerEngine
-        assert hasattr(DiffCrawlerEngine, "PIVOT_SAMPLE_RATIO")
-        assert 0 < DiffCrawlerEngine.PIVOT_SAMPLE_RATIO <= 1.0, \
-            "PIVOT_SAMPLE_RATIO가 유효 범위(0~1) 밖"
+        """PIVOT_SAMPLE_RATIO 기본값이 유효 범위(0~1)인지"""
+        import inspect
+        from app.services import pivot_manager
+        sig = inspect.signature(pivot_manager.sample_check)
+        ratio = sig.parameters["sample_ratio"].default
+        assert 0 < ratio <= 1.0, \
+            "sample_ratio 기본값이 유효 범위(0~1) 밖"
 
 
 class TestPivotSamplingLogic:
-    """#6 _sample_check_pivots 동작 검증 (async)"""
+    """#6 pivot_manager.sample_check 동작 검증 (async)"""
 
     @pytest.mark.asyncio
     async def test_empty_pivots_returns_false(self):
         """빈 pivots 딕셔너리는 항상 False(정상)를 반환해야 함"""
-        engine = make_engine()
-        result = await engine._sample_check_pivots({})
+        from app.services import pivot_manager
+        mock_client = MagicMock()
+        mock_client.fetch_data = AsyncMock(return_value={})
+        result = await pivot_manager.sample_check({}, mock_client, "I2859")
         assert result is False, "빈 pivots에서 True 반환 → 오탐 가능성"
 
     @pytest.mark.asyncio
     async def test_matching_pivot_returns_false(self):
         """피벗 LCNS_NO가 API 응답과 일치하면 False(정상)"""
+        from app.services import pivot_manager
         api_response = {
             "I2859": {"RESULT": {"CODE": "INFO-000"}, "row": [{"LCNS_NO": "ABC-123"}]}
         }
-        engine = make_engine(fetch_response=api_response)
+        mock_client = MagicMock()
+        mock_client.fetch_data = AsyncMock(return_value=api_response)
         pivots = {"100": {"LCNS_NO": "ABC-123", "CHNG_DT": "20250101", "BSSH_NM": "테스트업소"}}
 
-        result = await engine._sample_check_pivots(pivots)
+        result = await pivot_manager.sample_check(pivots, mock_client, "I2859")
         assert result is False, "피벗 일치인데 True 반환 → 오탐"
 
     @pytest.mark.asyncio
     async def test_mismatched_pivot_returns_true(self):
         """피벗 LCNS_NO가 API 응답과 불일치하면 True(Delete 감지)"""
+        from app.services import pivot_manager
         api_response = {
             "I2859": {"RESULT": {"CODE": "INFO-000"}, "row": [{"LCNS_NO": "XYZ-999"}]}  # 다른 값
         }
-        engine = make_engine(fetch_response=api_response)
+        mock_client = MagicMock()
+        mock_client.fetch_data = AsyncMock(return_value=api_response)
         pivots = {"100": {"LCNS_NO": "ABC-123", "CHNG_DT": "20250101", "BSSH_NM": "서로다른업소"}}
 
-        result = await engine._sample_check_pivots(pivots)
+        result = await pivot_manager.sample_check(pivots, mock_client, "I2859")
         assert result is True, "피벗 불일치인데 False 반환 → Delete 감지 실패"
 
     @pytest.mark.asyncio
     async def test_api_error_does_not_raise(self):
         """API 조회 실패 시 예외가 전파되지 않고 False(건너뜀) 처리되어야 함"""
-        engine = make_engine(fetch_side_effect=Exception("API 오류"))
+        from app.services import pivot_manager
+        mock_client = MagicMock()
+        mock_client.fetch_data = AsyncMock(side_effect=Exception("API 오류"))
         pivots = {"100": {"LCNS_NO": "ABC-123", "CHNG_DT": "20250101", "BSSH_NM": "테스트"}}
 
         # 예외 없이 실행되어야 함
-        result = await engine._sample_check_pivots(pivots)
+        result = await pivot_manager.sample_check(pivots, mock_client, "I2859")
         assert result is False, "API 오류 시 False를 반환해야 함 (방어적 처리)"
 
     @pytest.mark.asyncio
     async def test_sampling_uses_subset_of_pivots(self):
-        """PIVOT_SAMPLE_RATIO 비율만큼만 API 호출이 발생하는지 확인"""
-        from app.services.diff_crawler import DiffCrawlerEngine
+        """sample_ratio 비율만큼만 API 호출이 발생하는지 확인"""
+        from app.services import pivot_manager
+        import inspect
 
         api_response = {"I2859": {"RESULT": {"CODE": "INFO-000"}, "row": [{"LCNS_NO": "MATCH"}]}}
-        engine = make_engine(fetch_response=api_response)
+        mock_client = MagicMock()
+        mock_client.fetch_data = AsyncMock(return_value=api_response)
         # 피벗 LCNS_NO를 모두 MATCH로 세팅 (전부 일치) — dict 포맷
         pivots = {str(i): {"LCNS_NO": "MATCH", "CHNG_DT": "20250101", "BSSH_NM": ""} for i in range(100, 200)}  # 100개
 
-        await engine._sample_check_pivots(pivots)
+        sig = inspect.signature(pivot_manager.sample_check)
+        sample_ratio = sig.parameters["sample_ratio"].default
 
-        call_count = engine.api_client.fetch_data.call_count
-        expected_max = max(1, int(len(pivots) * DiffCrawlerEngine.PIVOT_SAMPLE_RATIO)) + 1
+        await pivot_manager.sample_check(pivots, mock_client, "I2859")
+
+        call_count = mock_client.fetch_data.call_count
+        expected_max = max(1, int(len(pivots) * sample_ratio)) + 1
         assert call_count <= expected_max, \
             f"샘플링이 아닌 전체 조회 발생: {call_count}회 호출"
 
     @pytest.mark.asyncio
     async def test_empty_api_row_is_skipped(self):
         """API 응답에 row가 없으면 해당 피벗은 건너뛰고 False 반환"""
+        from app.services import pivot_manager
         api_response = {"I2859": {"RESULT": {"CODE": "INFO-000"}, "row": []}}  # 빈 row
-        engine = make_engine(fetch_response=api_response)
+        mock_client = MagicMock()
+        mock_client.fetch_data = AsyncMock(return_value=api_response)
         pivots = {"100": {"LCNS_NO": "ABC-123", "CHNG_DT": "20250101", "BSSH_NM": ""}}
 
-        result = await engine._sample_check_pivots(pivots)
+        result = await pivot_manager.sample_check(pivots, mock_client, "I2859")
         assert result is False, "빈 row에서 오탐 발생"
 
 

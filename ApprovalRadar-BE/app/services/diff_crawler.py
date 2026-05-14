@@ -5,6 +5,7 @@ from app.clients.foodsafety_api import ApiClient
 from app.repositories.state_repository import StateRepository
 from app.core.logger import logger
 from app.core.events import shutdown_event
+from app.services import pivot_manager
 
 PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
 
@@ -60,6 +61,25 @@ class DiffCrawlerEngine:
 
     # ─── Tail 탐색 ────────────────────────────────────────────────────────────
 
+    async def _exponential_jump(self, start_pos: int) -> tuple[int, int]:
+        """
+        지수 점프로 데이터 없는 상한선을 탐색합니다.
+        Returns: (last_nonempty, upper_bound)
+        """
+        pos = start_pos
+        last_nonempty = pos
+        while not shutdown_event.is_set():
+            rows = await self._fetch_page(pos, pos + PAGE_SIZE - 1)
+            if rows:
+                last_nonempty = pos
+                logger.info(f"[{self.service_id}][Bootstrapper] 지수점프 {pos:,}: {len(rows)}건")
+                pos *= 2
+                if pos > 50_000_000:
+                    break
+            else:
+                break
+        return last_nonempty, pos
+
     async def find_true_tail(self, known_tail: int = 0) -> int:
         """
         실제 데이터 끝(Tail) 위치를 정확하게 탐색합니다.
@@ -102,21 +122,11 @@ class DiffCrawlerEngine:
                 return known_tail
             logger.info(f"[{svc}][Bootstrapper] Tail Ping: {len(ping)}건 신규 감지, 탐색 계속")
 
-        # Step 2: 지수 점프 - 데이터 없는 상한선 탐색
-        pos = max(PAGE_SIZE, known_tail + PAGE_SIZE)
-        last_nonempty = pos
-        while not shutdown_event.is_set():
-            rows = await self._fetch_page(pos, pos + PAGE_SIZE - 1)
-            if rows:
-                last_nonempty = pos
-                logger.info(f"[{svc}][Bootstrapper] 지수점프 {pos:,}: {len(rows)}건")
-                pos *= 2
-                if pos > 50_000_000:
-                    break
-            else:
-                break
+        # Step 2: 지수 점프
+        start_pos = max(PAGE_SIZE, known_tail + PAGE_SIZE)
+        last_nonempty, upper_bound = await self._exponential_jump(start_pos)
 
-        low, high = last_nonempty, pos
+        low, high = last_nonempty, upper_bound
         logger.info(f"[{svc}][Bootstrapper] 이진탐색 범위: {low:,} ~ {high:,}")
 
         # Step 3: 이진 탐색 - 마지막 데이터 PAGE 경계 확정
@@ -183,117 +193,14 @@ class DiffCrawlerEngine:
         logger.info(f"[{self.service_id}][Bootstrapper] 부트스트랩 완료! 총 {len(pivots)}개 피벗 색인 생성. (Tail: {total_count:,}건)")
         return state
 
-    # ─── 보조 감지: Delete 은폐 피벗 샘플링 ──────────────────────────────────
-
-    PIVOT_SAMPLE_RATIO = 0.2  # 피벗의 20%를 샘플링
-
-    async def _sample_check_pivots(self, pivots: dict) -> bool:
-        """
-        저장된 피벗 중 일부를 무작위로 샘플링하여 API 현재 응답과 비교합니다.
-        Delete가 은폐(Insert+Delete 동시 발생)된 경우 피벗의 LCNS_NO가 바뀌어 있습니다.
-        ✅ Boundary 양방향 보완: LCNS_NO(첫 번째) + LAST_LCNS_NO(마지막) 모두 검증
-        Returns: True = 불일치 감지(Delete 의심), False = 정상
-        """
-        if not pivots:
-            return False
-
-        pivot_items = list(pivots.items())
-        sample_size = max(1, int(len(pivot_items) * self.PIVOT_SAMPLE_RATIO))
-        sampled = random.sample(pivot_items, min(sample_size, len(pivot_items)))
-
-        for idx_str, pivot_data in sampled:
-            idx = int(idx_str)
-            # pivot_data는 dict(신규) 또는 str(레거시) 형태일 수 있음
-            if isinstance(pivot_data, dict):
-                expected_lcns_no = pivot_data.get("LCNS_NO", "")
-                expected_last_lcns_no = pivot_data.get("LAST_LCNS_NO", "")  # 신규 Boundary 필드
-            else:
-                expected_lcns_no = str(pivot_data)  # 레거시 문자열 포맷 호환
-                expected_last_lcns_no = ""
-            try:
-                # 첫 번째 행 검증
-                res = await self.api_client.fetch_data(self.service_id, idx, idx)
-                # WAF 차단 방지: 피벗 샘플링 API 호출 직후 Jitter 적용
-                await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
-                items = res.get(self.service_id, {}).get("row", [])
-                if not items:
-                    continue
-                actual_lcns_no = items[0].get("LCNS_NO", "")
-                if actual_lcns_no != expected_lcns_no:
-                    logger.warning(
-                        f"[{self.service_id}][피벗 샘플링] idx={idx} 첫번째 불일치! "
-                        f"저장값(LCNS_NO)={expected_lcns_no}, 현재값={actual_lcns_no}"
-                    )
-                    return True
-
-                # ✅ 마지막 행 검증 (LAST_LCNS_NO 저장된 경우만)
-                if expected_last_lcns_no:
-                    last_res = await self.api_client.fetch_data(self.service_id, idx + PAGE_SIZE - 1, idx + PAGE_SIZE - 1)
-                    # WAF 차단 방지: 피벗 샘플링 마지막 행 API 호출 직후 Jitter 적용
-                    await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
-                    last_items = last_res.get(self.service_id, {}).get("row", [])
-                    if last_items:
-                        actual_last_lcns_no = last_items[0].get("LCNS_NO", "")
-                        if actual_last_lcns_no != expected_last_lcns_no:
-                            logger.warning(
-                                f"[{self.service_id}][피벗 샘플링] idx={idx} 마지막 행 불일치! "
-                                f"저장값(LAST_LCNS_NO)={expected_last_lcns_no}, 현재값={actual_last_lcns_no}"
-                            )
-                            return True
-
-            except Exception as e:
-                logger.debug(f"[{self.service_id}][피벗 샘플링] idx={idx} 조회 실패: {e}")
-                continue
-        return False
-
     # ─── 델타 감지 ────────────────────────────────────────────────────────────
 
-    async def scan_for_updates(self):
-        """주기적으로 실행되어 차분(Delta)을 감지합니다."""
-        import time
-        svc = self.service_id
-        start_time = time.time()
-        state = self.state_repo.load_state(self.service_id)
-
-        if state["last_total_count"] == 0:
-            logger.info(f"[{svc}] 최초 실행: 베이스라인 부트스트랩을 시작합니다...")
-            state = await self.bootstrap()
-            return []  # 부트스트랩 시에는 데이터를 가져오지 않고 베이스라인만 구축
-
-        old_tail = state["last_total_count"]
-
-        # find_true_tail 내부에서 Ping → 지수점프 → 이진탐색 → Gap스캔 전체 처리
-        new_tail = await self.find_true_tail(known_tail=old_tail)
-
-        if new_tail <= old_tail:
-            elapsed = time.time() - start_time
-            # ✅ Delete 은폐 감지: Tail이 같아도 Insert+Delete가 동시 발생했을 수 있음
-            changed = await self._sample_check_pivots(state.get("pivots", {}))
-            if changed:
-                logger.warning(
-                    f"[{svc}] ⚠️ [Delete 은폐 감지] Tail 변동 없으나 피벗 불일치! "
-                    f"Insert+Delete 동시 발생 가능성. 다음 주기에 Tail 재탐색 예정."
-                )
-                # 은폐 감지 시 last_total_count를 -1 감소시켜 다음 주기에 강제 탐색 유도
-                state["last_total_count"] = max(0, old_tail - 1)
-                self.state_repo.save_state(self.service_id, state)
-            else:
-                logger.info(f"[{svc}] ✨ [소요: {elapsed:.2f}초] Tail 변동 없음. (tail: {old_tail:,}건)")
-            return []
-
-        diff_count = new_tail - old_tail
-        logger.info(
-            f"[{svc}] 🔍 [Delta 감지] Tail {old_tail:,} → {new_tail:,} (+{diff_count:,}건 신규 삽입)"
-        )
-
-        # ── Step 3: Pivot 검사 (Shift 오프셋 확인) ─────────────────────────
-        pivots = state["pivots"]
-        pivot_indices = sorted([int(k) for k in pivots.keys()])
-
-        shift_amounts = {}  # pivot_idx -> shift_amount
+    async def _compute_shift_offsets(self, pivots: dict, pivot_indices: list, diff_count: int) -> dict:
+        """피벗별 Shift 오프셋을 계산합니다."""
+        shift_amounts = {}
         current_shift = 0
 
-        logger.info(f"[{svc}] ⚙️ 피벗 {len(pivot_indices)}개 Shift 오프셋 보정 시작...")
+        logger.info(f"[{self.service_id}] ⚙️ 피벗 {len(pivot_indices)}개 Shift 오프셋 보정 시작...")
         for p_idx in pivot_indices:
             old_data = pivots[str(p_idx)]
             found_offset = current_shift
@@ -304,13 +211,15 @@ class DiffCrawlerEngine:
                     break
             shift_amounts[p_idx] = found_offset
             current_shift = found_offset
+        return shift_amounts
 
-        # ── Step 4: 신규 데이터 다운로드 ────────────────────────────────────
+    async def _download_new_rows(self, pivot_indices: list, shift_amounts: dict, old_tail: int, new_tail: int, diff_count: int) -> list:
+        """신규 삽입된 행들을 구간별로 다운로드합니다."""
         new_data_rows = []
         prev_idx = 0
         prev_shift = 0
-
         segments = []
+
         for p_idx in pivot_indices:
             shift = shift_amounts[p_idx]
             if shift > prev_shift:
@@ -343,7 +252,10 @@ class DiffCrawlerEngine:
                     r["DB_INDEX_RANGE"] = f"{new_start}~{new_end}"
                 new_data_rows.extend(top_new)
 
-        # ── Step 5: 피벗 및 Tail 갱신 → DB 영속화 ──────────────────────────
+        return new_data_rows
+
+    async def _update_pivots(self, pivot_indices: list, pivots: dict, shift_amounts: dict, new_tail: int, diff_count: int) -> dict:
+        """피벗 인덱스를 Shift 오프셋에 맞게 갱신하고, 새 꼬리까지 추가 피벗을 생성합니다."""
         new_pivots = {}
         for p_idx in pivot_indices:
             shift = shift_amounts[p_idx]
@@ -368,6 +280,59 @@ class DiffCrawlerEngine:
                 }
             next_pivot += settings.PIVOT_INTERVAL
 
+        return new_pivots
+
+    async def scan_for_updates(self):
+        """주기적으로 실행되어 차분(Delta)을 감지합니다."""
+        import time
+        svc = self.service_id
+        start_time = time.time()
+        state = self.state_repo.load_state(self.service_id)
+
+        if state["last_total_count"] == 0:
+            logger.info(f"[{svc}] 최초 실행: 베이스라인 부트스트랩을 시작합니다...")
+            state = await self.bootstrap()
+            return []  # 부트스트랩 시에는 데이터를 가져오지 않고 베이스라인만 구축
+
+        old_tail = state["last_total_count"]
+
+        # find_true_tail 내부에서 Ping → 지수점프 → 이진탐색 → Gap스캔 전체 처리
+        new_tail = await self.find_true_tail(known_tail=old_tail)
+
+        if new_tail <= old_tail:
+            elapsed = time.time() - start_time
+            # ✅ Delete 은폐 감지: Tail이 같아도 Insert+Delete가 동시 발생했을 수 있음
+            changed = await pivot_manager.sample_check(
+                state.get("pivots", {}), self.api_client, svc
+            )
+            if changed:
+                logger.warning(
+                    f"[{svc}] ⚠️ [Delete 은폐 감지] Tail 변동 없으나 피벗 불일치! "
+                    f"Insert+Delete 동시 발생 가능성. 다음 주기에 Tail 재탐색 예정."
+                )
+                # 은폐 감지 시 last_total_count를 -1 감소시켜 다음 주기에 강제 탐색 유도
+                state["last_total_count"] = max(0, old_tail - 1)
+                self.state_repo.save_state(self.service_id, state)
+            else:
+                logger.info(f"[{svc}] ✨ [소요: {elapsed:.2f}초] Tail 변동 없음. (tail: {old_tail:,}건)")
+            return []
+
+        diff_count = new_tail - old_tail
+        logger.info(
+            f"[{svc}] 🔍 [Delta 감지] Tail {old_tail:,} → {new_tail:,} (+{diff_count:,}건 신규 삽입)"
+        )
+
+        pivots = state["pivots"]
+        pivot_indices = sorted([int(k) for k in pivots.keys()])
+
+        # Step 3: Pivot 검사 (Shift 오프셋 확인)
+        shift_amounts = await self._compute_shift_offsets(pivots, pivot_indices, diff_count)
+
+        # Step 4: 신규 데이터 다운로드
+        new_data_rows = await self._download_new_rows(pivot_indices, shift_amounts, old_tail, new_tail, diff_count)
+
+        # Step 5: 피벗 및 Tail 갱신 → DB 영속화
+        new_pivots = await self._update_pivots(pivot_indices, pivots, shift_amounts, new_tail, diff_count)
         state["last_total_count"] = new_tail
         state["pivots"] = new_pivots
         self.state_repo.save_state(self.service_id, state)  # ← Tail 영속화
