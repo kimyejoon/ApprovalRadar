@@ -1,9 +1,12 @@
 # pyrefly: ignore [missing-import]
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 # pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
+# pyrefly: ignore [missing-import]
+from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
 import asyncio
+import time as _time
 import signal
 import os as _os
 from database import init_db
@@ -18,6 +21,28 @@ from app.core.events import broadcaster, log_broadcaster, shutdown_event
 # 미설정 시 개발용 localhost 기본값 사용 (프로덕션에서는 반드시 명시)
 _raw_origins = _os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")
 ALLOWED_ORIGINS: list[str] = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
+# 헬스체크 경로는 로그에서 제외 (노이즈 방지)
+_LOG_SKIP_PATHS = {"/health", "/", "/favicon.ico"}
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """
+    모든 FastAPI 엔드포인트 호출을 로깅합니다.
+    요청정보: method, path, status_code, 소요시간(ms)
+    "/health" 등 유지보수용 엔드포인트는 로그 제외하여 노이즈 최소화.
+    """
+    async def dispatch(self, request: Request, call_next):
+        start = _time.monotonic()
+        response = await call_next(request)
+        duration_ms = (_time.monotonic() - start) * 1000
+
+        path = request.url.path
+        if path not in _LOG_SKIP_PATHS:
+            logger.info(
+                f"[FastAPI] {request.method} {path} "
+                f"→ {response.status_code} ({duration_ms:.1f}ms)"
+            )
+        return response
 
 def _handle_sigint(signum, frame):
     """Ctrl+C 즉시 강제 종료 핸들러. SSE 연결이 uvicorn을 block하는 경우를 방지."""
@@ -72,6 +97,9 @@ async def lifespan(app: FastAPI):
     shutdown_scheduler()
 
 app = FastAPI(title="Food Safety Data API", lifespan=lifespan)
+
+# ── 요청 로깅 미들웨어 (가장 먼저 등록해야 CORS 에러 전에 로깅 가능) ──
+app.add_middleware(RequestLoggingMiddleware)
 
 # Configure CORS for React frontend
 app.add_middleware(

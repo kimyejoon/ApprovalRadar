@@ -165,8 +165,11 @@ class DiffCrawlerEngine:
                 idx = future_to_idx[future]
                 row = future.result()
                 if row:
+                    # ✅ [개선] Boundary 양방향 저장: 첫 번째(idx) + 마지막(idx + PAGE_SIZE - 1)
+                    last_row = self._fetch_single(idx + PAGE_SIZE - 1)
                     pivots[str(idx)] = {
                         "LCNS_NO": row.get("LCNS_NO", ""),
+                        "LAST_LCNS_NO": last_row.get("LCNS_NO", "") if last_row else "",
                         "CHNG_DT": row.get("CHNG_DT", ""),
                         "BSSH_NM": row.get("BSSH_NM", "")
                     }
@@ -187,6 +190,7 @@ class DiffCrawlerEngine:
         """
         저장된 피벗 중 일부를 무작위로 샘플링하여 API 현재 응답과 비교합니다.
         Delete가 은폐(Insert+Delete 동시 발생)된 경우 피벗의 LCNS_NO가 바뀌어 있습니다.
+        ✅ [개선] Boundary 양방향 보완: LCNS_NO(첫 번째) + LAST_LCNS_NO(마지막) 모두 검증
         Returns: True = 불일치 감지(Delete 의심), False = 정상
         """
         if not pivots:
@@ -201,9 +205,12 @@ class DiffCrawlerEngine:
             # pivot_data는 dict(신규) 또는 str(레거시) 형태일 수 있음
             if isinstance(pivot_data, dict):
                 expected_lcns_no = pivot_data.get("LCNS_NO", "")
+                expected_last_lcns_no = pivot_data.get("LAST_LCNS_NO", "")  # 신규 Boundary 필드
             else:
                 expected_lcns_no = str(pivot_data)  # 레거시 문자열 포맷 호환
+                expected_last_lcns_no = ""
             try:
+                # 첫 번째 행 검증
                 res = self.api_client.fetch_data(self.service_id, idx, idx)
                 # WAF 차단 방지: 피벗 샘플링 API 호출 직후 Jitter 적용
                 time.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
@@ -213,10 +220,26 @@ class DiffCrawlerEngine:
                 actual_lcns_no = items[0].get("LCNS_NO", "")
                 if actual_lcns_no != expected_lcns_no:
                     logger.warning(
-                        f"[{self.service_id}][피벗 샘플링] idx={idx} 불일치! "
+                        f"[{self.service_id}][피벗 샘플링] idx={idx} 첫번째 불일치! "
                         f"저장값(LCNS_NO)={expected_lcns_no}, 현재값={actual_lcns_no}"
                     )
-                    return True  # 첫 불일치 발견 즉시 반환
+                    return True
+
+                # ✅ [개선] 마지막 행 검증 (LAST_LCNS_NO 저장된 경우만)
+                if expected_last_lcns_no:
+                    last_res = self.api_client.fetch_data(self.service_id, idx + PAGE_SIZE - 1, idx + PAGE_SIZE - 1)
+                    # WAF 차단 방지: 피벗 샘플링 마지막 행 API 호출 직후 Jitter 적용
+                    time.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+                    last_items = last_res.get(self.service_id, {}).get("row", [])
+                    if last_items:
+                        actual_last_lcns_no = last_items[0].get("LCNS_NO", "")
+                        if actual_last_lcns_no != expected_last_lcns_no:
+                            logger.warning(
+                                f"[{self.service_id}][피벗 샘플링] idx={idx} 마지막 행 불일치! "
+                                f"저장값(LAST_LCNS_NO)={expected_last_lcns_no}, 현재값={actual_last_lcns_no}"
+                            )
+                            return True
+
             except Exception as e:
                 logger.debug(f"[{self.service_id}][피벗 샘플링] idx={idx} 조회 실패: {e}")
                 continue
@@ -334,8 +357,11 @@ class DiffCrawlerEngine:
         while next_pivot < new_tail:
             row = self._fetch_single(next_pivot)
             if row:
+                # ✅ [개선] Boundary 양방향 저장
+                last_row = self._fetch_single(next_pivot + PAGE_SIZE - 1)
                 new_pivots[str(next_pivot)] = {
                     "LCNS_NO": row.get("LCNS_NO", ""),
+                    "LAST_LCNS_NO": last_row.get("LCNS_NO", "") if last_row else "",
                     "CHNG_DT": row.get("CHNG_DT", ""),
                     "BSSH_NM": row.get("BSSH_NM", "")
                 }
