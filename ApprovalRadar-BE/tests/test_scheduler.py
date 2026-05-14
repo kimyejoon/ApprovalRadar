@@ -6,6 +6,7 @@ Gap 분석 개선사항 #3, #5에 대한 스케줄러 설정 검증
 - 세부업종 백필 job이 등록되는지
 - 실제 APScheduler job 등록 단위 테스트
 """
+# pyrefly: ignore [missing-import]
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -15,6 +16,7 @@ class TestSchedulerJobRegistration:
 
     def test_scraper_job_uses_settings_interval(self):
         """scraper_job의 주기가 settings.SCRAPER_INTERVAL_MINUTES를 따르는지 확인"""
+        # pyrefly: ignore [missing-import]
         from apscheduler.schedulers.background import BackgroundScheduler
         from app.core.config import settings
 
@@ -39,6 +41,7 @@ class TestSchedulerJobRegistration:
 
     def test_backfill_job_registered(self):
         """backfill_job이 스케줄러에 등록되는지 확인 (#5 자동 재시도)"""
+        # pyrefly: ignore [missing-import]
         from apscheduler.schedulers.background import BackgroundScheduler
 
         registered_ids = []
@@ -60,6 +63,7 @@ class TestSchedulerJobRegistration:
 
     def test_backfill_job_is_6hour_interval(self):
         """backfill_job이 6시간 간격으로 등록되는지 확인"""
+        # pyrefly: ignore [missing-import]
         from apscheduler.schedulers.background import BackgroundScheduler
 
         registered_jobs = {}
@@ -81,6 +85,7 @@ class TestSchedulerJobRegistration:
 
     def test_key_recovery_job_registered(self):
         """key_recovery_job이 10분 간격으로 등록되는지 확인 (소진 후 10분마다 재시도)"""
+        # pyrefly: ignore [missing-import]
         from apscheduler.schedulers.background import BackgroundScheduler
 
         registered_jobs = {}

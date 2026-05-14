@@ -9,6 +9,7 @@ Gap 분석 개선사항 #4에 대한 SSE 연결 관리 검증
 """
 import asyncio
 import json
+# pyrefly: ignore [missing-import]
 import pytest
 
 
