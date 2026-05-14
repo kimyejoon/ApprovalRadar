@@ -20,6 +20,13 @@ class ApiClient:
         self._key_locks: dict[str, threading.Lock] = {
             key: threading.Lock() for key in self.api_keys
         }
+        # HTTP Keep-Alive 연결 재사용 (TCP 연결 비용 절감)
+        # requests.get() 매 호출 시 새 TCP 연결 → Session 사용 시 연결 재사용으로 1초 이하 단축
+        self._session = requests.Session()
+        self._session.headers.update({
+            'Connection': 'keep-alive',
+            'Accept': 'application/json',
+        })
 
     def get_current_key(self) -> str:
         with self.key_lock:
@@ -42,9 +49,12 @@ class ApiClient:
             self.current_key_idx = next_idx
             new_key = self.api_keys[self.current_key_idx]
             logger.info(f"[키 회전] API 한도 초과! 새로운 키로 교체: {new_key[:5]}***")
+            # 새 키로 전환 시 Session 재생성 (새 TCP 연결로 WAF 우회)
+            self._session = requests.Session()
+            self._session.headers.update({'Connection': 'keep-alive', 'Accept': 'application/json'})
 
     def switch_key(self, current_key: str):
-        """한도 초과가 아닌 일시적 문제(타임아웃, 임시차단)로 키를 소진시키지 않고 다음 키로 단순 변경합니다."""
+        """한도 초과가 아닌 일시적 문제(WAF 임시차단)로 키를 소진시키지 않고 다음 키로 단순 변경합니다."""
         with self.key_lock:
             if self.api_keys[self.current_key_idx] != current_key:
                 return
@@ -52,6 +62,9 @@ class ApiClient:
             self.current_key_idx = next_idx
             new_key = self.api_keys[self.current_key_idx]
             logger.info(f"[키 전환] 일시적 오류(WAF/Timeout)로 임시 키 전환: {new_key[:5]}***")
+            # 새 키로 전환 시 Session 재생성 (새 TCP 연결로 WAF 우회)
+            self._session = requests.Session()
+            self._session.headers.update({'Connection': 'keep-alive', 'Accept': 'application/json'})
                 
     def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5, timeout: int = 30, **kwargs) -> dict:
         """
@@ -80,7 +93,7 @@ class ApiClient:
                     continue  # 키가 바뀌었으면 새 키로 다시 루프 (attempt 소모 없음)
 
                 try:
-                    response = requests.get(url, timeout=timeout)
+                    response = self._session.get(url, timeout=timeout)
                     response.raise_for_status()
                     res = response.json()
                     
