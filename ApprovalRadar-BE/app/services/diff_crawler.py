@@ -55,70 +55,90 @@ class DiffCrawlerEngine:
 
     def find_true_tail(self, known_tail: int = 0) -> int:
         """
-        서비스별 Tail 탐색 전략을 선택합니다:
-        - RELIABLE_TOTAL_COUNT_SERVICES (I2861 등): total_count 1회 조회로 즉시 확보
-        - I2859 등: 페이지 기반 스캔 (total_count 신뢰 불가)
+        실제 데이터 끝(Tail) 위치를 정확하게 탐색합니다.
 
-        known_tail: DB에 저장된 이전 tail (0이면 최초 실행)
+        ⚠️ API 특성: Gappy(비연속) 인덱스 구조 (테스트로 실증)
+        - total_count 신뢰 불가: 키/범위마다 다른 값 반환
+        - 순차 페이지 스캔 오탐: Gap(예: 34756~34999 공백)에서 조기 종료
+          → 34,755에서 멈췄으나 실제 tail ~226,000 (2025년 데이터)
+        - 새 데이터: 항상 HIGH-END 인덱스에 추가 (CHNG_DT 기준 확인)
+
+        알고리즘 4단계:
+          1. [Ping]     known_tail+1 빠른 조회 → 변동 없으면 즉시 반환
+          2. [지수점프]  PAGE*1, PAGE*2, PAGE*4... 데이터 없는 상한선 탐색
+          3. [이진탐색]  마지막 데이터 있는 PAGE 경계를 O(log N)으로 확정
+          4. [Gap허용]   빈 PAGE 연속 3개 미만이면 Gap으로 간주하고 계속 탐색
         """
         svc = self.service_id
 
-        # ── 전략 A: total_count 직접 신뢰 서비스 ─────────────────────────────
+        # ── 전략 A: total_count 신뢰 서비스 (미래 확장용, 현재 비어있음) ────────
         if svc in RELIABLE_TOTAL_COUNT_SERVICES:
-            logger.info(f"[{svc}][Bootstrapper] 전체 데이터 건수 확인 중... (total_count 직접 조회)")
+            logger.info(f"[{svc}][Bootstrapper] total_count 직접 조회 시도")
             res = self.api_client.fetch_data(svc, 1, 1, timeout=10)
             if res and svc in res:
                 block = res[svc]
-                code = block['RESULT']['CODE']
-                if code in ("INFO-000", "INFO-200"):
+                if block.get("RESULT", {}).get("CODE") in ("INFO-000", "INFO-200"):
                     total_count = int(block.get("total_count") or block.get("TOTAL_COUNT") or 0)
                     if total_count > 0:
                         logger.info(f"[{svc}][Bootstrapper] Tail 확정: {total_count:,}건 (total_count 직접)")
                         return total_count
-            logger.warning(f"[{svc}][Bootstrapper] total_count 읽기 실패. 페이지 스캔으로 폴백합니다.")
-            # 폴백: 아래 페이지 스캔으로 진행
+            logger.warning(f"[{svc}][Bootstrapper] total_count 읽기 실패, 페이지 탐색으로 폴백")
 
-        # ── 전략 B: 페이지 기반 스캔 (I2859 등) ───────────────────────
-        logger.info(f"[{svc}][Bootstrapper] 전체 데이터 건수 확인 중... (페이지 기반 엔드-페이지 탐색)")
+        # ── 전략 B: 지수점프 + 이진탐색 + Gap허용 스캔 ───────────────────────
+        logger.info(f"[{svc}][Bootstrapper] Tail 탐색 시작 (known_tail={known_tail:,})")
 
-        # 알려진 Tail의 마지막 완전 페이지 경계부터 시작
-        # 예: known_tail=22416 → 마지막 완전 페이지 = 22001 (22000+1)
+        # Step 1: Ping - known_tail 직후 확인 (빠른 경로)
         if known_tail > 0:
-            page_start = ((known_tail - 1) // PAGE_SIZE) * PAGE_SIZE + 1
-        else:
-            page_start = 1
-
-        # Step 1: 현재 페이지가 가득 찼는지 확인 (이전 tail이 여전히 유효한 페이지인지)
-        # 이미 known_tail이 유효한 꼬리라면 → 변동 없음
-        if known_tail > 0:
-            rows = self._fetch_page(page_start, page_start + PAGE_SIZE - 1)
-            if len(rows) == known_tail - (page_start - 1):
-                # 마지막 페이지의 레코드 수가 이전과 동일 → tail 변화 없음
-                logger.info(f"[{svc}][Bootstrapper] Tail 변동 없음: {known_tail:,}건 (저장된 페이지 그대로)")
+            ping = self._fetch_page(known_tail + 1, known_tail + PAGE_SIZE)
+            if not ping:
+                logger.info(f"[{svc}][Bootstrapper] Tail Ping: 변동 없음 ({known_tail:,}건)")
                 return known_tail
+            logger.info(f"[{svc}][Bootstrapper] Tail Ping: {len(ping)}건 신규 감지, 탐색 계속")
 
-        # Step 2: 가득 찬 페이지를 따라 앞으로 점프
+        # Step 2: 지수 점프 - 데이터 없는 상한선 탐색
+        pos = max(PAGE_SIZE, known_tail + PAGE_SIZE)
+        last_nonempty = pos
         while not shutdown_event.is_set():
-            page_end = page_start + PAGE_SIZE - 1
-            rows = self._fetch_page(page_start, page_end)
-            row_count = len(rows)
+            rows = self._fetch_page(pos, pos + PAGE_SIZE - 1)
+            if rows:
+                last_nonempty = pos
+                logger.info(f"[{svc}][Bootstrapper] 지수점프 {pos:,}: {len(rows)}건")
+                pos *= 2
+                if pos > 50_000_000:
+                    break
+            else:
+                break
 
-            if row_count == 0:
-                # 이 페이지에 데이터가 없음 → 이전 page_start - 1 이 Tail
-                tail = page_start - 1
-                logger.info(f"[{svc}][Bootstrapper] Tail 확정: {tail:,}건 (빈 페이지 도달)")
-                return tail if tail > 0 else 0
+        low, high = last_nonempty, pos
+        logger.info(f"[{svc}][Bootstrapper] 이진탐색 범위: {low:,} ~ {high:,}")
 
-            if row_count < PAGE_SIZE:
-                # 마지막 페이지 발견: page_start - 1 + row_count
-                tail = (page_start - 1) + row_count
-                logger.info(f"[{svc}][Bootstrapper] Tail 확정: {tail:,}건 (마지막 페이지 {page_start}~{page_start+PAGE_SIZE-1}, {row_count}건 수록)")
-                return tail
+        # Step 3: 이진 탐색 - 마지막 데이터 PAGE 경계 확정
+        best_start = low
+        while high - low >= PAGE_SIZE and not shutdown_event.is_set():
+            mid = ((low + high) // 2 // PAGE_SIZE) * PAGE_SIZE
+            if self._fetch_page(mid, mid + PAGE_SIZE - 1):
+                best_start = mid
+                low = mid + PAGE_SIZE
+            else:
+                high = mid
 
-            # 가득 찬 페이지 → 다음 페이지로
-            page_start += PAGE_SIZE
+        # Step 4: Gap 허용 선형 스캔 - 정확한 tail 확정
+        # 연속 빈 PAGE가 MAX_GAP_PAGES 이상이면 실제 끝으로 판단
+        MAX_GAP_PAGES = 3
+        pos, final_tail, consecutive_empty = best_start, best_start, 0
+        while not shutdown_event.is_set():
+            rows = self._fetch_page(pos, pos + PAGE_SIZE - 1)
+            if rows:
+                final_tail = pos + len(rows) - 1
+                consecutive_empty = 0
+            else:
+                consecutive_empty += 1
+                if consecutive_empty >= MAX_GAP_PAGES:
+                    break
+            pos += PAGE_SIZE
 
-        return 0  # 종료 신호 수신
+        logger.info(f"[{svc}][Bootstrapper] Tail 확정: {final_tail:,}")
+        return final_tail
 
     # ─── 부트스트랩 ───────────────────────────────────────────────────────────
 
@@ -166,27 +186,12 @@ class DiffCrawlerEngine:
 
         old_tail = state["last_total_count"]
 
-        # ── Step 1: 빠른 Tail Ping ──────────────────────────────────────────
-        # old_tail+1 부터 1000건을 요청 → 0건이면 변동 없음
-        # 이 1회 호출로 "신규 레코드 존재 여부"를 확인
-        ping_rows = self._fetch_page(old_tail + 1, old_tail + PAGE_SIZE)
-
-        if not ping_rows:
-            elapsed = time.time() - start_time
-            logger.info(
-                f"[{svc}] ✨ [소요: {elapsed:.2f}초] Tail 변동 없음. (현재 tail: {old_tail:,}건)"
-            )
-            return []
-
-        # ── Step 2: 신규 Tail 탐색 ─────────────────────────────────────────
-        # ping_rows가 있으므로 페이지 기반으로 새 꼬리를 찾음
-        # known_tail=old_tail을 넘겨 마지막 알려진 페이지부터 탐색 재개
+        # find_true_tail 내부에서 Ping → 지수점프 → 이진탐색 → Gap스캔 전체 처리
         new_tail = self.find_true_tail(known_tail=old_tail)
 
         if new_tail <= old_tail:
-            # 이론상 발생하지 않지만 방어 코드
             elapsed = time.time() - start_time
-            logger.info(f"[{svc}] ✨ [소요: {elapsed:.2f}초] Tail Ping 변동 없음. (현재 tail: {old_tail:,}건)")
+            logger.info(f"[{svc}] ✨ [소요: {elapsed:.2f}초] Tail 변동 없음. (tail: {old_tail:,}건)")
             return []
 
         diff_count = new_tail - old_tail
