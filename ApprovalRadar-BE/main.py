@@ -1,4 +1,6 @@
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
@@ -10,6 +12,12 @@ from app.core.logger import logger
 from app.api.router import api_router
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.core.events import broadcaster, log_broadcaster, shutdown_event
+
+# ALLOWED_ORIGINS: 쉼표(,)로 구분된 허용 오리진 목록 (.env에서 설정)
+# 예시) ALLOWED_ORIGINS=https://approvalradar.com,https://www.approvalradar.com
+# 미설정 시 개발용 localhost 기본값 사용 (프로덕션에서는 반드시 명시)
+_raw_origins = _os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")
+ALLOWED_ORIGINS: list[str] = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
 def _handle_sigint(signum, frame):
     """Ctrl+C 즉시 강제 종료 핸들러. SSE 연결이 uvicorn을 block하는 경우를 방지."""
@@ -68,7 +76,7 @@ app = FastAPI(title="Food Safety Data API", lifespan=lifespan)
 # Configure CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this to specific origins
+    allow_origins=ALLOWED_ORIGINS,  # .env의 ALLOWED_ORIGINS 환경변수로 제어
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
