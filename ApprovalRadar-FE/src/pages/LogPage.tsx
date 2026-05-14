@@ -21,16 +21,16 @@ import { fetchKeyStatus, fetchCrawlerStatus, API_BASE_URL } from '@/lib/api';
 // ─── 로그 레벨 스타일 ──────────────────────────────────────────────────────
 
 const LEVEL_STYLES: Record<string, string> = {
-  DEBUG:    'text-text-muted',
-  INFO:     'text-blue-400',
-  WARNING:  'text-yellow-400',
-  ERROR:    'text-red-500',
+  DEBUG: 'text-text-muted',
+  INFO: 'text-blue-400',
+  WARNING: 'text-yellow-400',
+  ERROR: 'text-red-500',
   CRITICAL: 'text-red-600 font-bold',
 };
 
 const LEVEL_BG: Record<string, string> = {
-  WARNING:  'bg-yellow-400/5',
-  ERROR:    'bg-red-500/5',
+  WARNING: 'bg-yellow-400/5',
+  ERROR: 'bg-red-500/5',
   CRITICAL: 'bg-red-600/10',
 };
 
@@ -55,9 +55,9 @@ function KeyStatusCard() {
     refetchInterval: 30_000,
   });
 
-  const activeCount   = data?.keys.filter(k => k.status === 'active').length ?? 0;
+  const activeCount = data?.keys.filter(k => k.status === 'active').length ?? 0;
   const exhaustedCount = data?.keys.filter(k => k.status === 'exhausted').length ?? 0;
-  const errorCount    = data?.keys.filter(k => k.status === 'error').length ?? 0;
+  const errorCount = data?.keys.filter(k => k.status === 'error').length ?? 0;
   const total = data?.total ?? 0;
 
   const overallStatus = errorCount > 0 ? 'error' : exhaustedCount > 0 ? 'warning' : 'ok';
@@ -82,22 +82,6 @@ function KeyStatusCard() {
               {activeCount}
               <span className="text-sm font-normal text-text-muted ml-2">/ {total} Active</span>
             </div>
-            {(exhaustedCount > 0 || errorCount > 0) && (
-              <div className="flex gap-3 mt-1.5">
-                {exhaustedCount > 0 && (
-                  <span className="text-xs text-yellow-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 inline-block" />
-                    소진 {exhaustedCount}
-                  </span>
-                )}
-                {errorCount > 0 && (
-                  <span className="text-xs text-red-500 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
-                    오류 {errorCount}
-                  </span>
-                )}
-              </div>
-            )}
           </>
         )}
       </CardContent>
@@ -239,11 +223,10 @@ export function LogPage() {
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium ${
-            isConnected
-              ? 'border-brand/30 text-brand bg-brand/5'
-              : 'border-border-standard text-text-muted bg-surface'
-          }`}>
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium ${isConnected
+            ? 'border-brand/30 text-brand bg-brand/5'
+            : 'border-border-standard text-text-muted bg-surface'
+            }`}>
             {isConnected
               ? <><WifiHigh className="w-3.5 h-3.5" /> 연결됨</>
               : <><WifiX className="w-3.5 h-3.5" /> 연결 안됨</>
@@ -252,11 +235,10 @@ export function LogPage() {
           <button
             id="log-connect-toggle"
             onClick={isConnected ? disconnect : connect}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
-              isConnected
-                ? 'border-border-standard text-text-muted hover:text-red-400 hover:border-red-400/30'
-                : 'border-brand/30 text-brand hover:bg-brand/10'
-            }`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${isConnected
+              ? 'border-border-standard text-text-muted hover:text-red-400 hover:border-red-400/30'
+              : 'border-brand/30 text-brand hover:bg-brand/10'
+              }`}
           >
             <PlugsConnected className="w-3.5 h-3.5" />
             {isConnected ? '연결 해제' : '연결'}

@@ -66,7 +66,7 @@ class LogBroadcaster:
                     disconnected.add(ws)
             with self._lock:
                 self._sockets -= disconnected
-        self.loop.call_soon_threadsafe(asyncio.ensure_future, _send_all())
+        asyncio.run_coroutine_threadsafe(_send_all(), self.loop)
 
 
 broadcaster = Broadcaster()
