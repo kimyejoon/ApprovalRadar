@@ -64,7 +64,10 @@ export interface FetchApprovalsParams {
   sort_order?: 'asc' | 'desc';
 }
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const envApiUrl = import.meta.env.VITE_API_URL;
+export const API_BASE_URL = envApiUrl !== undefined 
+  ? (envApiUrl === '' ? window.location.origin : envApiUrl) 
+  : 'http://localhost:8000';
 
 
 export async function fetchApprovals(params: FetchApprovalsParams): Promise<ApprovalsResponse> {

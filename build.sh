@@ -107,12 +107,13 @@ step "STEP 4 / 4 — PyInstaller 빌드 (단일 exe)"
 
 cd "$BE_DIR"
 info "PyInstaller 빌드 시작... (수 분 소요될 수 있습니다)"
-# iCloud Drive 환경에서 --clean 타이밍 문제 방지: 빌드 전 수동 삭제
-rm -rf "$BE_DIR/build" "$BE_DIR/dist"
-"$VENV_DIR/bin/pyinstaller" ApprovalRadar.spec --noconfirm
+# iCloud Drive 환경에서 --clean 타이밍 문제 방지: 빌드 캐시만 수동 삭제
+# (dist/는 STEP 2에서 복사한 FE 빌드가 있으므로 삭제 금지)
+rm -rf "$BE_DIR/build" "$BE_DIR/dist_exe"
+# FE dist/와 충돌 방지: PyInstaller 출력을 dist_exe/로 분리
+"$VENV_DIR/bin/pyinstaller" ApprovalRadar.spec --noconfirm --distpath "$BE_DIR/dist_exe"
 
-
-EXE_PATH="$BE_DIR/dist/ApprovalRadar"
+EXE_PATH="$BE_DIR/dist_exe/ApprovalRadar"
 [ -f "$EXE_PATH" ] || error "PyInstaller 빌드 실패: 실행파일이 생성되지 않았습니다."
 
 # ── 배포 패키지 정리 ──────────────────────────────────────────────────────────

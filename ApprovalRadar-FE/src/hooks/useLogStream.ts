@@ -7,8 +7,12 @@ export interface LogEntry {
 }
 
 const MAX_LOGS = 500;
-const WS_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000')
-  .replace(/^http/, 'ws') + '/api/v1/admin/logs';
+const envApiUrl = import.meta.env.VITE_API_URL;
+const apiBaseUrl = envApiUrl !== undefined 
+  ? (envApiUrl === '' ? window.location.origin : envApiUrl) 
+  : 'http://localhost:8000';
+
+const WS_URL = apiBaseUrl.replace(/^http/, 'ws') + '/api/v1/admin/logs';
 
 export function useLogStream() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
