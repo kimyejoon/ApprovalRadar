@@ -58,8 +58,10 @@ class WebSocketLogHandler(logging.Handler):
     def emit(self, record):
         try:
             from app.core.events import log_broadcaster
+            from datetime import datetime
+            timestamp = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S")
             payload = json.dumps({
-                "timestamp": self.formatTime(record, "%Y-%m-%d %H:%M:%S"),
+                "timestamp": timestamp,
                 "level": record.levelname,
                 "message": record.getMessage(),
             }, ensure_ascii=False)
