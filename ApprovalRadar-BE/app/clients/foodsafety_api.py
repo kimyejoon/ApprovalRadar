@@ -53,7 +53,7 @@ class ApiClient:
             new_key = self.api_keys[self.current_key_idx]
             logger.info(f"[키 전환] 일시적 오류(WAF/Timeout)로 임시 키 전환: {new_key[:5]}***")
                 
-    def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5, **kwargs) -> dict:
+    def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5, timeout: int = 30, **kwargs) -> dict:
         """
         주어진 구간의 데이터를 조회합니다.
         - 한도 초과(INFO-300 등) 시 자동으로 키를 회전하고 재시도합니다.
@@ -80,7 +80,7 @@ class ApiClient:
                     continue  # 키가 바뀌었으면 새 키로 다시 루프 (attempt 소모 없음)
 
                 try:
-                    response = requests.get(url, timeout=10)
+                    response = requests.get(url, timeout=timeout)
                     response.raise_for_status()
                     res = response.json()
                     
@@ -132,11 +132,19 @@ class ApiClient:
                     backoff *= 2
                     attempt += 1
 
+                except requests.exceptions.Timeout as e:
+                    ctx = f"서비스:{service_id}, 범위:{start_idx}~{end_idx}"
+                    logger.warning(f"[읽기 타임아웃] {ctx} | 서버 응답 지연 ({timeout}초 초과). {backoff}초 후 재시도합니다.")
+                    if shutdown_event.wait(backoff):
+                        return {}
+                    backoff = min(backoff * 2, 10)  # 최대 10초 대기
+                    attempt += 1
+
                 except requests.exceptions.RequestException as e:
                     ctx = f"서비스:{service_id}, 범위:{start_idx}~{end_idx}"
                     if kwargs:
                         ctx += f", 추가:{kwargs}"
-                    logger.warning(f"[네트워크 통신 오류] {ctx} | 사유: {str(e)}. 타임아웃/연결 오류로 인한 WAF 락 방지를 위해 키를 즉시 전환합니다.")
+                    logger.warning(f"[네트워크 통신 오류] {ctx} | 사유: {str(e)}. 연결 오류로 인해 키를 전환합니다.")
                     self.switch_key(api_key)
                     if shutdown_event.wait(backoff):
                         return {}

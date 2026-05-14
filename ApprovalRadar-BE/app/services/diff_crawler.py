@@ -20,11 +20,12 @@ class DiffCrawlerEngine:
     def _fetch_page(self, start: int, end: int) -> list:
         """
         [start, end] 범위의 레코드를 조회하여 row 리스트를 반환합니다.
+        bulk 응답 지연을 고려해 30초 timeout 사용.
         - INFO-000: 정상 데이터 리스트 반환
         - INFO-200: 빈 페이지(데이터 없음) → [] 반환
         - 기타 오류: [] 반환
         """
-        res = self.api_client.fetch_data(self.service_id, start, end)
+        res = self.api_client.fetch_data(self.service_id, start, end, timeout=30)
         if not res or self.service_id not in res:
             return []
         block = res[self.service_id]
@@ -34,9 +35,15 @@ class DiffCrawlerEngine:
         return []
 
     def _fetch_single(self, idx: int) -> dict | None:
-        """특정 단일 인덱스 1건 조회 (피벗 확인용)."""
-        rows = self._fetch_page(idx, idx)
-        return rows[0] if rows else None
+        """특정 단일 인덱스 1건 조회 (피벗 확인용). 단건이므로 10초 timeout."""
+        rows = self.api_client.fetch_data(self.service_id, idx, idx, timeout=10)
+        if not rows or self.service_id not in rows:
+            return None
+        block = rows[self.service_id]
+        code = block['RESULT']['CODE']
+        if code == "INFO-000" and 'row' in block and block['row']:
+            return block['row'][0]
+        return None
 
     # ─── Tail 탐색 ────────────────────────────────────────────────────────────
 
