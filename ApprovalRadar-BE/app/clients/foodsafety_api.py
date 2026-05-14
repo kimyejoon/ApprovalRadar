@@ -54,8 +54,8 @@ class ApiClient:
             cls._exhausted_until = now + datetime.timedelta(minutes=10)
 
     @classmethod
-    def _increment_usage(cls, key: str):
-        """키별 오늘 사용량 +1. DB에도 upsert."""
+    def _increment_usage(cls, key: str, service_id: str = ""):
+        """키별 오늘 사용량 +1. DB에도 upsert. 서비스명 포함 로그 출력."""
         today = datetime.date.today().isoformat()
         masked = cls._mask_key(key)
         with cls._class_lock:
@@ -64,7 +64,27 @@ class ApiClient:
                 entry["date"] = today
                 entry["count"] = 0
             entry["count"] += 1
-        key_usage_repo.increment(masked, today)
+            today_count = entry["count"]
+        key_usage_repo.increment(masked, today, service_id)
+
+        # 서비스명 포함 로그
+        svc_name = key_usage_repo.SERVICE_NAME_MAP.get(service_id, service_id) if service_id else "알 수 없음"
+        logger.debug(
+            f"[API 호출] {svc_name}({service_id}) | 키: {masked} | 오늘 누적: {today_count}회"
+        )
+
+        # 잔여량 경고: 900회 이상 사용 시 WARN SSE 브로드캐스트 (100회 단위 1회)
+        if today_count in (900, 950, 990):
+            try:
+                from app.core.events import broadcaster
+                import json
+                warn_msg = json.dumps({
+                    "type": "WARN",
+                    "message": f"API 키 잔여량 경고: {masked} 키가 {today_count}/1000건 사용됨 — 잔여 {1000 - today_count}건"
+                }, ensure_ascii=False)
+                broadcaster.broadcast_sync(warn_msg)
+            except Exception:
+                pass
 
     @classmethod
     def _mark_key_exhausted_in_db(cls, key: str):
@@ -206,8 +226,9 @@ class ApiClient:
         msg = res[service_id]['RESULT']['MSG']
 
         if code in ("INFO-000", "INFO-200"):
-            ApiClient._increment_usage(api_key)
+            ApiClient._increment_usage(api_key, service_id)
             return res
+
 
         if code in ("INFO-300", "INFO-333") or "유효 호출건수" in msg:
             # rotate_key는 async → 상위 fetch_data에서 처리 (마커 반환)

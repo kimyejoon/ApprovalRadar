@@ -170,6 +170,18 @@ def init_db():
         )
     ''')
 
+    # 서비스 ID별 API 호출 횟수 추적 테이블 (I2859/I2861/I2500 구분)
+    cursor.execute('''\
+        CREATE TABLE IF NOT EXISTS api_key_usage_by_service (
+            key_masked   TEXT NOT NULL,
+            usage_date   TEXT NOT NULL,
+            service_id   TEXT NOT NULL,
+            call_count   INTEGER DEFAULT 0,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (key_masked, usage_date, service_id)
+        )
+    ''')
+
     conn.commit()
     conn.close()
     

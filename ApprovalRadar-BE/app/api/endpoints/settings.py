@@ -147,6 +147,7 @@ async def create_api_key(body: ApiKeyCreateRequest):
     if ApiClient.is_exhausted():
         # 새 키가 실제로 유효한지 API 찔러봄 (비동기 → asyncio.run)
         import asyncio
+        # pyrefly: ignore [missing-import]
         import httpx
 
         def _validate_key(k: str) -> bool:

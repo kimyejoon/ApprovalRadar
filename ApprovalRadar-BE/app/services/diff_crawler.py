@@ -98,29 +98,36 @@ class DiffCrawlerEngine:
         """
         svc = self.service_id
 
-        # ── 전략 A: total_count 신뢰 서비스 (미래 확장용, 현재 비어있음) ────────
+        # ── 전략 A: total_count 신뢰 서비스 ──────────────────────────────────────
+        # I2861 등 total_count가 신뢰 가능한 서비스: Ping 없이 1/1 조회로 즉시 판단
         if svc in RELIABLE_TOTAL_COUNT_SERVICES:
-            logger.info(f"[{svc}][Bootstrapper] total_count 직접 조회 시도")
+            logger.info(f"[{svc}][전략A] total_count 직접 조회 (Ping 스킵)")
             res = await self.api_client.fetch_data(svc, 1, 1, timeout=10)
             if res and svc in res:
                 block = res[svc]
                 if block.get("RESULT", {}).get("CODE") in ("INFO-000", "INFO-200"):
                     total_count = int(block.get("total_count") or block.get("TOTAL_COUNT") or 0)
                     if total_count > 0:
-                        logger.info(f"[{svc}][Bootstrapper] Tail 확정: {total_count:,}건 (total_count 직접)")
+                        if known_tail > 0 and total_count == known_tail:
+                            logger.debug(f"[{svc}][전략A] 변동 없음: total_count={total_count:,} == known_tail={known_tail:,}")
+                        elif total_count > known_tail:
+                            logger.info(f"[{svc}][전략A] 신규 감지: {total_count - known_tail:,}건 증가 ({known_tail:,} → {total_count:,})")
+                        else:
+                            logger.info(f"[{svc}][전략A] Tail 확정: {total_count:,}건 (total_count 직접)")
                         return total_count
-            logger.warning(f"[{svc}][Bootstrapper] total_count 읽기 실패, 페이지 탐색으로 폴백")
+            logger.warning(f"[{svc}][전략A] total_count 읽기 실패, 페이지 탐색(전략B)으로 폴백")
 
         # ── 전략 B: 지수점프 + 이진탐색 + Gap허용 스캔 ───────────────────────
         logger.info(f"[{svc}][Bootstrapper] Tail 탐색 시작 (known_tail={known_tail:,})")
 
-        # Step 1: Ping - known_tail 직후 확인 (빠른 경로)
+        # Step 1: Ping - known_tail 직후 확인 (빠른 경로). 전략A 성공 서비스는 여기 미도달.
         if known_tail > 0:
             ping = await self._fetch_page(known_tail + 1, known_tail + PAGE_SIZE)
             if not ping:
-                logger.info(f"[{svc}][Bootstrapper] Tail Ping: 변동 없음 ({known_tail:,}건)")
+                logger.info(f"[{svc}][전략B] Ping: 변동 없음 ({known_tail:,}건)")
                 return known_tail
-            logger.info(f"[{svc}][Bootstrapper] Tail Ping: {len(ping)}건 신규 감지, 탐색 계속")
+            logger.info(f"[{svc}][전략B] Ping: {len(ping)}건 신규 감지, 탐색 계속")
+
 
         # Step 2: 지수 점프
         start_pos = max(PAGE_SIZE, known_tail + PAGE_SIZE)

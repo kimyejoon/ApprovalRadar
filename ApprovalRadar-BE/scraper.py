@@ -12,6 +12,9 @@ from app.core.logger import logger
 from app.repositories.business_repository import BusinessRepository
 from app.repositories.raw_data_repository import RawDataRepository
 
+# 서비스별 크롤러 연속 실패 카운터 (3회 이상 실패 시 ALERT SSE)
+_consecutive_failures: dict[str, int] = {}
+
 
 # ─── 필드 매핑 ────────────────────────────────────────────────────────────────
 
@@ -96,6 +99,8 @@ async def run_scraper_for_service(service_id: str):
 
         try:
             new_data_rows = await crawler.scan_for_updates()
+            # 성공 시 연속 실패 카운터 초기화
+            _consecutive_failures[service_id] = 0
             if not new_data_rows:
                 return
 
@@ -227,6 +232,23 @@ async def run_scraper_for_service(service_id: str):
 
         except Exception as e:
             logger.error(f"❌ {service_id} 크롤러 스케줄 작업 중 치명적인 오류 발생: {e}")
+            # 연속 실패 카운터 증가
+            _consecutive_failures[service_id] = _consecutive_failures.get(service_id, 0) + 1
+            fail_count = _consecutive_failures[service_id]
+            if fail_count >= 5:
+                try:
+                    from app.core.events import broadcaster
+                    svc_name = {
+                        "I2859": "식품업소 인허가변경",
+                        "I2861": "음식점업소 인허가변경",
+                    }.get(service_id, service_id)
+                    alert_msg = json.dumps({
+                        "type": "ALERT",
+                        "message": f"크롤러 연속 {fail_count}회 실패: {svc_name} 크롤러가 {fail_count}회 연속 오류를 발생했습니다."
+                    }, ensure_ascii=False)
+                    broadcaster.broadcast_sync(alert_msg)
+                except Exception:
+                    pass
 
 
 async def run_all_scrapers():

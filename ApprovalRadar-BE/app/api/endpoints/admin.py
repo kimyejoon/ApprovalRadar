@@ -39,8 +39,17 @@ class KeyStatusResponse(BaseModel):
     all_exhausted: bool = False  # 전체 키 소진 여부
 
 
+# 서비스 ID → 사용자 친화적 한글 서비스명 매핑
+SERVICE_NAME_MAP: dict[str, str] = {
+    "I2859": "식품업소 인허가변경",
+    "I2861": "음식점업소 인허가변경",
+    "I2500": "인허가 업소 정보",
+}
+
+
 class CrawlerServiceStatus(BaseModel):
     service_id: str
+    service_name: str  # 사용자 친화적 서비스명
     last_total_count: int
     updated_at: Optional[str] = None
 
@@ -170,8 +179,10 @@ async def get_crawler_status():
             )
             rows = cursor.fetchall()
             for row in rows:
+                svc_id = row["service_id"]
                 services.append(CrawlerServiceStatus(
-                    service_id=row["service_id"],
+                    service_id=svc_id,
+                    service_name=SERVICE_NAME_MAP.get(svc_id, svc_id),
                     last_total_count=row["last_total_count"],
                     updated_at=row["updated_at"],
                 ))

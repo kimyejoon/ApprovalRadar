@@ -121,7 +121,7 @@ function CrawlerStatusCard() {
           <div className="space-y-1.5">
             {data.services.map(svc => (
               <div key={svc.service_id} className="flex items-baseline justify-between">
-                <span className="font-mono text-xs font-medium text-brand">{svc.service_id}</span>
+                <span className="text-xs font-medium text-brand">{svc.service_name ?? svc.service_id}</span>
                 <span className="text-xl font-bold text-text-primary">
                   {svc.last_total_count.toLocaleString()}
                   <span className="text-xs font-normal text-text-muted ml-1">{formatTime(svc.updated_at)}</span>

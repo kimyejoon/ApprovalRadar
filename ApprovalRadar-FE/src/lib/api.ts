@@ -260,6 +260,7 @@ export async function fetchKeyStatus(): Promise<KeyStatusResponse> {
 
 export interface CrawlerServiceStatus {
   service_id: string;
+  service_name?: string;  // 사용자 친화적 서비스명 (BE에서 제공)
   last_total_count: number;
   updated_at: string | null;
 }

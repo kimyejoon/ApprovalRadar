@@ -4,6 +4,8 @@ import { useToastStore } from '@/store/useToastStore';
 import { playNotificationSound } from '@/lib/audio';
 import { fetchApprovals } from '@/lib/api';
 import { CATEGORY_NAMES } from '@/lib/constants';
+import { emitSystemAlert } from '@/components/ui/SystemAlertPopup';
+import type { SystemAlertType } from '@/components/ui/SystemAlertPopup';
 
 declare global {
   interface Window {
@@ -84,6 +86,9 @@ export function useSSE() {
           const data = JSON.parse(event.data);
           if (data.type === 'UPDATE') {
             await handleUpdateEvent();
+          } else if (data.type === 'WARN' || data.type === 'ALERT') {
+            // 시스템 경고/오류 → 우측 하단 팝업 표시
+            emitSystemAlert(data.type as SystemAlertType, data.message || '시스템 알림');
           }
         } catch {
           // JSON 파싱 실패 시 기존 텍스트 메시지 방식 호환 처리
