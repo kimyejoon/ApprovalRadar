@@ -20,11 +20,15 @@ def _check_api_key_recovery():
 def start_scheduler():
     logger.info("Configuring APScheduler jobs...")
     
-    # 10분마다 실행되는 정기 크롤링
-    scheduler.add_job(run_all_scrapers, 'interval', minutes=10, id="scraper_job")
+    # ✅ [개선] 10분 → 30분: 요구사항 준수 + API Key 일일 1,000건 한도 절약
+    scheduler.add_job(run_all_scrapers, 'interval', minutes=30, id="scraper_job")
     
     # 30분마다 소진 키 회복 체크 (소진 상태가 아니면 즉시 반환)
     scheduler.add_job(_check_api_key_recovery, 'interval', minutes=30, id="key_recovery_job")
+    
+    # ✅ [개선] 세부업종(industry_type) 백필 6시간 주기 - Key 소진/네트워크 오류로 중단 시 자동 재시도
+    from app.services.industry_filler import fill_missing_industry_types
+    scheduler.add_job(fill_missing_industry_types, 'interval', hours=6, id="backfill_job")
     
     # DB 최적화 (일요일 새벽 3시)
     scheduler.add_job(vacuum_db, 'cron', day_of_week='sun', hour=3, minute=0, id="vacuum_job")

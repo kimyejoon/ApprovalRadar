@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import random
 import concurrent.futures
 import threading
 
@@ -96,8 +97,8 @@ def fill_missing_industry_types():
             if processed_count % 100 == 0 or processed_count == total_missing:
                 logger.info(f"[진척도] {processed_count}/{total_missing} 처리 완료 (성공: {success_count}, 실패: {fail_count})")
 
-        # WAF 차단 방지 gap
-        time.sleep(settings.GAP_SECONDS)
+        # WAF 차단 방지 Jitter(무작위 지연) - 고정 간격은 봇 패턴으로 감지될 수 있음
+        time.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
 
     # 단일 워커 순차 처리 (WAF 우회)
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:

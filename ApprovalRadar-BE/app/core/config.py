@@ -22,7 +22,9 @@ class Settings:
     
     # Crawler Settings
     MAX_WORKERS = 2
-    GAP_SECONDS = 3.0
+    GAP_SECONDS = 3.0   # 하위 호환성 유지
+    GAP_MIN = 1.5       # Jitter 최솟값(초) - WAF/IP 차단 방지용 무작위 지연
+    GAP_MAX = 4.0       # Jitter 최댓값(초)
     
     # 모니터링 최적화 설정
     PIVOT_INTERVAL = 5000  # 희소 색인(Sparse Index) 피벗 간격

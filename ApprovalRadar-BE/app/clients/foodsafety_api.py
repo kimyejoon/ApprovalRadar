@@ -1,4 +1,4 @@
-import requests
+import httpx
 import threading
 import datetime
 from app.core.config import settings
@@ -120,7 +120,7 @@ class ApiClient:
         if not cls.is_exhausted():
             return False
 
-        import requests as req_lib
+        import httpx as req_lib
         logger.info("[키 회복 체크] 소진된 키 활성화 여부 확인 중...")
         active_masked: set[str] = set()
         for key in api_keys:
@@ -156,10 +156,12 @@ class ApiClient:
         self._session = self._create_session()
 
     @staticmethod
-    def _create_session() -> requests.Session:
+    def _create_session() -> httpx.Client:
         """HTTP Keep-Alive 연결 재사용 세션을 생성합니다."""
-        session = requests.Session()
-        session.headers.update({'Connection': 'keep-alive', 'Accept': 'application/json'})
+        session = httpx.Client(
+            headers={'Connection': 'keep-alive', 'Accept': 'application/json'},
+            follow_redirects=True,
+        )
         return session
 
     def _renew_session(self):
@@ -295,7 +297,7 @@ class ApiClient:
                     backoff = min(backoff * 2, 10)
                     attempt += 1
 
-                except requests.exceptions.Timeout:
+                except httpx.TimeoutException:
                     ctx = f"서비스:{service_id}, 범위:{start_idx}~{end_idx}"
                     logger.warning(f"[읽기 타임아웃] {ctx} | 서버 응답 지연 ({timeout}초 초과). {backoff}초 후 재시도합니다.")
                     if shutdown_event.wait(backoff):
@@ -303,7 +305,7 @@ class ApiClient:
                     backoff = min(backoff * 2, 10)
                     attempt += 1
 
-                except requests.exceptions.RequestException as e:
+                except httpx.HTTPError as e:
                     ctx = f"서비스:{service_id}, 범위:{start_idx}~{end_idx}"
                     if kwargs:
                         ctx += f", 추가:{kwargs}"
@@ -328,7 +330,7 @@ class ApiClient:
             url = f"{settings.BASE_URL}/{key}/{service_id}/{settings.DATA_TYPE}/1/1"
 
             try:
-                res = requests.get(url, timeout=5).json()
+                res = httpx.get(url, timeout=5).json()
                 if service_id in res:
                     code = res[service_id]['RESULT']['CODE']
                     msg = res[service_id]['RESULT']['MSG']

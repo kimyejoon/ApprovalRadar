@@ -171,6 +171,43 @@ class DiffCrawlerEngine:
         logger.info(f"[{self.service_id}][Bootstrapper] 부트스트랩 완료! 총 {len(pivots)}개 피벗 색인 생성. (Tail: {total_count:,}건)")
         return state
 
+    # ─── 보조 감지: Delete 은폐 피벗 샘플링 ──────────────────────────────────
+
+    PIVOT_SAMPLE_RATIO = 0.2  # 피벗의 20%를 샘플링
+
+    def _sample_check_pivots(self, pivots: dict) -> bool:
+        """
+        저장된 피벗 중 일부를 무작위로 샘플링하여 API 현재 응답과 비교합니다.
+        Delete가 은폐(Insert+Delete 동시 발생)된 경우 피벗의 LCNS_NO가 바뀌어 있습니다.
+        Returns: True = 불일치 감지(Delete 의심), False = 정상
+        """
+        if not pivots:
+            return False
+
+        import random as _random
+        pivot_items = list(pivots.items())
+        sample_size = max(1, int(len(pivot_items) * self.PIVOT_SAMPLE_RATIO))
+        sampled = _random.sample(pivot_items, min(sample_size, len(pivot_items)))
+
+        for idx_str, expected_lcns_no in sampled:
+            idx = int(idx_str)
+            try:
+                res = self.api_client.fetch_data(self.service_id, idx, idx)
+                items = res.get(self.service_id, {}).get("row", [])
+                if not items:
+                    continue
+                actual_lcns_no = items[0].get("LCNS_NO", "")
+                if actual_lcns_no != expected_lcns_no:
+                    logger.warning(
+                        f"[{self.service_id}][피벗 샘플링] idx={idx} 불일치! "
+                        f"저장값={expected_lcns_no}, 현재값={actual_lcns_no}"
+                    )
+                    return True  # 첫 불일치 발견 즉시 반환
+            except Exception as e:
+                logger.debug(f"[{self.service_id}][피벗 샘플링] idx={idx} 조회 실패: {e}")
+                continue
+        return False
+
     # ─── 델타 감지 ────────────────────────────────────────────────────────────
 
     def scan_for_updates(self):
@@ -191,7 +228,19 @@ class DiffCrawlerEngine:
 
         if new_tail <= old_tail:
             elapsed = time.time() - start_time
-            logger.info(f"[{svc}] ✨ [소요: {elapsed:.2f}초] Tail 변동 없음. (tail: {old_tail:,}건)")
+            # ✅ [개선] Delete 은폐 감지: Tail이 같아도 Insert+Delete가 동시 발생했을 수 있음
+            # 피벗의 일부(PIVOT_SAMPLE_RATIO)를 샘플링하여 내부 Shift 발생 여부 확인
+            changed = self._sample_check_pivots(state.get("pivots", {}))
+            if changed:
+                logger.warning(
+                    f"[{svc}] ⚠️ [Delete 은폐 감지] Tail 변동 없으나 피벗 불일치! "
+                    f"Insert+Delete 동시 발생 가능성. 다음 주기에 Tail 재탐색 예정."
+                )
+                # 은폐 감지 시 last_total_count를 -1 감소시켜 다음 주기에 강제 탐색 유도
+                state["last_total_count"] = max(0, old_tail - 1)
+                self.state_repo.save_state(self.service_id, state)
+            else:
+                logger.info(f"[{svc}] ✨ [소요: {elapsed:.2f}초] Tail 변동 없음. (tail: {old_tail:,}건)")
             return []
 
         diff_count = new_tail - old_tail

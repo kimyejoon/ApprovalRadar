@@ -1,7 +1,7 @@
 import asyncio
 import json
 import os
-import requests as http_requests
+import httpx as http_requests
 from datetime import datetime
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException

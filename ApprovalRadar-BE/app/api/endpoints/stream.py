@@ -1,6 +1,6 @@
 import asyncio
 import json
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.logger import logger
@@ -38,12 +38,16 @@ router = APIRouter()
         }
     }
 )
-async def stream_updates():
+async def stream_updates(request: Request):
     async def event_generator():
         q = asyncio.Queue()
         broadcaster.add_queue(q)
         try:
             while True:
+                # ✅ [개선] 클라이언트 연결 끊김 감지 - 좀비 커넥션/메모리 누수 방지
+                if await request.is_disconnected():
+                    logger.info("[SSE] 클라이언트 연결 끊김 감지 → 스트림 종료")
+                    break
                 try:
                     # 최대 5초 대기
                     msg = await asyncio.wait_for(q.get(), timeout=5.0)
