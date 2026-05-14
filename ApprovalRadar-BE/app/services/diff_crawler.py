@@ -26,22 +26,34 @@ class DiffCrawlerEngine:
             return None
         return None
 
-    def find_true_tail(self) -> int:
-        logger.info("[Bootstrapper] True Tail(실제 마지막 데이터) 찾는 중...")
-        low, high = 1, 1000000
-        best_valid = 1
+    def _get_total_count(self) -> int:
+        """
+        API의 TOTAL_COUNT 필드를 직접 읽어 전체 데이터 건수를 1회 호출로 파악합니다.
+        이진탐색 방식은 WAF 차단 시 항상 최댓값을 반환하는 결함이 있었습니다.
+        """
+        res = self.api_client.fetch_data(self.service_id, 1, 1)
+        if not res or self.service_id not in res:
+            raise RuntimeError("전체 건수 확인 실패: API 응답 없음")
         
-        while low <= high and not shutdown_event.is_set():
-            mid = (low + high) // 2
-            row = self._fetch_single(mid)
-            if row:
-                best_valid = mid
-                low = mid + 1
-            else:
-                high = mid - 1
-                
-        logger.info(f"[Bootstrapper] 전체 데이터 건수 확인 완료: {best_valid}건")
-        return best_valid
+        result_block = res[self.service_id]
+        # API가 반환하는 공식 전체 레코드 수 (TOTAL_COUNT 필드)
+        total_count = int(result_block.get("TOTAL_COUNT", 0))
+        
+        if total_count == 0:
+            code = result_block['RESULT']['CODE']
+            raise RuntimeError(f"전체 건수 확인 실패: 코드={code}, TOTAL_COUNT=0")
+        
+        return total_count
+
+    def find_true_tail(self) -> int:
+        """
+        API TOTAL_COUNT를 기반으로 전체 데이터 건수를 반환합니다.
+        (구: 이진탐색 방식 → API 공식 필드 직접 읽기로 교체)
+        """
+        logger.info("[Bootstrapper] 전체 데이터 건수 확인 중... (API TOTAL_COUNT 직접 조회)")
+        total_count = self._get_total_count()
+        logger.info(f"[Bootstrapper] 전체 데이터 건수 확인 완료: {total_count:,}건")
+        return total_count
 
     def bootstrap(self):
         """처음부터 피벗을 생성합니다."""
@@ -79,39 +91,22 @@ class DiffCrawlerEngine:
         if state["last_total_count"] == 0:
             logger.info("최초 실행: 베이스라인 부트스트랩을 시작합니다...")
             state = self.bootstrap()
-            return [] # 부트스트랩 시에는 데이터를 가져오지 않고 베이스라인만 구축
+            return []  # 부트스트랩 시에는 데이터를 가져오지 않고 베이스라인만 구축
             
         old_tail = state["last_total_count"]
         
-        # 1. Tail Ping (꼬리 검사)
-        # 만약 old_tail + 1 이 존재한다면 늘어난 것임.
-        row_next = self._fetch_single(old_tail + 1)
-        if not row_next:
-            elapsed = time.time() - start_time
-            logger.info(f"✨ [소요시간: {elapsed:.2f}초] 새로운 데이터가 감지되지 않았습니다. (현재 전체 데이터: {old_tail}건)")
+        # 1. TOTAL_COUNT 비교로 신규 삽입 감지 (단 1회 API 호출)
+        try:
+            new_tail = self._get_total_count()
+        except RuntimeError as e:
+            logger.warning(f"[Delta Sync] 전체 건수 조회 실패: {e}. 이번 주기 스킵.")
             return []
-            
-        # 늘어났다면 새로운 Tail을 찾는다 (장기간 꺼져 있었을 수 있으므로 Exponential Jump 활용)
-        new_tail = old_tail + 1
-        step = 1
-        # 1. 꼬리가 어디까지 늘어났는지 기하급수적으로 점프
-        while not shutdown_event.is_set() and self._fetch_single(new_tail + step):
-            step *= 2
-            
-        # 2. 범위를 찾았으면 이진 탐색으로 정확한 꼬리 확정
-        low = new_tail + (step // 2)
-        high = new_tail + step
-        best_valid = low
         
-        while low <= high and not shutdown_event.is_set():
-            mid = (low + high) // 2
-            if self._fetch_single(mid):
-                best_valid = mid
-                low = mid + 1
-            else:
-                high = mid - 1
-                
-        new_tail = best_valid
+        if new_tail <= old_tail:
+            elapsed = time.time() - start_time
+            logger.info(f"✨ [소요시간: {elapsed:.2f}초] 새로운 데이터가 감지되지 않았습니다. (현재 전체 데이터: {old_tail:,}건)")
+            return []
+
             
         diff_count = new_tail - old_tail
         logger.info(f"🔍 [Tail 탐색] 인덱스가 {old_tail}에서 {new_tail}로 증가했습니다. (총 {diff_count}건의 신규 삽입 감지)")
