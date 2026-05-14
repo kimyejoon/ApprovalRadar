@@ -25,6 +25,8 @@ class Settings:
     GAP_SECONDS = 3.0   # 하위 호환성 유지
     GAP_MIN = 1.5       # Jitter 최솟값(초) - WAF/IP 차단 방지용 무작위 지연
     GAP_MAX = 4.0       # Jitter 최댓값(초)
+    # 탐색 최소주기 - .env의 SCRAPER_INTERVAL_MINUTES 로 오버라이드 가능 (기본값 30분)
+    SCRAPER_INTERVAL_MINUTES: int = 30
     
     # 모니터링 최적화 설정
     PIVOT_INTERVAL = 5000  # 희소 색인(Sparse Index) 피벗 간격
@@ -49,5 +51,13 @@ class Settings:
                 self.API_KEYS.append(fallback_key)
             else:
                 raise ValueError("환경변수에 등록된 API 키가 없습니다. FOOD_SAFETY_API_KEY_1 을 설정해주세요.")
+        
+        # SCRAPER_INTERVAL_MINUTES: env 오버라이드 (.env에서 SCRAPER_INTERVAL_MINUTES=10 식으로 변경 가능)
+        interval = os.getenv("SCRAPER_INTERVAL_MINUTES")
+        if interval is not None:
+            try:
+                self.SCRAPER_INTERVAL_MINUTES = int(interval)
+            except ValueError:
+                pass  # 잘못된 값이면 기본값(30) 유지
 
 settings = Settings()

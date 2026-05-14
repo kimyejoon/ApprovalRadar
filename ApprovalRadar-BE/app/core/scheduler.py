@@ -21,7 +21,11 @@ def start_scheduler():
     logger.info("Configuring APScheduler jobs...")
     
     # ✅ [개선] 10분 → 30분: 요구사항 준수 + API Key 일일 1,000건 한도 절약
-    scheduler.add_job(run_all_scrapers, 'interval', minutes=30, id="scraper_job")
+    # 주기는 settings.SCRAPER_INTERVAL_MINUTES (기본 30분, .env의 SCRAPER_INTERVAL_MINUTES로 오버라이드 가능)
+    from app.core.config import settings as _s
+    interval = _s.SCRAPER_INTERVAL_MINUTES
+    logger.info(f"크롤링 주기: {interval}분")
+    scheduler.add_job(run_all_scrapers, 'interval', minutes=interval, id="scraper_job")
     
     # 30분마다 소진 키 회복 체크 (소진 상태가 아니면 즉시 반환)
     scheduler.add_job(_check_api_key_recovery, 'interval', minutes=30, id="key_recovery_job")
