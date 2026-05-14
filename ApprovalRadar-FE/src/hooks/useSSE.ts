@@ -33,7 +33,7 @@ export function useSSE() {
         const latestResponse = await fetchApprovals({
           page: 1,
           size: 1,
-          sort_by: 'created_at',
+          sort_by: 'updated_at',
           sort_order: 'desc'
         });
 
