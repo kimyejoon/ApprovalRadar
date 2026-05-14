@@ -9,7 +9,7 @@ from database import init_db
 from app.core.logger import logger
 from app.api.router import api_router
 from app.core.scheduler import start_scheduler, shutdown_scheduler
-from app.core.events import broadcaster, shutdown_event
+from app.core.events import broadcaster, log_broadcaster, shutdown_event
 
 def _handle_sigint(signum, frame):
     """Ctrl+C 즉시 강제 종료 핸들러. SSE 연결이 uvicorn을 block하는 경우를 방지."""
@@ -19,8 +19,13 @@ def _handle_sigint(signum, frame):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Set the main event loop for broadcaster
-    broadcaster.set_loop(asyncio.get_running_loop())
+    loop = asyncio.get_running_loop()
+    # SSE 브로드캐스터 루프 설정
+    broadcaster.set_loop(loop)
+    logger.info("Broadcaster main event loop initialized.")
+    # WebSocket 로그 브로드캐스터 루프 설정
+    log_broadcaster.set_loop(loop)
+    logger.info("LogBroadcaster main event loop initialized.")
 
     # Startup logic
     logger.info("Initializing Database...")

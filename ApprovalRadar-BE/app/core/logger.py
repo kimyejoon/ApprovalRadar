@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 import sqlite3
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
@@ -29,17 +30,14 @@ class SQLiteHandler(logging.Handler):
             conn.commit()
             conn.close()
         except Exception as e:
-            # 로거 초기화 중 에러는 print로 대체 (무한루프 방지)
             print(f"Failed to create system_logs table: {e}")
 
     def emit(self, record):
         try:
-            # 포맷팅된 메시지 가져오기 (시간 등 제외, 순수 메시지)
             msg = self.format(record)
             level = record.levelname
             module = record.name
             
-            # DB 연결 및 저장
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
             cursor.execute(
@@ -51,15 +49,32 @@ class SQLiteHandler(logging.Handler):
         except Exception:
             self.handleError(record)
 
+
+class WebSocketLogHandler(logging.Handler):
+    """
+    연결된 WebSocket 클라이언트들에게 실시간으로 로그를 전달하는 핸들러.
+    순환참조를 방지하기 위해 log_broadcaster를 지연 임포트(lazy import)로 참조합니다.
+    """
+    def emit(self, record):
+        try:
+            from app.core.events import log_broadcaster
+            payload = json.dumps({
+                "timestamp": self.formatTime(record, "%Y-%m-%d %H:%M:%S"),
+                "level": record.levelname,
+                "message": record.getMessage(),
+            }, ensure_ascii=False)
+            log_broadcaster.broadcast_log(payload)
+        except Exception:
+            pass  # 로거 핸들러 내부 오류는 무시 (무한루프 방지)
+
+
 def custom_namer(default_name):
     """
     TimedRotatingFileHandler의 기본 백업 파일명(app.log.2026-05-12)을
     app_20260512.log 형태로 변경하는 커스텀 네이머
     """
-    # default_name: .../logs/app.log.2026-05-12
     base_dir = os.path.dirname(default_name)
     filename = os.path.basename(default_name)
-    # filename ex: app.log.2026-05-12
     parts = filename.split('.')
     if len(parts) >= 3 and parts[-1].count('-') == 2:
         date_str = parts[-1].replace('-', '')
@@ -69,11 +84,10 @@ def custom_namer(default_name):
 def setup_logger(name: str = "ApprovalRadar") -> logging.Logger:
     logger = logging.getLogger(name)
     
-    # 이미 핸들러가 등록되어 있다면 중복 추가 방지
     if not logger.handlers:
         logger.setLevel(logging.INFO)
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s - %(message)s")
-        db_formatter = logging.Formatter("%(message)s") # DB에는 순수 메시지만 저장 (시간은 DB 컬럼에 기록됨)
+        db_formatter = logging.Formatter("%(message)s")
         
         # 1. Console Handler
         console_handler = logging.StreamHandler()
@@ -85,11 +99,9 @@ def setup_logger(name: str = "ApprovalRadar") -> logging.Logger:
         log_dir = os.path.join(base_dir, "logs")
         os.makedirs(log_dir, exist_ok=True)
         
-        # 현재 활성 파일은 app_{YYYYMMDD}.log
         current_date = datetime.now().strftime("%Y%m%d")
         log_file = os.path.join(log_dir, f"app_{current_date}.log")
         
-        # 자정마다 새로운 날짜의 파일로 회전
         file_handler = TimedRotatingFileHandler(
             filename=log_file,
             when="midnight",
@@ -102,11 +114,14 @@ def setup_logger(name: str = "ApprovalRadar") -> logging.Logger:
         
         # 3. DB Handler (SQLite)
         db_path = os.path.join(base_dir, "food_safety.db")
-        # 백그라운드 환경에서 SQLite DB가 준비되기 전일 수도 있으므로, 예외 처리가 필요할 수 있지만,
-        # emit 내부에서 매번 connect 하므로 안전합니다.
         db_handler = SQLiteHandler(db_path)
         db_handler.setFormatter(db_formatter)
         logger.addHandler(db_handler)
+
+        # 4. WebSocket Handler (실시간 프론트엔드 모니터링용)
+        ws_handler = WebSocketLogHandler()
+        ws_handler.setFormatter(formatter)
+        logger.addHandler(ws_handler)
         
     return logger
 
