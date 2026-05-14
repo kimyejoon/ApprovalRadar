@@ -31,8 +31,11 @@ class DiffCrawlerEngine:
         - INFO-000: 정상 데이터 리스트 반환
         - INFO-200: 빈 페이지(데이터 없음) → [] 반환
         - 기타 오류: [] 반환
+        WAF 차단 방지를 위해 호출 후 Jitter(무작위 지연) 적용.
         """
         res = self.api_client.fetch_data(self.service_id, start, end, timeout=30)
+        # WAF 차단 방지: API 호출 직후 무작위 지연
+        time.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
         if not res or self.service_id not in res:
             return []
         block = res[self.service_id]
@@ -42,8 +45,12 @@ class DiffCrawlerEngine:
         return []
 
     def _fetch_single(self, idx: int) -> dict | None:
-        """특정 단일 인덱스 1건 조회 (피벗 확인용). 단건이므로 10초 timeout."""
+        """특정 단일 인덱스 1건 조회 (피벗 확인용). 단건이므로 10초 timeout.
+        WAF 차단 방지를 위해 호출 후 Jitter(무작위 지연) 적용.
+        """
         rows = self.api_client.fetch_data(self.service_id, idx, idx, timeout=10)
+        # WAF 차단 방지: API 호출 직후 무작위 지연
+        time.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
         if not rows or self.service_id not in rows:
             return None
         block = rows[self.service_id]
