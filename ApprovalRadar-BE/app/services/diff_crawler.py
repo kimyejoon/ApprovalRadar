@@ -5,6 +5,7 @@ from app.core.config import settings
 from app.clients.foodsafety_api import ApiClient
 from app.repositories.state_repository import StateRepository
 from app.core.logger import logger
+from app.core.events import shutdown_event
 
 class DiffCrawlerEngine:
     def __init__(self, api_client: ApiClient, service_id: str):
@@ -30,7 +31,7 @@ class DiffCrawlerEngine:
         low, high = 1, 1000000
         best_valid = 1
         
-        while low <= high:
+        while low <= high and not shutdown_event.is_set():
             mid = (low + high) // 2
             row = self._fetch_single(mid)
             if row:
@@ -94,7 +95,7 @@ class DiffCrawlerEngine:
         new_tail = old_tail + 1
         step = 1
         # 1. 꼬리가 어디까지 늘어났는지 기하급수적으로 점프
-        while self._fetch_single(new_tail + step):
+        while not shutdown_event.is_set() and self._fetch_single(new_tail + step):
             step *= 2
             
         # 2. 범위를 찾았으면 이진 탐색으로 정확한 꼬리 확정
@@ -102,7 +103,7 @@ class DiffCrawlerEngine:
         high = new_tail + step
         best_valid = low
         
-        while low <= high:
+        while low <= high and not shutdown_event.is_set():
             mid = (low + high) // 2
             if self._fetch_single(mid):
                 best_valid = mid

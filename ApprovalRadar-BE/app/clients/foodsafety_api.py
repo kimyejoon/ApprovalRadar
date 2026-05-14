@@ -3,6 +3,7 @@ import threading
 import time
 from app.core.config import settings
 from app.core.logger import logger
+from app.core.events import shutdown_event
 
 class ApiKeysExhaustedError(Exception):
     """모든 API 키가 소진되었을 때 발생하는 예외"""
@@ -56,7 +57,7 @@ class ApiClient:
         attempt = 0
         backoff = 1
         
-        while attempt < max_retries:
+        while attempt < max_retries and not shutdown_event.is_set():
             api_key = self.get_current_key()
             url = f"{settings.BASE_URL}/{api_key}/{service_id}/{settings.DATA_TYPE}/{start_idx}/{end_idx}"
             
@@ -80,12 +81,16 @@ class ApiClient:
                         # 한도 초과: 키 회전 후 즉시 재시도 시 WAF에 걸릴 수 있으므로 짧은 대기 추가
                         self.rotate_key(api_key)
                         logger.warning(f"키 회전 후 {settings.GAP_SECONDS}초 대기...")
-                        time.sleep(settings.GAP_SECONDS)
+                        if shutdown_event.wait(settings.GAP_SECONDS):
+                            logger.info("서버 종료 신호 수신. API 호출 중단.")
+                            return {}
                         continue
                     elif code in ["ERROR-500", "ERROR-601"]:
                         # 서버 일시적 오류: 지수 백오프 적용
                         logger.warning(f"[API 서버 오류] {code}: {msg}. {backoff}초 후 재시도합니다...")
-                        time.sleep(backoff)
+                        if shutdown_event.wait(backoff):
+                            logger.info("서버 종료 신호 수신. API 호출 중단.")
+                            return {}
                         backoff *= 2
                         attempt += 1
                         continue
@@ -95,7 +100,8 @@ class ApiClient:
                         return res
                 else:
                     logger.warning(f"알 수 없는 응답 형식입니다. {backoff}초 후 재시도합니다...")
-                    time.sleep(backoff)
+                    if shutdown_event.wait(backoff):
+                        return {}
                     
             except ValueError as e:
                 # JSONDecodeError (ValueError)
@@ -109,9 +115,11 @@ class ApiClient:
                 elif attempt >= 2:
                     logger.warning("연속적인 응답 오류 발생! 해당 키가 WAF에 의해 임시 차단된 것으로 의심되어 키를 회전합니다.")
                     self.rotate_key(api_key)
-                    time.sleep(settings.GAP_SECONDS)
+                    if shutdown_event.wait(settings.GAP_SECONDS):
+                        return {}
                 else:
-                    time.sleep(backoff)
+                    if shutdown_event.wait(backoff):
+                        return {}
                     
                 backoff *= 2
                 attempt += 1
@@ -123,7 +131,8 @@ class ApiClient:
                 logger.warning(f"[네트워크 통신 오류] {ctx} | 사유: {str(e)}. 타임아웃/연결 오류 발생으로 인한 WAF 락 방지를 위해 키를 즉시 전환합니다.")
                 
                 self.switch_key(api_key)
-                time.sleep(backoff)
+                if shutdown_event.wait(backoff):
+                    return {}
                 
                 backoff *= 2
                 attempt += 1
@@ -157,6 +166,7 @@ class ApiClient:
                 status = f"[bold red]통신 오류 또는 WAF 차단 ({str(e)})[/bold red]"
                 
             logger.info(f"Key {idx+1} ({masked_key}): {status}")
-            time.sleep(0.5)
+            if shutdown_event.wait(0.5):
+                break
             
         logger.info("--- 점검 완료 ---\n")

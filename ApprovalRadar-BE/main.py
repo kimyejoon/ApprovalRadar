@@ -28,6 +28,8 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown logic
+    from app.core.events import shutdown_event
+    shutdown_event.set()
     shutdown_scheduler()
 
 app = FastAPI(title="Food Safety Data API", lifespan=lifespan)

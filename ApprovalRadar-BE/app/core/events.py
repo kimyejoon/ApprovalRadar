@@ -1,6 +1,9 @@
 import asyncio
+import threading
 from typing import List
 from app.core.logger import logger
+
+shutdown_event = threading.Event()
 
 class Broadcaster:
     def __init__(self):
