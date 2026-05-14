@@ -28,8 +28,19 @@ def generate_excel_export(start_date: Optional[str], end_date: Optional[str], se
     ws = wb.active
     ws.title = "인허가 데이터"
 
-    # 헤더 설정
-    headers = ["업소명", "소재지", "인허가번호", "대표자명", "영업상태", "최초인허가일", "변동인허가일", "전화번호"]
+    # 변경타입 한글 매핑 (프론트엔드 CATEGORY_NAMES와 동일)
+    CATEGORY_NAMES = {
+        '신규등록': '신규등록',
+        '상태변경': '상태 변경',
+        '대표자변경': '대표 변경',
+        '변경민원-상호명': '상호 변경',
+        '변경민원-주소': '주소 변경',
+        '변경민원-성함': '성함 변경',
+        '초기수집(과거변경있음)': '기타',
+    }
+
+    # 헤더 설정 (프론트엔드 테이블 컬럼 순서와 동일)
+    headers = ["업소명", "소재지", "인허가번호", "대표자명", "세부업종", "변경타입", "인허가변동시각", "전화번호"]
     ws.append(headers)
 
     # 헤더 스타일 지정
@@ -44,25 +55,29 @@ def generate_excel_export(start_date: Optional[str], end_date: Optional[str], se
     # 데이터 입력
     for row in rows:
         record = dict(row)
-        
-        # Format dates if necessary, or just return as is
-        last_event_date = record.get("last_event_date", "")
-        if last_event_date and len(last_event_date) == 8:
-            last_event_date = f"{last_event_date[:4]}-{last_event_date[4:6]}-{last_event_date[6:]}"
-            
-        license_date = record.get("license_date", "")
-        if license_date and len(license_date) == 8:
-            license_date = f"{license_date[:4]}-{license_date[4:6]}-{license_date[6:]}"
-            
+
+        # 변경타입: infer_update_type → 한글 매핑
+        raw_update_type = record.get("infer_update_type", "") or ""
+        change_type = CATEGORY_NAMES.get(raw_update_type, raw_update_type)
+
+        # 인허가변동시각: last_event_time (ISO 8601 → 한국 가독성 포맷)
+        last_event_time = record.get("last_event_time", "") or ""
+        if last_event_time:
+            try:
+                from datetime import datetime as _dt
+                last_event_time = _dt.fromisoformat(last_event_time).strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass  # 파싱 실패 시 원본 유지
+
         ws.append([
             record.get("business_name", ""),
             record.get("address", ""),
             record.get("license_no", ""),
             record.get("representative_name", ""),
-            record.get("business_status", ""),
-            license_date,
-            last_event_date,
-            record.get("phone_number", "")
+            record.get("industry_type", "") or "",
+            change_type,
+            last_event_time,
+            record.get("phone_number", "") or "",
         ])
 
     # 컬럼 너비 자동 조정
