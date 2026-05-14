@@ -31,6 +31,10 @@ async def lifespan(app: FastAPI):
     from app.core.events import shutdown_event
     shutdown_event.set()
     shutdown_scheduler()
+    
+    logger.info("Forcefully terminating process to prevent thread hangs...")
+    import os
+    os._exit(0)
 
 app = FastAPI(title="Food Safety Data API", lifespan=lifespan)
 
