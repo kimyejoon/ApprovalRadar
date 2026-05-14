@@ -285,6 +285,7 @@ export interface ApiKeyManagementItem {
   created_at: string;
   call_count_today: number;
   is_exhausted: boolean;
+  crawl_resumed: boolean;  // 새 키 추가로 크롤링이 즉시 재개됐으면 true
 }
 
 export interface ApiKeyListResponse {

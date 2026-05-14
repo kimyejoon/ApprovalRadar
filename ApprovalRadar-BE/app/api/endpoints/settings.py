@@ -21,6 +21,7 @@ class ApiKeyItem(BaseModel):
     created_at: str
     call_count_today: int = 0
     is_exhausted: bool = False
+    crawl_resumed: bool = False  # 새 키 추가로 크롤링이 재개됐으면 True
 
 
 class ApiKeyListResponse(BaseModel):
@@ -138,6 +139,40 @@ async def create_api_key(body: ApiKeyCreateRequest):
     _reload_settings_keys()
     logger.info(f"[settings] API 키 추가: {_mask_key(key_value)} | 메모: {body.memo}")
 
+    # ── 소진 상태 검증 및 크롤링 자동 재개 ──────────────────────────────────
+    crawl_resumed = False
+    from app.clients.foodsafety_api import ApiClient
+    from app.core.config import settings as _settings
+
+    if ApiClient.is_exhausted():
+        # 새 키가 실제로 유효한지 API 찔러봄 (비동기 → asyncio.run)
+        import asyncio
+        import httpx
+
+        def _validate_key(k: str) -> bool:
+            """새 키에 대해 실제 API 1건 요청으로 활성 여부 확인."""
+            url = f"{_settings.BASE_URL}/{k}/{_settings.SERVICE_ID}/{_settings.DATA_TYPE}/1/1"
+            try:
+                res = httpx.get(url, timeout=7).json()
+                if _settings.SERVICE_ID in res:
+                    code = res[_settings.SERVICE_ID]['RESULT']['CODE']
+                    return code == "INFO-000"
+            except Exception:
+                pass
+            return False
+
+        if _validate_key(key_value):
+            masked_new = _mask_key(key_value)
+            ApiClient.recover_exhaustion({masked_new})
+            logger.info(f"[settings] 새 키 {masked_new} 검증 통과 → 소진 플래그 해제, 크롤링 재개 예약")
+
+            # 즉시 1회 스크래퍼 실행 (비동기 safe: 별도 APScheduler 잡으로 위임)
+            from app.core.scheduler import trigger_immediate_scrape
+            trigger_immediate_scrape()
+            crawl_resumed = True
+        else:
+            logger.warning(f"[settings] 새 키 {_mask_key(key_value)} 검증 실패 (비활성/소진 키). 소진 상태 유지.")
+
     return ApiKeyItem(
         id=row["id"],
         key_masked=_mask_key(row["key_value"]),
@@ -146,6 +181,7 @@ async def create_api_key(body: ApiKeyCreateRequest):
         created_at=row["created_at"] or "",
         call_count_today=0,
         is_exhausted=False,
+        crawl_resumed=crawl_resumed,
     )
 
 

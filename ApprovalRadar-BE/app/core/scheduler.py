@@ -75,3 +75,21 @@ def start_scheduler():
 def shutdown_scheduler():
     logger.info("Shutting down APScheduler...")
     scheduler.shutdown(wait=False)
+
+
+def trigger_immediate_scrape():
+    """키 회복/추가 시 크롤링을 즉시 1회 실행합니다.
+    APScheduler 'date' 잡으로 등록하여 별도 스레드에서 비동기로 안전하게 실행합니다.
+    이미 실행 중인 잡과 충돌하지 않습니다 (고유 id를 timestamp로 구분)."""
+    import time
+    job_id = f"immediate_scrape_{int(time.time())}"
+    try:
+        scheduler.add_job(
+            _scraper_job,
+            'date',
+            run_date=datetime.now(),
+            id=job_id,
+        )
+        logger.info(f"[즉시 재가동] 크롤러 즉시 실행 잡 등록됨: {job_id}")
+    except Exception as e:
+        logger.error(f"[즉시 재가동] 잡 등록 실패: {e}")

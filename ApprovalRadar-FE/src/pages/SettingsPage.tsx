@@ -11,6 +11,7 @@ import {
   ToggleRight,
   Eye,
   EyeSlash,
+  Play,
 } from '@phosphor-icons/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -169,16 +170,24 @@ function AddKeyForm({ onSuccess }: { onSuccess: () => void }) {
   const [memo, setMemo] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [resumedMsg, setResumedMsg] = useState<'resumed' | 'invalid' | null>(null);
 
   const mutation = useMutation({
     mutationFn: () => createApiKey(keyValue.trim(), memo.trim() || undefined),
-    onSuccess: () => {
+    onSuccess: (data) => {
       setKeyValue('');
       setMemo('');
       setErrorMsg('');
+      // crawl_resumed: 서버가 소진 상태를 해제하고 크롤링을 즉시 재개했으면 true
+      if (data.crawl_resumed) {
+        setResumedMsg('resumed');
+      } else if (data.is_active && !data.is_exhausted) {
+        // 새 키 추가 성공, 크롤링 중단 상태는 아니었음
+        setResumedMsg(null);
+      }
       onSuccess();
     },
-    onError: (e: Error) => setErrorMsg(e.message),
+    onError: (e: Error) => { setErrorMsg(e.message); setResumedMsg(null); },
   });
 
   return (
@@ -227,6 +236,14 @@ function AddKeyForm({ onSuccess }: { onSuccess: () => void }) {
         </button>
       </div>
       {errorMsg && <p className="text-xs text-red-400">{errorMsg}</p>}
+
+      {/* 크롤링 재개 배너 */}
+      {resumedMsg === 'resumed' && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand/10 border border-brand/30 text-brand text-xs font-medium">
+          <Play className="w-3.5 h-3.5" weight="fill" />
+          새 키 검증 통과 — 크롤링이 즉시 재개됩니다.
+        </div>
+      )}
     </div>
   );
 }
