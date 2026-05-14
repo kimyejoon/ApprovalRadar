@@ -13,9 +13,14 @@ class ApiClient:
     def __init__(self):
         self.api_keys = settings.API_KEYS.copy()
         self.current_key_idx = 0
-        self.key_lock = threading.Lock()
+        self.key_lock = threading.Lock()       # 키 인덱스 교체용 Lock
         self.exhausted_keys = set()
-        
+        # WAF 동시 접근 방지: 키별 요청 직렬화 Lock
+        # 동일 키로 동시에 2개 이상 요청하면 "현재 접속 중인 인증키입니다" WAF 차단 발생
+        self._key_locks: dict[str, threading.Lock] = {
+            key: threading.Lock() for key in self.api_keys
+        }
+
     def get_current_key(self) -> str:
         with self.key_lock:
             return self.api_keys[self.current_key_idx]
@@ -62,80 +67,81 @@ class ApiClient:
             url = f"{settings.BASE_URL}/{api_key}/{service_id}/{settings.DATA_TYPE}/{start_idx}/{end_idx}"
             
             if kwargs:
-                # kwargs에 담긴 추가 조건을 변수명=값 형태로 URL에 조합 (예: /LCNS_NO=20240714123)
                 params = "&".join(f"{k}={v}" for k, v in kwargs.items())
                 url += f"/{params}"
             
-            try:
-                response = requests.get(url, timeout=10)
-                response.raise_for_status()
-                res = response.json()
-                
-                if service_id in res:
-                    code = res[service_id]['RESULT']['CODE']
-                    msg = res[service_id]['RESULT']['MSG']
+            # 동일 키 동시 요청 → WAF "현재 접속 중인 인증키입니다" 차단 방지
+            # 같은 키를 쓰는 스레드는 순서대로 직렬화. 다른 키는 독립적으로 병렬 진행 가능.
+            key_lock = self._key_locks.setdefault(api_key, threading.Lock())
+
+            with key_lock:
+                # Lock 대기 중 다른 스레드가 키를 교체했을 수 있으므로 재확인
+                if self.get_current_key() != api_key:
+                    continue  # 키가 바뀌었으면 새 키로 다시 루프 (attempt 소모 없음)
+
+                try:
+                    response = requests.get(url, timeout=10)
+                    response.raise_for_status()
+                    res = response.json()
                     
-                    if code == "INFO-000" or code == "INFO-200":
-                        return res
-                    elif code in ["INFO-300", "INFO-333"] or "유효 호출건수" in msg:
-                        # 한도 초과: 키 회전 후 즉시 재시도 시 WAF에 걸릴 수 있으므로 짧은 대기 추가
-                        self.rotate_key(api_key)
-                        logger.warning(f"키 회전 후 {settings.GAP_SECONDS}초 대기...")
-                        if shutdown_event.wait(settings.GAP_SECONDS):
-                            logger.info("서버 종료 신호 수신. API 호출 중단.")
-                            return {}
-                        continue
-                    elif code in ["ERROR-500", "ERROR-601"]:
-                        # 서버 일시적 오류: 지수 백오프 적용
-                        logger.warning(f"[API 서버 오류] {code}: {msg}. {backoff}초 후 재시도합니다...")
-                        if shutdown_event.wait(backoff):
-                            logger.info("서버 종료 신호 수신. API 호출 중단.")
-                            return {}
-                        backoff *= 2
-                        attempt += 1
-                        continue
+                    if service_id in res:
+                        code = res[service_id]['RESULT']['CODE']
+                        msg = res[service_id]['RESULT']['MSG']
+                        
+                        if code == "INFO-000" or code == "INFO-200":
+                            return res
+                        elif code in ["INFO-300", "INFO-333"] or "유효 호출건수" in msg:
+                            self.rotate_key(api_key)
+                            logger.warning(f"키 회전 후 {settings.GAP_SECONDS}초 대기...")
+                            if shutdown_event.wait(settings.GAP_SECONDS):
+                                logger.info("서버 종료 신호 수신. API 호출 중단.")
+                                return {}
+                            continue
+                        elif code in ["ERROR-500", "ERROR-601"]:
+                            logger.warning(f"[API 서버 오류] {code}: {msg}. {backoff}초 후 재시도합니다...")
+                            if shutdown_event.wait(backoff):
+                                logger.info("서버 종료 신호 수신. API 호출 중단.")
+                                return {}
+                            backoff *= 2
+                            attempt += 1
+                            continue
+                        else:
+                            logger.error(f"[API 파라미터/기타 오류] {code}: {msg}")
+                            return res
                     else:
-                        # 기타 치명적인 오류 (ERROR-300, ERROR-331 등)는 재시도하지 않고 예외 발생
-                        logger.error(f"[API 파라미터/기타 오류] {code}: {msg}")
-                        return res
-                else:
-                    logger.warning(f"알 수 없는 응답 형식입니다. {backoff}초 후 재시도합니다...")
-                    if shutdown_event.wait(backoff):
-                        return {}
+                        logger.warning(f"알 수 없는 응답 형식입니다. {backoff}초 후 재시도합니다...")
+                        if shutdown_event.wait(backoff):
+                            return {}
+
+                except ValueError as e:
+                    ctx = f"서비스:{service_id}, 추가:{kwargs}" if kwargs else f"서비스:{service_id}"
+                    raw_text = response.text[:200].replace('\n', ' ') if 'response' in locals() else "N/A"
+                    logger.warning(f"[API 파싱 오류] {ctx} | 서버가 JSON이 아닌 데이터를 반환했습니다 (WAF 차단 의심). 응답 미리보기: {raw_text} | 사유: {str(e)}")
                     
-            except ValueError as e:
-                # JSONDecodeError (ValueError)
-                ctx = f"서비스:{service_id}, 추가:{kwargs}" if kwargs else f"서비스:{service_id}"
-                raw_text = response.text[:200].replace('\n', ' ') if 'response' in locals() else "N/A"
-                logger.warning(f"[API 파싱 오류] {ctx} | 서버가 JSON이 아닌 데이터를 반환했습니다 (WAF 차단 의심). 응답 미리보기: {raw_text} | 사유: {str(e)}")
-                
-                if "현재 접속 중인 인증키입니다" in raw_text:
-                    logger.warning("WAF 임시 차단 감지! 키를 즉시 전환합니다.")
+                    if "현재 접속 중인 인증키입니다" in raw_text:
+                        logger.warning("WAF 임시 차단 감지! 키를 즉시 전환합니다.")
+                        self.switch_key(api_key)
+                    elif attempt >= 2:
+                        logger.warning("연속적인 응답 오류 발생! 해당 키가 WAF에 의해 임시 차단된 것으로 의심되어 키를 회전합니다.")
+                        self.rotate_key(api_key)
+                        if shutdown_event.wait(settings.GAP_SECONDS):
+                            return {}
+                    else:
+                        if shutdown_event.wait(backoff):
+                            return {}
+                    backoff *= 2
+                    attempt += 1
+
+                except requests.exceptions.RequestException as e:
+                    ctx = f"서비스:{service_id}, 범위:{start_idx}~{end_idx}"
+                    if kwargs:
+                        ctx += f", 추가:{kwargs}"
+                    logger.warning(f"[네트워크 통신 오류] {ctx} | 사유: {str(e)}. 타임아웃/연결 오류로 인한 WAF 락 방지를 위해 키를 즉시 전환합니다.")
                     self.switch_key(api_key)
-                elif attempt >= 2:
-                    logger.warning("연속적인 응답 오류 발생! 해당 키가 WAF에 의해 임시 차단된 것으로 의심되어 키를 회전합니다.")
-                    self.rotate_key(api_key)
-                    if shutdown_event.wait(settings.GAP_SECONDS):
-                        return {}
-                else:
                     if shutdown_event.wait(backoff):
                         return {}
-                    
-                backoff *= 2
-                attempt += 1
-                
-            except requests.exceptions.RequestException as e:
-                ctx = f"서비스:{service_id}, 범위:{start_idx}~{end_idx}"
-                if kwargs:
-                    ctx += f", 추가:{kwargs}"
-                logger.warning(f"[네트워크 통신 오류] {ctx} | 사유: {str(e)}. 타임아웃/연결 오류 발생으로 인한 WAF 락 방지를 위해 키를 즉시 전환합니다.")
-                
-                self.switch_key(api_key)
-                if shutdown_event.wait(backoff):
-                    return {}
-                
-                backoff *= 2
-                attempt += 1
+                    backoff *= 2
+                    attempt += 1
                 
         logger.error(f"❌ 최대 재시도 횟수({max_retries}) 초과. API 요청 완전 실패: {start_idx}~{end_idx}")
         raise Exception(f"식품나라 API 서버 통신 실패 (최대 재시도 초과): {start_idx}~{end_idx}")
