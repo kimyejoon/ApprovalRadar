@@ -1,3 +1,4 @@
+import asyncio
 import argparse
 import sys
 import os
@@ -10,29 +11,33 @@ from app.services.diff_crawler import DiffCrawlerEngine
 
 def check_keys():
     print("API 키 상태를 점검합니다...")
-    client = ApiClient()
-    client.check_keys_status()
+    async def _run():
+        async with ApiClient() as client:
+            await client.check_keys_status()
+    asyncio.run(_run())
 
 def test_tail():
     import time
     print("현재 데이터의 꼬리(Tail) 지점을 조회합니다 (서비스별 최적 전략)...")
     print("(I2500은 Backfill 전용 단건 조회 API이므로 tail 스캔 대상 아님)")
-    client = ApiClient()
-    # 스캐닝 대상 서비스만 조회 (I2500 제외 - Backfill 전용)
-    services = ["I2859", "I2861"]
-    for i, service_id in enumerate(services):
-        if i > 0:
-            print(f"  (다음 서비스 전 3초 대기 - WAF 방지)")
-            time.sleep(3)
-        crawler = DiffCrawlerEngine(api_client=client, service_id=service_id)
-        tail = crawler.find_true_tail()
-        print(f"  [{service_id}] 현재 전체 데이터 건수: {tail:,}건")
+    async def _run():
+        async with ApiClient() as client:
+            services = ["I2859", "I2861"]
+            for i, service_id in enumerate(services):
+                if i > 0:
+                    print(f"  (다음 서비스 전 3초 대기 - WAF 방지)")
+                    await asyncio.sleep(3)
+                crawler = DiffCrawlerEngine(api_client=client, service_id=service_id)
+                tail = await crawler.find_true_tail()
+                print(f"  [{service_id}] 현재 전체 데이터 건수: {tail:,}건")
+    asyncio.run(_run())
     print("\n✅ 조회 완료")
 
 def run_sync():
     print("수동으로 차분 동기화(Delta Sync)를 1회 실행합니다...")
     from scraper import run_all_scrapers
-    run_all_scrapers()
+    asyncio.run(run_all_scrapers())
+
 
 def run_backfill():
     print("DB에 누락된 세부업종 데이터를 단건 조회를 통해 채워넣습니다(Backfill)...")

@@ -22,7 +22,11 @@ class Settings:
     
     # Crawler Settings
     MAX_WORKERS = 2
-    GAP_SECONDS = 3.0
+    GAP_SECONDS = 3.0   # 하위 호환성 유지
+    GAP_MIN = 1.5       # Jitter 최솟값(초) - WAF/IP 차단 방지용 무작위 지연
+    GAP_MAX = 4.0       # Jitter 최댓값(초)
+    # 탐색 최소주기 - .env의 SCRAPER_INTERVAL_MINUTES 로 오버라이드 가능 (기본값 30분)
+    SCRAPER_INTERVAL_MINUTES: int = 30
     
     # 모니터링 최적화 설정
     PIVOT_INTERVAL = 5000  # 희소 색인(Sparse Index) 피벗 간격
@@ -35,17 +39,43 @@ class Settings:
         self._load_api_keys()
         
     def _load_api_keys(self):
+        """API 키를 DB(api_keys 테이블) 우선으로 로드합니다. DB에 키가 없으면 env를 fallback으로 사용."""
         self.API_KEYS = []
-        for i in range(1, 10):
-            key = os.getenv(f"FOOD_SAFETY_API_KEY_{i}")
-            if key:
-                self.API_KEYS.append(key)
         
+        # 1차: DB에서 활성 키 로드
+        try:
+            import sqlite3
+            db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "food_safety.db")
+            if os.path.exists(db_path):
+                conn = sqlite3.connect(db_path)
+                rows = conn.execute(
+                    "SELECT key_value FROM api_keys WHERE is_active = 1 ORDER BY id"
+                ).fetchall()
+                conn.close()
+                self.API_KEYS = [row[0] for row in rows if row[0]]
+        except Exception:
+            pass  # DB 미초기화 상태면 env fallback으로 진행
+
+        # 2차 fallback: env에서 로드 (DB 키가 없을 때)
         if not self.API_KEYS:
-            fallback_key = os.getenv("FOOD_SAFETY_API_KEY")
-            if fallback_key:
-                self.API_KEYS.append(fallback_key)
-            else:
-                raise ValueError("환경변수에 등록된 API 키가 없습니다. FOOD_SAFETY_API_KEY_1 을 설정해주세요.")
+            for i in range(1, 10):
+                key = os.getenv(f"FOOD_SAFETY_API_KEY_{i}")
+                if key:
+                    self.API_KEYS.append(key)
+            
+            if not self.API_KEYS:
+                fallback_key = os.getenv("FOOD_SAFETY_API_KEY")
+                if fallback_key:
+                    self.API_KEYS.append(fallback_key)
+                else:
+                    raise ValueError("DB 및 환경변수에 등록된 API 키가 없습니다. api_keys 테이블 또는 FOOD_SAFETY_API_KEY_1 을 설정해주세요.")
+
+        # SCRAPER_INTERVAL_MINUTES: env 오버라이드 (.env에서 SCRAPER_INTERVAL_MINUTES=10 식으로 변경 가능)
+        interval = os.getenv("SCRAPER_INTERVAL_MINUTES")
+        if interval is not None:
+            try:
+                self.SCRAPER_INTERVAL_MINUTES = int(interval)
+            except ValueError:
+                pass  # 잘못된 값이면 기본값(30) 유지
 
 settings = Settings()

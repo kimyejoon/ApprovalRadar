@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfToday } from 'date-fns';
 import { fetchApprovals, markApprovalAsRead, type ApprovalData, type ApprovalMappedItem, type ApprovalsResponse } from '@/lib/api';
-import { CATEGORY_NAMES } from '@/lib/constants';
+import { CATEGORY_NAMES, DEFAULT_STATUS_FILTERS, DEFAULT_INDUSTRY_FILTERS } from '@/lib/constants';
 import { formatPhoneNumber } from '@/lib/utils';
 
 export type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id' | 'type';
@@ -13,9 +13,9 @@ export function useApprovalRadar() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilters, setStatusFilters] = useState<string[]>(['대표자변경']);
+  const [statusFilters, setStatusFilters] = useState<string[]>(DEFAULT_STATUS_FILTERS);
   const [locationFilters, setLocationFilters] = useState<string[]>([]);
-  const [industryFilters, setIndustryFilters] = useState<string[]>(['일반음식점', '제과점영업', '휴게음식점']);
+  const [industryFilters, setIndustryFilters] = useState<string[]>(DEFAULT_INDUSTRY_FILTERS);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>({
     from: startOfToday(),
     to: startOfToday()

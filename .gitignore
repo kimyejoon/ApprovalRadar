@@ -36,3 +36,10 @@ backups/
 # Logs
 *.log
 logs/
+
+# 배포 관련 (PyInstaller)
+dist_release/
+ApprovalRadar-BE/dist/       # FE 빌드 복사본 (build.sh가 생성)
+ApprovalRadar-BE/build/      # PyInstaller 임시 빌드 폴더
+ApprovalRadar-BE/__pycache__/
+ApprovalRadar-BE/*.spec.bak
