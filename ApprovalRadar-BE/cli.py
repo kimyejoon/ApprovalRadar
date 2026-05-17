@@ -205,6 +205,142 @@ def full_scan_init(no_backup: bool = False, services: list | None = None, resume
     print("이제 정상적인 차분 동기화를 시작하세요:")
     print("  python cli.py --run-sync    # 수동 1회 실행")
     print("  uvicorn main:app ...        # 자동 30분 주기 크롤링 시작")
+    print()
+    print("풍부한 과거 이력 데이터를 비즈니스 테이블에 채우려면:")
+    print("  python cli.py --mirror      # 전체 API 데이터 미러링 (일회성, ~1,200회 호출)")
+
+
+# ─── Full Mirror ──────────────────────────────────────────────────────────────
+
+def full_mirror(services: list | None = None, from_index: int = 1):
+    """
+    전체 API 데이터를 businesses 테이블에 미러링합니다. (일회성 운영 작업)
+    - 1,000건씩 페이지네이션으로 fetch → OR IGNORE INSERT
+    - --from-index N 으로 중단된 지점부터 이어서 실행 가능
+    - API 호출: I2859 ~238회 + I2861 ~953회 = ~1,191회 (한도 23.8%)
+    """
+    from database import init_db, get_db
+    from app.repositories.state_repository import StateRepository
+    from scraper import _map_row_fields, _parse_datetime_fields
+
+    init_db()
+    services = services or ["I2859", "I2861"]
+    svc_names = {"I2859": "식품업소 인허가변경", "I2861": "음식점업소 인허가변경"}
+    PAGE_SIZE = 1000
+
+    print("\n" + "=" * 60)
+    print("📸  전체 미러링(Full Mirror)을 시작합니다.")
+    print("=" * 60)
+    svc_label = ", ".join(f"{s}({svc_names.get(s, s)})" for s in services)
+    print(f"  대상: {svc_label}")
+    print(f"  시작 인덱스: {from_index:,}")
+    print(f"  예상 API 호출: ~1,191회 (23.8% 한도)")
+    print("\n  ⚠️  기존 businesses 데이터는 덮어쓰지 않고 OR IGNORE로 작동합니다.")
+    print()
+
+    yn = input("계속하시겠습니까? (yes/no): ").strip().lower()
+    if yn != "yes":
+        print("❌ 취소되었습니다.")
+        return
+
+    total_start = datetime.datetime.now()
+    grand_total_calls = 0
+    grand_total_saved = 0
+
+    async def _run_mirror():
+        nonlocal grand_total_calls, grand_total_saved
+
+        async with ApiClient() as client:
+            state_repo = StateRepository()
+
+            for svc in services:
+                state = state_repo.load_state(svc)
+                tail = state.get("last_total_count", 0)
+
+                if tail == 0:
+                    print(f"[{svc}] ⚠️  crawler_state에 tail 정보가 없습니다. --full-scan-init을 먼저 실행하세요.")
+                    continue
+
+                print(f"\n{'─' * 50}")
+                print(f"📸 [{svc}] {svc_names.get(svc, svc)} 미러링 시작... (tail={tail:,}건)")
+                print(f"{'─' * 50}")
+
+                call_before = client.get_total_call_count()
+                svc_saved = 0
+                svc_skipped = 0
+                current = max(from_index, 1)
+
+                import random
+                from app.core.config import settings
+
+                while current <= tail:
+                    end = min(current + PAGE_SIZE - 1, tail)
+                    try:
+                        res = await client.fetch_data(svc, current, end)
+                        rows = res.get(svc, {}).get("row", [])
+                    except Exception as e:
+                        print(f"\n  ⚠️  [{svc}] idx={current:,} fetch 실패: {e}")
+                        rows = []
+
+                    with get_db() as conn:
+                        for row in rows:
+                            fields = _map_row_fields(svc, row)
+                            if not fields or not fields.get("lcns_no"):
+                                continue
+                            lcns_no = fields["lcns_no"]
+                            event_date, event_time, license_date, license_time = _parse_datetime_fields(
+                                fields.get("event_date_raw", ""), fields.get("license_date", "")
+                            )
+                            try:
+                                conn.execute(
+                                    """INSERT OR IGNORE INTO businesses
+                                    (license_no, business_name, address, representative_name,
+                                     business_status, license_date, phone_number, industry_type,
+                                     last_event_date, last_event_time, license_time,
+                                     is_new, update_type, infer_update_type)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'mirror', 'mirror')""",
+                                    (
+                                        lcns_no, fields["business_name"], fields.get("address", ""),
+                                        fields.get("representative_name", ""),
+                                        fields.get("business_status"), license_date,
+                                        fields.get("phone_number", ""), fields.get("industry_type", ""),
+                                        event_date, event_time, license_time,
+                                    )
+                                )
+                                if conn.execute("SELECT changes()").fetchone()[0] > 0:
+                                    svc_saved += 1
+                                else:
+                                    svc_skipped += 1
+                            except Exception:
+                                pass
+                        conn.commit()
+
+                    pct = current / tail * 100
+                    calls_so_far = client.get_total_call_count() - call_before
+                    print(
+                        f"  ✔  {current:>9,} ~ {end:>9,} / {tail:,} ({pct:5.1f}%)"
+                        f" │ 저장 {svc_saved:,}건 │ API {calls_so_far}회",
+                        end="\r"
+                    )
+
+                    current += PAGE_SIZE
+                    await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+
+                calls_used = client.get_total_call_count() - call_before
+                grand_total_calls += calls_used
+                grand_total_saved += svc_saved
+                print()  # \r 덮어쓰기 종료
+                print(f"  ✅ [{svc}] 완료: 신규 {svc_saved:,}건 저장 / {svc_skipped:,}건 중복 스킵 / API {calls_used}회")
+
+    asyncio.run(_run_mirror())
+
+    elapsed = (datetime.datetime.now() - total_start).total_seconds()
+    print(f"\n{'=' * 60}")
+    print("✅ Full Mirror 완료!")
+    print(f"{'=' * 60}")
+    print(f"  신규 저장: {grand_total_saved:,}건")
+    print(f"  사용 API 호출: {grand_total_calls}회 / 5,000회 한도 ({grand_total_calls / 50:.1f}%)")
+    print(f"  소요 시간: {elapsed:.1f}초")
 
 
 # ─── CLI Entry Point ──────────────────────────────────────────────────────────
@@ -238,9 +374,15 @@ if __name__ == "__main__":
         help="특정 서비스 ID만 대상으로 합니다. (예: --service I2859)"
     )
     parser.add_argument(
-        "--resume",
+        "--mirror",
         action="store_true",
-        help="--full-scan-init 시 이미 초기화된 서비스(tail > 0, 피벗 존재)는 건너뜁니다."
+        help="전체 API 데이터를 businesses 테이블에 미러링합니다. (일회성, ~1,191회 API 호출)"
+    )
+    parser.add_argument(
+        "--from-index",
+        type=int,
+        default=1,
+        help="--mirror 시 시작할 API 인덱스를 지정합니다. 중단 후 이어서 실행 가능. (default=1)"
     )
 
     args = parser.parse_args()
@@ -262,5 +404,7 @@ if __name__ == "__main__":
         full_scan_init(no_backup=args.no_backup, services=target_services, resume=args.resume)
     elif args.reset_state:
         reset_state(services=target_services)
+    elif args.mirror:
+        full_mirror(services=target_services, from_index=args.from_index)
     else:
         parser.print_help()
