@@ -11,9 +11,10 @@ PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
 
 # total_count 필드가 신뢰 가능한 서비스 목록
 # → 1회 API 호출로 정확한 Tail을 바로 얻을 수 있음 (페이지 스캔 불필요)
-# I2859: total_count 신뢰 불가 (API 버그로 9 등 엉뚱한 값 반환) → 페이지 스캔 사용
-# I2861: 음식점업소 인허가변경 - 이벤트 로그 append 구조로 total_count가 정확
-RELIABLE_TOTAL_COUNT_SERVICES = {"I2861"}
+# I2859: API 버그로 9 등 엉덩한 값 반환 (기존 알려진 문제)
+# I2861: total_count=8 반환으로 신뢰 불가 확인 (2026-05-17 실증)
+# → 향후 신뢰 가능한 서비스가 확인될 때만 이 set에 추가할 것.
+RELIABLE_TOTAL_COUNT_SERVICES: set[str] = set()
 
 # [Phase 3] Circuit Breaker 임계값
 # diff_count가 이 값을 초과하면 API 한도 초과를 방지하기 위해 해당 주기를 즉시 중단하고
@@ -153,6 +154,26 @@ class DiffCrawlerEngine:
                 return known_tail
             logger.info(f"[{svc}][전략B] Ping: {len(ping)}건 신규 감지, 탐색 계속")
 
+
+        # Step 0 (NEW): 소규모 데이터 Pre-check
+        # 지수점프는 start_pos=PAGE_SIZE부터 시작하므로, 인덱스 1~(PAGE_SIZE-1) 구간을 탐지하지 못함.
+        # known_tail=0일 때 첫 페이지 [1, PAGE_SIZE]를 선행 1회 조회하여 소규모 여부를 판단.
+        if known_tail == 0:
+            first_page = await self._fetch_page(1, PAGE_SIZE)
+            if not first_page:
+                # 인덱스 1부터 데이터 없음 → tail=0
+                logger.info(f"[{svc}][전략B] Pre-check: 데이터 없음 (tail=0)")
+                state = {"last_total_count": 0, "pivots": {}}
+                self.state_repo.save_state(svc, state)
+                return 0
+            if len(first_page) < PAGE_SIZE:
+                # 첫 페이지에 데이터가 PAGE_SIZE보다 적음 → 전체 데이터가 PAGE_SIZE 미만 (\uc18c규모)
+                final_tail = len(first_page)
+                logger.info(f"[{svc}][전략B] Pre-check: 소규모 데이터 감지 — tail={final_tail:,}건 (< PAGE_SIZE={PAGE_SIZE:,}). 지수점프 스킵.")
+                logger.info(f"[{svc}][Bootstrapper] Tail 확정: {final_tail:,}")
+                return final_tail
+            # len == PAGE_SIZE: 정상 규모 → 기존 지수점프로 진행
+            logger.debug(f"[{svc}][전략B] Pre-check: 정상 규모 ({PAGE_SIZE:,}건) → 지수점프 진행")
 
         # Step 2: 지수 점프
         start_pos = max(PAGE_SIZE, known_tail + PAGE_SIZE)

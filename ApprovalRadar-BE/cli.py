@@ -83,7 +83,7 @@ def reset_state(services: list | None = None):
         conn.close()
 
 
-def full_scan_init(no_backup: bool = False, services: list | None = None):
+def full_scan_init(no_backup: bool = False, services: list | None = None, resume: bool = False):
     """
     DB를 완전 초기화하고 전체 bootstrap을 재실행합니다.
     - businesses, api_raw_data, crawler_state 초기화
@@ -154,20 +154,31 @@ def full_scan_init(no_backup: bool = False, services: list | None = None):
     async def _run_bootstrap():
         async with ApiClient() as client:
             for i, svc in enumerate(services):
-                if i > 0:
+                # --resume: 이미 초기화된 서비스는 스킵
+                if resume:
+                    from app.repositories.state_repository import StateRepository
+                    existing = StateRepository().load_state(svc)
+                    if existing.get("last_total_count", 0) > 0 and len(existing.get("pivots", {})) > 0:
+                        tail_e = existing['last_total_count']
+                        pivots_e = len(existing['pivots'])
+                        print(f"[{svc}] ✅ 이미 초기화됨 (tail={tail_e:,}건, 피벗 {pivots_e}개) → 스킵")
+                        summary.append((svc, tail_e, pivots_e, 0))
+                        continue
+
+                if i > 0 or (resume and i == 0):
                     print(f"\n   (다음 서비스 전 5초 대기 - WAF 방지)")
                     await asyncio.sleep(5)
 
-                print(f"\n{'─' * 50}")
+                print(f"\n{'\u2500' * 50}")
                 print(f"🚀 [{svc}] {svc_names.get(svc, svc)} Bootstrap 시작...")
-                print(f"{'─' * 50}")
+                print(f"{'\u2500' * 50}")
 
-                call_count_before = client.get_total_call_count() if hasattr(client, 'get_total_call_count') else 0
+                call_count_before = client.get_total_call_count()
 
                 crawler = DiffCrawlerEngine(api_client=client, service_id=svc)
                 state = await crawler.bootstrap()
 
-                call_count_after = client.get_total_call_count() if hasattr(client, 'get_total_call_count') else 0
+                call_count_after = client.get_total_call_count()
                 calls_used = call_count_after - call_count_before
 
                 pivot_count = len(state.get("pivots", {}))
@@ -225,6 +236,11 @@ if __name__ == "__main__":
         default=None,
         help="특정 서비스 ID만 대상으로 합니다. (예: --service I2859)"
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="--full-scan-init 시 이미 초기화된 서비스(tail > 0, 피벗 존재)는 건너뜁니다."
+    )
 
     args = parser.parse_args()
 
@@ -242,7 +258,7 @@ if __name__ == "__main__":
     elif args.test_stream_update:
         test_stream_update()
     elif args.full_scan_init:
-        full_scan_init(no_backup=args.no_backup, services=target_services)
+        full_scan_init(no_backup=args.no_backup, services=target_services, resume=args.resume)
     elif args.reset_state:
         reset_state(services=target_services)
     else:
