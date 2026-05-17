@@ -1,113 +1,113 @@
-﻿@echo off
-REM ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧??
-REM  ApprovalRadar ??Windows 鍮뚮뱶 ?ㅽ겕由쏀듃
-REM  ?ъ슜踰? build.bat (?붾툝?대┃ ?먮뒗 cmd?먯꽌 ?ㅽ뻾)
-REM  ?ㅽ뻾 ???붽뎄?ы빆: Python 3.11+, Node.js 18+
-REM ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧??
+@echo off
+REM ============================================================================
+REM  ApprovalRadar - Windows Build Script
+REM  Usage: build.bat (double-click or run in cmd)
+REM  Requirements: Python 3.11+, Node.js 18+
+REM ============================================================================
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-REM ?? 寃쎈줈 ?ㅼ젙 ???????????????????????????????????????????????????????????????
+REM ── Path Setup ───────────────────────────────────────────────────────────────
 set "SCRIPT_DIR=%~dp0"
 set "BE_DIR=%SCRIPT_DIR%ApprovalRadar-BE"
 set "FE_DIR=%SCRIPT_DIR%ApprovalRadar-FE"
 set "RELEASE_DIR=%SCRIPT_DIR%dist_release"
 
 echo.
-echo   ?붴븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븮
-echo   ??    ApprovalRadar -- Build Script        ??
-echo   ??    Windows                              ??
-echo   ?싢븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븴
+echo   +==========================================+
+echo   ^|     ApprovalRadar -- Build Script        ^|
+echo   ^|     Windows                              ^|
+echo   +==========================================+
 echo.
 
-REM ?? ?ъ쟾 ?붽뎄?ы빆 泥댄겕 ??????????????????????????????????????????????????????
-echo [STEP 0] ?ъ쟾 ?붽뎄?ы빆 ?뺤씤...
+REM ── Prerequisites Check ──────────────────────────────────────────────────────
+echo [STEP 0] Checking prerequisites...
 
 where python >nul 2>&1 || (
-    echo [ERROR] Python???ㅼ튂?섏? ?딆븯?듬땲?? https://python.org ?먯꽌 ?ㅼ튂?댁＜?몄슂.
+    echo [ERROR] Python not found. Install from https://python.org
     rem pause & rem exit /b 1
 )
 where node >nul 2>&1 || (
-    echo [ERROR] Node.js媛 ?ㅼ튂?섏? ?딆븯?듬땲?? https://nodejs.org ?먯꽌 ?ㅼ튂?댁＜?몄슂.
+    echo [ERROR] Node.js not found. Install from https://nodejs.org
     rem pause & rem exit /b 1
 )
 where npm >nul 2>&1 || (
-    echo [ERROR] npm???ㅼ튂?섏? ?딆븯?듬땲??
+    echo [ERROR] npm not found.
     rem pause & rem exit /b 1
 )
 
 for /f "tokens=*" %%v in ('python --version 2^>^&1') do set PY_VER=%%v
 for /f "tokens=*" %%v in ('node --version 2^>^&1') do set NODE_VER=%%v
 echo [INFO]  %PY_VER% / Node.js %NODE_VER%
-echo [OK]    ?붽뎄?ы빆 異⑹”
+echo [OK]    Prerequisites satisfied
 echo.
 
-REM ?? STEP 1: FE 鍮뚮뱶 ?????????????????????????????????????????????????????????
-echo ?곣봺?곣봺?? STEP 1 / 4 -- ?꾨줎?몄뿏??鍮뚮뱶  ?곣봺?곣봺??
+REM ── STEP 1: Frontend Build ───────────────────────────────────────────────────
+echo ====  STEP 1 / 4 -- Frontend Build  ====
 cd /d "%FE_DIR%"
 
-echo [INFO]  npm ?⑦궎吏 ?ㅼ튂 以?..
+echo [INFO]  Installing npm packages...
 call npm install
-if errorlevel 1 ( echo [ERROR] npm install ?ㅽ뙣. & rem pause & rem exit /b 1 )
+if errorlevel 1 ( echo [ERROR] npm install failed. & rem pause & rem exit /b 1 )
 
-echo [INFO]  React ??鍮뚮뱶 以?..
+echo [INFO]  Building React app...
 call npm run build
-if errorlevel 1 ( echo [ERROR] npm run build ?ㅽ뙣. & rem pause & rem exit /b 1 )
+if errorlevel 1 ( echo [ERROR] npm run build failed. & rem pause & rem exit /b 1 )
 
 if not exist "%FE_DIR%\dist" (
-    echo [ERROR] FE 鍮뚮뱶 ?ㅽ뙣: dist\ ?대뜑媛 ?놁뒿?덈떎.
+    echo [ERROR] Frontend build failed: dist\ not found.
     rem pause & rem exit /b 1
 )
-echo [OK]    ?꾨줎?몄뿏??鍮뚮뱶 ?꾨즺
+echo [OK]    Frontend build complete
 echo.
 
-REM ?? STEP 2: FE dist瑜?BE ?대뜑濡?蹂듭궗 ???????????????????????????????????????
-echo ?곣봺?곣봺?? STEP 2 / 4 -- 鍮뚮뱶 ?뚯씪 蹂듭궗  ?곣봺?곣봺??
+REM ── STEP 2: Copy FE dist to BE folder ───────────────────────────────────────
+echo ====  STEP 2 / 4 -- Copy Build Files  ====
 if exist "%BE_DIR%\dist" rmdir /s /q "%BE_DIR%\dist"
 xcopy /E /I /Q "%FE_DIR%\dist" "%BE_DIR%\dist"
-if errorlevel 1 ( echo [ERROR] ?뚯씪 蹂듭궗 ?ㅽ뙣. & rem pause & rem exit /b 1 )
-echo [OK]    FE dist 蹂듭궗 ?꾨즺
+if errorlevel 1 ( echo [ERROR] File copy failed. & rem pause & rem exit /b 1 )
+echo [OK]    FE dist copied
 echo.
 
-REM ?? STEP 3: Python 媛?곹솚寃?& ?섏〈???ㅼ튂 ???????????????????????????????????
-echo ?곣봺?곣봺?? STEP 3 / 4 -- Python ?섍꼍 援ъ꽦  ?곣봺?곣봺??
+REM ── STEP 3: Python venv & dependencies ──────────────────────────────────────
+echo ====  STEP 3 / 4 -- Python Environment  ====
 cd /d "%BE_DIR%"
 
 if not exist "%BE_DIR%\venv" (
-    echo [INFO]  媛?곹솚寃??앹꽦 以?..
+    echo [INFO]  Creating virtual environment...
     python -m venv venv
-    if errorlevel 1 ( echo [ERROR] venv ?앹꽦 ?ㅽ뙣. & rem pause & rem exit /b 1 )
+    if errorlevel 1 ( echo [ERROR] venv creation failed. & rem pause & rem exit /b 1 )
 )
 
 call "%BE_DIR%\venv\Scripts\activate.bat"
 
-echo [INFO]  ?섏〈???ㅼ튂 以?..
+echo [INFO]  Installing dependencies...
 python -m pip install --quiet --upgrade pip
 python -m pip install --quiet -r requirements.txt
 
-REM Windows?먯꽌??uvloop ?쒓굅 (誘몄???
+REM Remove uvloop (not supported on Windows)
 python -m pip uninstall -y uvloop >nul 2>&1
 
 python -m pip install --quiet pyinstaller
-echo [OK]    Python ?섍꼍 援ъ꽦 ?꾨즺
+echo [OK]    Python environment ready
 echo.
 
-REM ?? STEP 4: PyInstaller 鍮뚮뱶 ????????????????????????????????????????????????
-echo ?곣봺?곣봺?? STEP 4 / 4 -- PyInstaller 鍮뚮뱶  ?곣봺?곣봺??
+REM ── STEP 4: PyInstaller Build ────────────────────────────────────────────────
+echo ====  STEP 4 / 4 -- PyInstaller Build  ====
 cd /d "%BE_DIR%"
 
-echo [INFO]  PyInstaller 鍮뚮뱶 ?쒖옉... (??遺??뚯슂?????덉뒿?덈떎)
+echo [INFO]  Starting PyInstaller build... (may take several minutes)
 pyinstaller ApprovalRadar.spec --clean --noconfirm
-if errorlevel 1 ( echo [ERROR] PyInstaller 鍮뚮뱶 ?ㅽ뙣. & rem pause & rem exit /b 1 )
+if errorlevel 1 ( echo [ERROR] PyInstaller build failed. & rem pause & rem exit /b 1 )
 
 if not exist "%BE_DIR%\dist\ApprovalRadar.exe" (
-    echo [ERROR] 鍮뚮뱶 ?ㅽ뙣: ApprovalRadar.exe媛 ?앹꽦?섏? ?딆븯?듬땲??
+    echo [ERROR] Build failed: ApprovalRadar.exe not found.
     rem pause & rem exit /b 1
 )
 echo.
 
-REM ?? 諛고룷 ?⑦궎吏 ?뺣━ ????????????????????????????????????????????????????????
-echo ?곣봺?곣봺?? 諛고룷 ?⑦궎吏 ?뺣━  ?곣봺?곣봺??
+REM ── Package Release ──────────────────────────────────────────────────────────
+echo ====  Release Package  ====
 
 if exist "%RELEASE_DIR%" rmdir /s /q "%RELEASE_DIR%"
 mkdir "%RELEASE_DIR%"
@@ -116,46 +116,46 @@ copy /Y "%BE_DIR%\dist\ApprovalRadar.exe" "%RELEASE_DIR%\ApprovalRadar.exe" >nul
 
 copy /Y "%BE_DIR%\.env" "%RELEASE_DIR%\.env" >nul
 
-REM DB ?뚯씪 蹂듭궗 (誘몃윭留??댁쁺 ?곗씠???ы븿)
+REM Copy DB file (mirrored operation data)
 if exist "%BE_DIR%\food_safety.db" (
     copy /Y "%BE_DIR%\food_safety.db" "%RELEASE_DIR%\food_safety.db" >nul
-    echo [OK]    DB ?뚯씪 ?ы븿 ^(food_safety.db^)
+    echo [OK]    DB file included ^(food_safety.db^)
 ) else (
-    echo [WARN]  food_safety.db ?놁쓬 -- ??泥??ㅽ뻾 ??鍮?DB ?먮룞 ?앹꽦?⑸땲??
+    echo [WARN]  food_safety.db not found -- empty DB will be created on first launch.
 )
 
-REM ?ㅽ뻾 ?덈궡 ?띿뒪??(UTF-8)
+REM Create README (ASCII only to avoid encoding issues in .bat)
 (
-echo ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧??
-echo   ApprovalRadar -- ?ㅽ뻾 諛⑸쾿 ^(Windows^)
-echo ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧??
+echo ===================================================
+echo   ApprovalRadar -- How to Run ^(Windows^)
+echo ===================================================
 echo.
-echo 1. ???대뜑?먯꽌 'ApprovalRadar.exe' 瑜??붾툝?대┃?⑸땲??
-echo 2. Windows Defender 寃쎄퀬媛 ?⑤㈃:
-echo    '異붽? ?뺣낫' -^> '?ㅽ뻾' ???대┃?⑸땲??
-echo 3. ?곗쿂 李쎌씠 ?④퀬, 釉뚮씪?곗?媛 ?먮룞?쇰줈 ?대┰?덈떎.
-echo 4. 醫낅즺 ???곗쿂 李쎌쓽 [醫낅즺] 踰꾪듉???대┃?⑸땲??
+echo 1. Double-click 'ApprovalRadar.exe' in this folder.
+echo 2. If Windows Defender SmartScreen appears:
+echo    Click 'More info' -^> 'Run anyway'
+echo 3. The launcher window will open and browser will launch automatically.
+echo 4. To exit, click the [Exit] button in the launcher window.
 echo.
-echo ???????????????????????????????????????????????????
-echo API ???ㅼ젙: .env ?뚯씪??硫붾え?μ쑝濡??댁뼱 ?섏젙
-echo DB ?뚯씪:     food_safety.db ^(?명뿀媛 ?곗씠????μ냼^)
-echo ???????????????????????????????????????????????????
+echo ---------------------------------------------------
+echo API Key: Edit .env file with Notepad
+echo Database: food_safety.db ^(license change records^)
+echo ---------------------------------------------------
 echo.
-echo 二쇱쓽: food_safety.db ?뚯씪????젣?섎㈃ 紐⑤뱺 ?곗씠?곌? 珥덇린?붾맗?덈떎.
-echo       諛깆뾽???꾩슂??寃쎌슦 DB ?뚯씪??蹂꾨룄 ?꾩튂??蹂듭궗?섏꽭??
-) > "%RELEASE_DIR%\?ㅽ뻾諛⑸쾿.txt"
+echo WARNING: Deleting food_safety.db will erase all data.
+echo          Back up the DB file before major operations.
+) > "%RELEASE_DIR%\README.txt"
 
 echo.
-echo   ?붴븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븮
-echo   ?? ?? 鍮뚮뱶 ?깃났!                                      ??
-echo   ??                                                     ??
-echo   ?? ?벀  諛고룷 ?대뜑: dist_release\                        ??
-echo   ?? ?뱛  ?ы븿 ?뚯씪:                                      ??
-echo   ??      - ApprovalRadar.exe   ^(?ㅽ뻾 ?뚯씪^)             ??
-echo   ??      - .env                ^(API ???ㅼ젙^)           ??
-echo   ??      - food_safety.db      ^(?명뿀媛 ?곗씠??DB^)      ??
-echo   ??      - ?ㅽ뻾諛⑸쾿.txt        ^(?덈궡 臾몄꽌^)             ??
-echo   ?싢븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븴
+echo   +======================================================+
+echo   ^|  Build Successful!                                   ^|
+echo   ^|                                                      ^|
+echo   ^|  Output: dist_release\                              ^|
+echo   ^|  Files:                                             ^|
+echo   ^|    - ApprovalRadar.exe   ^(executable^)              ^|
+echo   ^|    - .env                ^(API key config^)          ^|
+echo   ^|    - food_safety.db      ^(license data DB^)         ^|
+echo   ^|    - README.txt          ^(instructions^)            ^|
+echo   +======================================================+
 echo.
 
 call deactivate
