@@ -1,5 +1,5 @@
 # pyrefly: ignore [missing-import]
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Dict, Any, Optional
 
 class BusinessModel(BaseModel):
@@ -23,6 +23,18 @@ class BusinessModel(BaseModel):
     industry_type: Optional[str] = None
     is_read: Optional[int] = 0
     read_at: Optional[str] = None
+
+    @field_validator('is_new', 'is_read', mode='before')
+    @classmethod
+    def coerce_int_field(cls, v: Any) -> Optional[int]:
+        """비정상 문자열 등 잘못된 값이 들어와도 None으로 처리 (DB 오염 방어)"""
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except (ValueError, TypeError):
+            return None
+
 
 class PaginationMeta(BaseModel):
     total_count: int
