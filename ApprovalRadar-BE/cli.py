@@ -212,10 +212,11 @@ def full_scan_init(no_backup: bool = False, services: list | None = None, resume
 
 # ─── Full Mirror ──────────────────────────────────────────────────────────────
 
-def full_mirror(services: list | None = None, from_index: int = 1):
+def full_mirror(services: list | None = None, from_index: int = 1, force: bool = False):
     """
     전체 API 데이터를 businesses 테이블에 미러링합니다. (일회성 운영 작업)
-    - 1,000건씩 페이지네이션으로 fetch → OR IGNORE INSERT
+    - 기본값: OR IGNORE (기존 레코드 보존, 중복 스킵)
+    - --force: OR REPLACE (기존 레코드를 API 최신값으로 덮어씀)
     - --from-index N 으로 중단된 지점부터 이어서 실행 가능
     - API 호출: I2859 ~238회 + I2861 ~953회 = ~1,191회 (한도 23.8%)
     """
@@ -235,7 +236,11 @@ def full_mirror(services: list | None = None, from_index: int = 1):
     print(f"  대상: {svc_label}")
     print(f"  시작 인덱스: {from_index:,}")
     print(f"  예상 API 호출: ~1,191회 (23.8% 한도)")
-    print("\n  ⚠️  기존 businesses 데이터는 덮어쓰지 않고 OR IGNORE로 작동합니다.")
+    if force:
+        print("\n  🔄  --force 모드: 기존 레코드를 API 최신값으로 덮어씁니다. (OR REPLACE)")
+    else:
+        print("\n  ⚠️  기존 businesses 데이터는 덮어쓰지 않고 OR IGNORE로 작동합니다.")
+        print("      재실행으로 기존 레코드를 갱신하려면 --force를 사용하세요.")
     print()
 
     yn = input("계속하시겠습니까? (yes/no): ").strip().lower()
@@ -292,8 +297,9 @@ def full_mirror(services: list | None = None, from_index: int = 1):
                                 fields.get("event_date_raw", ""), fields.get("license_date", "")
                             )
                             try:
+                                insert_mode = "OR REPLACE" if force else "OR IGNORE"
                                 conn.execute(
-                                    """INSERT OR IGNORE INTO businesses
+                                    f"""INSERT {insert_mode} INTO businesses
                                     (license_no, business_name, address, representative_name,
                                      business_status, license_date, phone_number, industry_type,
                                      last_event_date, last_event_time, license_time,
@@ -379,6 +385,11 @@ if __name__ == "__main__":
         help="전체 API 데이터를 businesses 테이블에 미러링합니다. (일회성, ~1,191회 API 호출)"
     )
     parser.add_argument(
+        "--force",
+        action="store_true",
+        help="--mirror 시 기존 레코드를 API 최신값으로 덮어씁니다. (OR REPLACE, 필드 오류 수정 시 사용)"
+    )
+    parser.add_argument(
         "--from-index",
         type=int,
         default=1,
@@ -405,6 +416,6 @@ if __name__ == "__main__":
     elif args.reset_state:
         reset_state(services=target_services)
     elif args.mirror:
-        full_mirror(services=target_services, from_index=args.from_index)
+        full_mirror(services=target_services, from_index=args.from_index, force=args.force)
     else:
         parser.print_help()
