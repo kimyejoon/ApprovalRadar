@@ -21,37 +21,46 @@ _consecutive_failures: dict[str, int] = {}
 def _map_row_fields(service_id: str, row: dict) -> Optional[Dict[str, Any]]:
     """
     서비스별 API 응답 row를 내부 공통 필드 dict로 변환합니다.
-    지원하지 않는 service_id는 None을 반환합니다.
+
+    ⚠️ 식품안전나라 인허가변경 API(I2859/I2861)는 "변경이력 로그" 구조로,
+    아래 필드는 이 API 응답에 포함되지 않습니다:
+      - 대표자명 (PRSDNT_NM)  → 개인정보 비공개, Backfill(I2500)로만 수집 가능
+      - 영업상태 (BSN_STATE_NM) → 미제공
+      - 인허가일자 (PRMS_DT)   → 미제공
+
+    실제 API 공통 필드:
+      LCNS_NO, BSSH_NM, SITE_ADDR, INDUTY_CD_NM, CHNG_DT, TELNO,
+      CHNG_PRVNS (변경사유), CHNG_BF_CN (변경 전), CHNG_AF_CN (변경 후)
     """
     if service_id == "I2859":
-        last_updt = row.get("LAST_UPDT_DTM", "")
-        cret_dtm = row.get("CRET_DTM", "")
-        license_date = row.get("PRMS_DT", "")
-        event_date = last_updt or cret_dtm or license_date
         return {
-            "lcns_no": row.get("LCNS_NO", ""),
-            "business_name": row.get("BSSH_NM", ""),
-            "address": row.get("LOCP_ADDR", ""),
-            "representative_name": row.get("PRSDNT_NM", ""),
-            "business_status": row.get("BSN_STATE_NM", ""),
-            "license_date": license_date,
-            "phone_number": row.get("TELNO", ""),
-            "industry_type": row.get("INDUTY_CD_NM", ""),
-            "event_date_raw": event_date,
+            "lcns_no":             row.get("LCNS_NO", ""),
+            "business_name":       row.get("BSSH_NM", ""),
+            "address":             row.get("SITE_ADDR", ""),    # ← LOCP_ADDR(X) → SITE_ADDR(O)
+            "representative_name": "",                          # ← API 미제공 (Backfill 필요)
+            "business_status":     None,                        # ← API 미제공
+            "license_date":        "",                          # ← PRMS_DT 미제공
+            "phone_number":        row.get("TELNO", ""),
+            "industry_type":       row.get("INDUTY_CD_NM", ""),
+            "event_date_raw":      row.get("CHNG_DT", ""),      # ← LAST_UPDT_DTM(X) → CHNG_DT(O)
+            "change_reason":       row.get("CHNG_PRVNS", ""),   # 변경사유 (변경민원, 관할이전 등)
+            "change_before":       row.get("CHNG_BF_CN", ""),   # 변경 전 내용 (infer 활용 가능)
+            "change_after":        row.get("CHNG_AF_CN", ""),   # 변경 후 내용
         }
     elif service_id == "I2861":
-        license_date = row.get("PRMS_DT", "")
-        event_date = row.get("CHNG_DT", "") or license_date
         return {
-            "lcns_no": row.get("LCNS_NO", ""),
-            "business_name": row.get("BSSH_NM", ""),
-            "address": row.get("SITE_ADDR") or row.get("ADDR", ""),
-            "representative_name": row.get("PRSDNT_NM", ""),
-            "business_status": None,  # I2861은 영업상태 미제공
-            "license_date": license_date,
-            "phone_number": row.get("TELNO", ""),
-            "industry_type": row.get("INDUTY_CD_NM", ""),
-            "event_date_raw": event_date,
+            "lcns_no":             row.get("LCNS_NO", ""),
+            "business_name":       row.get("BSSH_NM", ""),
+            "address":             row.get("SITE_ADDR", "") or row.get("ADDR", ""),
+            "representative_name": "",                          # ← API 미제공 (Backfill 필요)
+            "business_status":     None,                        # ← API 미제공
+            "license_date":        "",                          # ← PRMS_DT 미제공
+            "phone_number":        row.get("TELNO", ""),
+            "industry_type":       row.get("INDUTY_CD_NM", ""),
+            "event_date_raw":      row.get("CHNG_DT", ""),
+            "change_reason":       row.get("CHNG_PRVNS", ""),
+            "change_before":       row.get("CHNG_BF_CN", ""),
+            "change_after":        row.get("CHNG_AF_CN", ""),
         }
     else:
         logger.warning(f"Unknown service_id: {service_id}. Skipping row mapping.")

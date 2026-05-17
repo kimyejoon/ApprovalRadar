@@ -11,9 +11,22 @@ PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
 
 # total_count 필드가 신뢰 가능한 서비스 목록
 # → 1회 API 호출로 정확한 Tail을 바로 얻을 수 있음 (페이지 스캔 불필요)
-# I2859: total_count 신뢰 불가 (API 버그로 9 등 엉뚱한 값 반환) → 페이지 스캔 사용
-# I2861: 음식점업소 인허가변경 - 이벤트 로그 append 구조로 total_count가 정확
-RELIABLE_TOTAL_COUNT_SERVICES = {"I2861"}
+# I2859: API 버그로 9 등 엉덩한 값 반환 (기존 알려진 문제)
+# I2861: total_count=8 반환으로 신뢰 불가 확인 (2026-05-17 실증)
+# → 향후 신뢰 가능한 서비스가 확인될 때만 이 set에 추가할 것.
+RELIABLE_TOTAL_COUNT_SERVICES: set[str] = set()
+
+# [Phase 3] Circuit Breaker 임계값
+# diff_count가 이 값을 초과하면 API 한도 초과를 방지하기 위해 해당 주기를 즉시 중단하고
+# 관리자에게 ALERT SSE를 발송한다. (Key 5개 × 1,000회 = 5,000회 한도 고려)
+CIRCUIT_BREAKER_THRESHOLD = 10_000
+
+
+# [B] Circuit Breaker 자가 복구: 연속 발동 시 bootstrap 자동 시도
+CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER = 3  # N회 연속 발동 시 자가 복구 트리거
+
+# [C] bootstrap 동시성 제한: WAF DDoS 패턴 감지 방지
+BOOTSTRAP_SEMAPHORE_LIMIT = 3  # 최대 동시 fetch_page 요청 수
 
 
 class DiffCrawlerEngine:
@@ -21,6 +34,8 @@ class DiffCrawlerEngine:
         self.api_client = api_client
         self.service_id = service_id
         self.state_repo = StateRepository()
+        # [B] Circuit Breaker 연속 발동 카운터 (서버 재시작 시 리셋)
+        self._cb_consecutive_count: int = 0
 
     # ─── 저수준 API 유틸리티 ──────────────────────────────────────────────────
 
@@ -108,14 +123,25 @@ class DiffCrawlerEngine:
                 if block.get("RESULT", {}).get("CODE") in ("INFO-000", "INFO-200"):
                     total_count = int(block.get("total_count") or block.get("TOTAL_COUNT") or 0)
                     if total_count > 0:
-                        if known_tail > 0 and total_count == known_tail:
+                        # [A] 전략A 오응답 방어: total_count가 known_tail 대비 50% 이상 급감하면 신뢰 불가
+                        # → 전략B(이진탐색)로 자동 fallback
+                        if known_tail > 0 and total_count < known_tail * 0.5:
+                            logger.warning(
+                                f"[{svc}][전략A] ⚠️ total_count={total_count:,}이 "
+                                f"known_tail={known_tail:,}의 50% 미만 — API 오응답 의심. "
+                                f"전략B(이진탐색)로 자동 전환합니다."
+                            )
+                            # 전략B 진행 (아래 코드로 fall-through)
+                        elif known_tail > 0 and total_count == known_tail:
                             logger.debug(f"[{svc}][전략A] 변동 없음: total_count={total_count:,} == known_tail={known_tail:,}")
+                            return total_count
                         elif total_count > known_tail:
                             logger.info(f"[{svc}][전략A] 신규 감지: {total_count - known_tail:,}건 증가 ({known_tail:,} → {total_count:,})")
+                            return total_count
                         else:
                             logger.info(f"[{svc}][전략A] Tail 확정: {total_count:,}건 (total_count 직접)")
-                        return total_count
-            logger.warning(f"[{svc}][전략A] total_count 읽기 실패, 페이지 탐색(전략B)으로 폴백")
+                            return total_count
+            logger.warning(f"[{svc}][전략A] total_count 읽기 실패 또는 오응답, 페이지 탐색(전략B)으로 폴백")
 
         # ── 전략 B: 지수점프 + 이진탐색 + Gap허용 스캔 ───────────────────────
         logger.info(f"[{svc}][Bootstrapper] Tail 탐색 시작 (known_tail={known_tail:,})")
@@ -128,6 +154,26 @@ class DiffCrawlerEngine:
                 return known_tail
             logger.info(f"[{svc}][전략B] Ping: {len(ping)}건 신규 감지, 탐색 계속")
 
+
+        # Step 0 (NEW): 소규모 데이터 Pre-check
+        # 지수점프는 start_pos=PAGE_SIZE부터 시작하므로, 인덱스 1~(PAGE_SIZE-1) 구간을 탐지하지 못함.
+        # known_tail=0일 때 첫 페이지 [1, PAGE_SIZE]를 선행 1회 조회하여 소규모 여부를 판단.
+        if known_tail == 0:
+            first_page = await self._fetch_page(1, PAGE_SIZE)
+            if not first_page:
+                # 인덱스 1부터 데이터 없음 → tail=0
+                logger.info(f"[{svc}][전략B] Pre-check: 데이터 없음 (tail=0)")
+                state = {"last_total_count": 0, "pivots": {}}
+                self.state_repo.save_state(svc, state)
+                return 0
+            if len(first_page) < PAGE_SIZE:
+                # 첫 페이지에 데이터가 PAGE_SIZE보다 적음 → 전체 데이터가 PAGE_SIZE 미만 (\uc18c규모)
+                final_tail = len(first_page)
+                logger.info(f"[{svc}][전략B] Pre-check: 소규모 데이터 감지 — tail={final_tail:,}건 (< PAGE_SIZE={PAGE_SIZE:,}). 지수점프 스킵.")
+                logger.info(f"[{svc}][Bootstrapper] Tail 확정: {final_tail:,}")
+                return final_tail
+            # len == PAGE_SIZE: 정상 규모 → 기존 지수점프로 진행
+            logger.debug(f"[{svc}][전략B] Pre-check: 정상 규모 ({PAGE_SIZE:,}건) → 지수점프 진행")
 
         # Step 2: 지수 점프
         start_pos = max(PAGE_SIZE, known_tail + PAGE_SIZE)
@@ -174,14 +220,19 @@ class DiffCrawlerEngine:
         logger.info(f"[{self.service_id}][Bootstrapper] 피벗 캐싱 시작 (간격: {settings.PIVOT_INTERVAL})...")
         pivot_indices = list(range(settings.PIVOT_INTERVAL, total_count, settings.PIVOT_INTERVAL))
 
-        # ✅ asyncio.gather로 피벗 병렬 조회 (비동기 동시 실행)
+        # [Phase 2 + C] fetch_page 1회로 1,000건을 받아 rows[0]/rows[-1]로 Boundary 구성
+        # [C] Semaphore로 최대 BOOTSTRAP_SEMAPHORE_LIMIT개 동시 요청 제한 (WAF DDoS 방지)
+        semaphore = asyncio.Semaphore(BOOTSTRAP_SEMAPHORE_LIMIT)
+
         async def _fetch_pivot(idx: int):
-            row = await self._fetch_single(idx)
-            if row:
-                last_row = await self._fetch_single(idx + PAGE_SIZE - 1)
+            async with semaphore:
+                rows = await self._fetch_page(idx, idx + PAGE_SIZE - 1)
+            if rows:
+                row = rows[0]
+                last_row = rows[-1]
                 return idx, {
                     "LCNS_NO": row.get("LCNS_NO", ""),
-                    "LAST_LCNS_NO": last_row.get("LCNS_NO", "") if last_row else "",
+                    "LAST_LCNS_NO": last_row.get("LCNS_NO", ""),
                     "CHNG_DT": row.get("CHNG_DT", ""),
                     "BSSH_NM": row.get("BSSH_NM", "")
                 }
@@ -203,19 +254,65 @@ class DiffCrawlerEngine:
     # ─── 델타 감지 ────────────────────────────────────────────────────────────
 
     async def _compute_shift_offsets(self, pivots: dict, pivot_indices: list, diff_count: int) -> dict:
-        """피벗별 Shift 오프셋을 계산합니다."""
+        """
+        [Phase 1] 피벗별 Shift 오프셋을 메모리 기반 청크 스캔으로 계산합니다.
+
+        기존 방식(단건 fetch_single 루프)의 문제:
+          - diff_count=500 시 API 500회 단건 호출 → 장기 다운타임 후 Key 고갈 위험
+
+        개선 방식(청크 스캔):
+          - 탐색 범위 [p_idx+current_shift, p_idx+diff_count]를 PAGE_SIZE(1,000건) 단위로
+            fetch_page 1~2회 호출 후 메모리 리스트에서 선형 탐색
+          - diff_count=500 시 피벗 1개당 API 1회 → 피벗 60개 전체 60회로 단축 (88% 절감)
+          - Fallback: 피벗 레코드가 삭제 등으로 발견되지 않으면 current_shift 유지 후 다음 피벗 진행
+        """
         shift_amounts = {}
         current_shift = 0
 
-        logger.info(f"[{self.service_id}] ⚙️ 피벗 {len(pivot_indices)}개 Shift 오프셋 보정 시작...")
+        logger.info(
+            f"[{self.service_id}] ⚙️ 피벗 {len(pivot_indices)}개 Shift 오프셋 보정 시작... "
+            f"(청크 스캔 모드, diff_count={diff_count:,})"
+        )
         for p_idx in pivot_indices:
             old_data = pivots[str(p_idx)]
-            found_offset = current_shift
-            for offset in range(current_shift, diff_count + 1):
-                row = await self._fetch_single(p_idx + offset)
-                if row and row.get("LCNS_NO") == old_data["LCNS_NO"] and row.get("CHNG_DT") == old_data["CHNG_DT"]:
-                    found_offset = offset
-                    break
+            # 레거시 문자열 포맷 및 신규 dict 포맷 모두 호환
+            expected_lcns_no = old_data["LCNS_NO"] if isinstance(old_data, dict) else str(old_data)
+            expected_chng_dt = old_data.get("CHNG_DT", "") if isinstance(old_data, dict) else ""
+
+            found_offset = current_shift  # 미발견 시 Fallback: 현재 shift 유지
+            found = False
+
+            # 탐색 범위: [p_idx + current_shift, p_idx + diff_count]
+            search_start = p_idx + current_shift
+            search_end = p_idx + diff_count
+            current_search_pos = search_start
+
+            while current_search_pos <= search_end and not found and not shutdown_event.is_set():
+                chunk_end = min(current_search_pos + PAGE_SIZE - 1, search_end)
+                rows = await self._fetch_page(current_search_pos, chunk_end)
+
+                for i, row in enumerate(rows):
+                    if (
+                        row.get("LCNS_NO") == expected_lcns_no
+                        and row.get("CHNG_DT") == expected_chng_dt
+                    ):
+                        # 실제 API 인덱스에서 p_idx를 빼면 offset
+                        found_offset = (current_search_pos - p_idx) + i
+                        found = True
+                        break
+
+                current_search_pos += PAGE_SIZE
+
+            if not found:
+                logger.warning(
+                    f"[{self.service_id}] ⚠️ [청크 스캔] p_idx={p_idx:,} 피벗 레코드 미발견 "
+                    f"(LCNS_NO={expected_lcns_no}). current_shift={current_shift} 유지 (Fallback)"
+                )
+            else:
+                logger.debug(
+                    f"[{self.service_id}] [청크 스캔] p_idx={p_idx:,} → offset={found_offset} 확정"
+                )
+
             shift_amounts[p_idx] = found_offset
             current_shift = found_offset
         return shift_amounts
@@ -262,7 +359,13 @@ class DiffCrawlerEngine:
         return new_data_rows
 
     async def _update_pivots(self, pivot_indices: list, pivots: dict, shift_amounts: dict, new_tail: int, diff_count: int) -> dict:
-        """피벗 인덱스를 Shift 오프셋에 맞게 갱신하고, 새 꼬리까지 추가 피벗을 생성합니다."""
+        """
+        [Phase 2] 피벗 인덱스를 Shift 오프셋에 맞게 갱신하고, 새 꼬리까지 추가 피벗을 생성합니다.
+
+        개선 사항:
+          - 새 피벗 생성 시 _fetch_single × 2 (첫 행 + 마지막 행) →
+            _fetch_page × 1 후 rows[0], rows[-1] 메모리 추출로 API 호출 50% 절감
+        """
         new_pivots = {}
         for p_idx in pivot_indices:
             shift = shift_amounts[p_idx]
@@ -275,16 +378,23 @@ class DiffCrawlerEngine:
             (max_pivot + shift_amounts.get(max_pivot, diff_count)) // settings.PIVOT_INTERVAL + 1
         ) * settings.PIVOT_INTERVAL
         while next_pivot < new_tail:
-            row = await self._fetch_single(next_pivot)
-            if row:
-                # ✅ Boundary 양방향 저장
-                last_row = await self._fetch_single(next_pivot + PAGE_SIZE - 1)
+            # [Phase 2] fetch_page 1회로 1,000건을 통째로 가져와 메모리에서 첫/마지막 행 추출
+            # 기존: _fetch_single(next_pivot) + _fetch_single(next_pivot + PAGE_SIZE - 1) = 2회
+            # 개선: _fetch_page(next_pivot, next_pivot + PAGE_SIZE - 1) = 1회
+            rows = await self._fetch_page(next_pivot, next_pivot + PAGE_SIZE - 1)
+            if rows:
+                row = rows[0]
+                last_row = rows[-1]
                 new_pivots[str(next_pivot)] = {
                     "LCNS_NO": row.get("LCNS_NO", ""),
-                    "LAST_LCNS_NO": last_row.get("LCNS_NO", "") if last_row else "",
+                    "LAST_LCNS_NO": last_row.get("LCNS_NO", ""),
                     "CHNG_DT": row.get("CHNG_DT", ""),
                     "BSSH_NM": row.get("BSSH_NM", "")
                 }
+                logger.debug(
+                    f"[{self.service_id}] [피벗 생성] idx={next_pivot:,} "
+                    f"LCNS_NO={row.get('LCNS_NO','')} ~ {last_row.get('LCNS_NO','')}"
+                )
             next_pivot += settings.PIVOT_INTERVAL
 
         return new_pivots
@@ -325,6 +435,60 @@ class DiffCrawlerEngine:
             return []
 
         diff_count = new_tail - old_tail
+
+        # ── [Phase 3] Circuit Breaker ────────────────────────────────────────────
+        # diff_count가 임계값 초과 시 API 한도 보호를 위해 이번 주기를 안전하게 중단한다.
+        # [B] 3회 연속 발동 시 자가 복구: last_total_count = new_tail 강제 업데이트
+        if diff_count > CIRCUIT_BREAKER_THRESHOLD:
+            svc_name = {
+                "I2859": "식품업소 인허가변경",
+                "I2861": "음식점업소 인허가변경",
+            }.get(svc, svc)
+            self._cb_consecutive_count += 1
+            logger.error(
+                f"[{svc}] 🚨 [Circuit Breaker #{self._cb_consecutive_count}] diff_count={diff_count:,}건이 "
+                f"임계값({CIRCUIT_BREAKER_THRESHOLD:,})을 초과! "
+                f"API 한도 초과 방지를 위해 이번 주기를 강제 중단합니다."
+            )
+            try:
+                from app.core.events import broadcaster
+                import json
+                alert_msg = json.dumps({
+                    "type": "ALERT",
+                    "message": (
+                        f"[Circuit Breaker #{self._cb_consecutive_count}] {svc_name} 변동분 {diff_count:,}건 감지 — "
+                        f"API 한도 초과 위험으로 이번 주기를 중단했습니다."
+                        + (f" ({CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER}회 연속 발동 시 자동 복구를 시도합니다.)" if self._cb_consecutive_count < CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER else "")
+                    )
+                }, ensure_ascii=False)
+                broadcaster.broadcast_sync(alert_msg)
+            except Exception:
+                pass
+
+            # [B] 자가 복구: N회 연속 발동 시 Tail을 new_tail로 강제 갱신 후 bootstrap 재실행
+            if self._cb_consecutive_count >= CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER:
+                logger.warning(
+                    f"[{svc}] 🔄 [CB 자가 복구] {CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER}회 연속 발동 감지. "
+                    f"Tail을 {new_tail:,}으로 강제 업데이트 후 피벗 재생성을 시도합니다. "
+                    f"(기존 businesses 데이터는 보존됩니다)"
+                )
+                self._cb_consecutive_count = 0
+                state["last_total_count"] = new_tail
+                state["pivots"] = {}
+                self.state_repo.save_state(self.service_id, state)
+                try:
+                    recovered_state = await self.bootstrap()
+                    logger.info(
+                        f"[{svc}] ✅ [CB 자가 복구 완료] 피벗 {len(recovered_state.get('pivots', {}))}개 재생성. "
+                        f"다음 주기부터 정상 차분 탐지를 재개합니다."
+                    )
+                except Exception as e:
+                    logger.error(f"[{svc}] ❌ [CB 자가 복구 실패] bootstrap 오류: {e}")
+            return []
+        # ────────────────────────────────────────────────────────────────────────
+        # Circuit Breaker 미발동 시 연속 카운터 리셋
+        self._cb_consecutive_count = 0
+
         logger.info(
             f"[{svc}] 🔍 [Delta 감지] Tail {old_tail:,} → {new_tail:,} (+{diff_count:,}건 신규 삽입)"
         )

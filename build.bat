@@ -113,9 +113,18 @@ if exist "%RELEASE_DIR%" rmdir /s /q "%RELEASE_DIR%"
 mkdir "%RELEASE_DIR%"
 
 copy /Y "%BE_DIR%\dist\ApprovalRadar.exe" "%RELEASE_DIR%\ApprovalRadar.exe" >nul
+
 copy /Y "%BE_DIR%\.env" "%RELEASE_DIR%\.env" >nul
 
-REM 실행 안내 텍스트
+REM DB 파일 복사 (미러링/운영 데이터 포함)
+if exist "%BE_DIR%\food_safety.db" (
+    copy /Y "%BE_DIR%\food_safety.db" "%RELEASE_DIR%\food_safety.db" >nul
+    echo [OK]    DB 파일 포함 ^(food_safety.db^)
+) else (
+    echo [WARN]  food_safety.db 없음 -- 앱 첫 실행 시 빈 DB 자동 생성됩니다.
+)
+
+REM 실행 안내 텍스트 (UTF-8)
 (
 echo ═══════════════════════════════════════════════════
 echo   ApprovalRadar -- 실행 방법 ^(Windows^)
@@ -123,13 +132,17 @@ echo ═════════════════════════
 echo.
 echo 1. 이 폴더에서 'ApprovalRadar.exe' 를 더블클릭합니다.
 echo 2. Windows Defender 경고가 뜨면:
-echo    '추가 정보' → '실행' 을 클릭합니다.
+echo    '추가 정보' -^> '실행' 을 클릭합니다.
 echo 3. 런처 창이 뜨고, 브라우저가 자동으로 열립니다.
 echo 4. 종료 시 런처 창의 [종료] 버튼을 클릭합니다.
 echo.
 echo ───────────────────────────────────────────────────
 echo API 키 설정: .env 파일을 메모장으로 열어 수정
+echo DB 파일:     food_safety.db ^(인허가 데이터 저장소^)
 echo ───────────────────────────────────────────────────
+echo.
+echo 주의: food_safety.db 파일을 삭제하면 모든 데이터가 초기화됩니다.
+echo       백업이 필요한 경우 DB 파일을 별도 위치에 복사하세요.
 ) > "%RELEASE_DIR%\실행방법.txt"
 
 echo.
@@ -138,9 +151,10 @@ echo   ║  ✅  빌드 성공!                                      ║
 echo   ║                                                      ║
 echo   ║  📦  배포 폴더: dist_release\                        ║
 echo   ║  📂  포함 파일:                                      ║
-echo   ║       - ApprovalRadar.exe  ^(실행 파일^)              ║
-echo   ║       - .env               ^(API 키 설정^)            ║
-echo   ║       - 실행방법.txt       ^(안내 문서^)              ║
+echo   ║       - ApprovalRadar.exe   ^(실행 파일^)             ║
+echo   ║       - .env                ^(API 키 설정^)           ║
+echo   ║       - food_safety.db      ^(인허가 데이터 DB^)      ║
+echo   ║       - 실행방법.txt        ^(안내 문서^)             ║
 echo   ╚══════════════════════════════════════════════════════╝
 echo.
 

@@ -147,6 +147,8 @@ class ApiClient:
         # WAF 동시 접근 방지: 키별 요청 직렬화 Lock
         self._key_locks: dict[str, asyncio.Lock] = {}
         self._session = self._create_session()
+        # 이 세션에서의 총 API 호출 횟수 카운터 (CLI 보고용)
+        self._call_count: int = 0
 
     @staticmethod
     def _create_session() -> httpx.AsyncClient:
@@ -263,6 +265,7 @@ class ApiClient:
         - 한도 초과(INFO-300 등) 시 자동으로 키를 회전하고 재시도합니다.
         - 서버 에러(ERROR-500 등)나 네트워크 에러 발생 시 지수 백오프를 적용하여 재시도합니다.
         """
+        self._call_count += 1  # 호출 횟수 카운터
         if ApiClient.is_exhausted():
             raise ApiKeysExhaustedError("All API keys are exhausted for today.")
 
@@ -336,6 +339,10 @@ class ApiClient:
         raise Exception(f"식품나라 API 서버 통신 실패 (최대 재시도 초과): {start_idx}~{end_idx}")
 
     # ─── 키 상태 점검 ───────────────────────────────────────────────────────
+
+    def get_total_call_count(self) -> int:
+        """이 ApiClient 세션에서 발생한 총 API 호출 횟수를 반환합니다. (CLI 보고용)"""
+        return self._call_count
 
     async def check_keys_status(self, service_id: str = "I2859"):
         """모든 로드된 API 키의 상태를 테스트하여 출력합니다."""
