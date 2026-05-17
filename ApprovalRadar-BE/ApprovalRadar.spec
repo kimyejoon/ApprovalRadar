@@ -97,12 +97,23 @@ a = Analysis(
         'app.core.logger',
         'app.core.port_finder',
         'app.core.scheduler',
+        # clients
+        'app.clients.foodsafety_api',
         'app.clients.key_usage_repository',
+        # repositories
         'app.repositories',
+        'app.repositories.business_repository',
+        'app.repositories.raw_data_repository',
+        'app.repositories.state_repository',
+        'app.repositories.memo_repository',
+        # schemas & utils
         'app.schemas',
-        'app.services.diff_crawler',
-        'app.services.industry_filler',
         'app.utils',
+        # services
+        'app.services.diff_crawler',
+        'app.services.pivot_manager',
+        'app.services.change_detector',
+        'app.services.industry_filler',
     ],
     hookspath=[],
     hooksconfig={},
