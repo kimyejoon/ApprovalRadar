@@ -129,7 +129,17 @@ chmod +x "$RELEASE_DIR/ApprovalRadar"
 # .env (API 키 — 유저 편집 가능)
 cp "$BE_DIR/.env" "$RELEASE_DIR/.env"
 
-# 실행 안내 텍스트
+# DB 파일 (미러링/운영 데이터 포함)
+DB_FILE="$BE_DIR/food_safety.db"
+if [ -f "$DB_FILE" ]; then
+    cp "$DB_FILE" "$RELEASE_DIR/food_safety.db"
+    DB_SIZE=$(du -sh "$DB_FILE" | cut -f1)
+    success "DB 파일 포함 → food_safety.db ($DB_SIZE)"
+else
+    warn "food_safety.db 없음 → 앱 첫 실행 시 빈 DB 자동 생성됩니다."
+fi
+
+# 실행 안내 텍스트 (UTF-8 강제)
 cat > "$RELEASE_DIR/실행방법.txt" << 'EOF'
 ═══════════════════════════════════════════════════
   ApprovalRadar — 실행 방법 (macOS)
@@ -138,12 +148,17 @@ cat > "$RELEASE_DIR/실행방법.txt" << 'EOF'
 1. 이 폴더에서 'ApprovalRadar' 파일을 더블클릭합니다.
 2. 처음 실행 시 macOS 보안 경고가 뜰 수 있습니다:
    시스템 환경설정 → 개인정보 보호 및 보안 → '확인 없이 열기' 클릭
+   또는: 터미널에서 xattr -cr ./ApprovalRadar 실행 후 재시도
 3. 런처 창이 뜨고, 브라우저가 자동으로 열립니다.
 4. 종료 시 런처 창의 [종료] 버튼을 클릭합니다.
 
 ───────────────────────────────────────────────────
 API 키 설정: .env 파일을 텍스트 편집기로 열어 수정
+DB 파일:     food_safety.db (인허가 데이터 저장소)
 ───────────────────────────────────────────────────
+
+⚠️  주의: food_safety.db 파일을 삭제하면 모든 데이터가 초기화됩니다.
+          백업이 필요한 경우 DB 파일을 별도 위치에 복사하세요.
 EOF
 
 success "배포 패키지 생성 완료!"
@@ -153,9 +168,10 @@ echo    "║  ✅  빌드 성공!                                      ║"
 echo    "║                                                      ║"
 echo -e "║  📦  배포 폴더: ${NC}dist_release/${GREEN}                        ║"
 echo    "║  📂  포함 파일:                                      ║"
-echo    "║       • ApprovalRadar  (실행 파일)                   ║"
-echo    "║       • .env           (API 키 설정)                 ║"
-echo    "║       • 실행방법.txt   (안내 문서)                   ║"
+echo    "║       • ApprovalRadar    (실행 파일)                 ║"
+echo    "║       • .env             (API 키 설정)               ║"
+echo    "║       • food_safety.db   (인허가 데이터 DB)          ║"
+echo    "║       • 실행방법.txt     (안내 문서)                 ║"
 echo    "╚══════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
