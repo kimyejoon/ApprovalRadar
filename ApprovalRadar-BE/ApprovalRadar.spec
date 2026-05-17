@@ -154,14 +154,40 @@ exe = EXE(  # noqa: F821
     upx_exclude=[],
     runtime_tmpdir=None,
     # windowed=True: 콘솔 창 없음 (런처 GUI 사용)
-    # Mac에서는 콘솔 창 자체가 없으므로 무관
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # 아이콘 설정 (파일 존재 시 적용)
     # icon='assets/icon.ico',  # Windows
     # icon='assets/icon.icns', # Mac
 )
+
+# ── macOS 전용: .app 번들 생성 ────────────────────────────────────────────────
+# .app 번들 구조:
+#   dist_exe/ApprovalRadar.app/
+#     Contents/
+#       MacOS/ApprovalRadar   ← 실행 바이너리
+#       Info.plist
+#
+# DB(.food_safety.db)와 .env는 .app 바깥(배포 폴더)에 위치합니다.
+# database.py / launcher.py 의 경로 감지 로직으로 자동 탐지됩니다.
+if sys.platform == 'darwin':
+    app = BUNDLE(  # noqa: F821
+        exe,
+        name='ApprovalRadar.app',
+        icon=None,  # 'assets/icon.icns' 로 교체 가능
+        bundle_identifier='com.approvalradar.monitoring',
+        info_plist={
+            'CFBundleName':             'ApprovalRadar',
+            'CFBundleDisplayName':      'ApprovalRadar',
+            'CFBundleShortVersionString': '1.0.0',
+            'CFBundleVersion':          '1.0.0',
+            'NSHighResolutionCapable':  True,
+            'LSMinimumSystemVersion':   '12.0',
+            'NSPrincipalClass':         'NSApplication',
+            # 파일 연결 없음 (문서 앱 아님)
+            'CFBundleDocumentTypes':    [],
+        },
+    )

@@ -7,8 +7,14 @@ from contextlib import contextmanager
 # PyInstaller 번들 실행 시: exe 옆에 DB 파일 위치
 # 개발 환경: 소스 파일과 같은 디렉토리에 위치
 if getattr(sys, 'frozen', False):
-    # 실행 중인 exe 경로의 부모 디렉토리 (exe 옆)
-    _BASE_DIR = os.path.dirname(sys.executable)
+    _exe_dir = os.path.dirname(sys.executable)
+    # macOS .app 번들 내부 구조: .app/Contents/MacOS/ApprovalRadar
+    # DB/설정 파일은 .app 파일과 같은 폴더(배포 폴더)에 위치
+    if (os.path.basename(_exe_dir) == 'MacOS'
+            and os.path.basename(os.path.dirname(_exe_dir)) == 'Contents'):
+        _BASE_DIR = os.path.abspath(os.path.join(_exe_dir, '..', '..', '..'))
+    else:
+        _BASE_DIR = _exe_dir  # Windows/Linux 단일 바이너리
 else:
     _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 

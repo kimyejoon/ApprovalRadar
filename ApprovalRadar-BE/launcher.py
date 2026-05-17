@@ -26,9 +26,14 @@ if getattr(sys, 'frozen', False):
     _bundle_dir = sys._MEIPASS  # type: ignore[attr-defined]
     if _bundle_dir not in sys.path:
         sys.path.insert(0, _bundle_dir)
-    # .env 파일: exe 옆에서 로드 (배포 환경)
+    # .env 파일: macOS .app 번들이면 .app 옆 폴더, 아니면 exe 옆
     _exe_dir = os.path.dirname(sys.executable)
-    _env_file = os.path.join(_exe_dir, '.env')
+    if (os.path.basename(_exe_dir) == 'MacOS'
+            and os.path.basename(os.path.dirname(_exe_dir)) == 'Contents'):
+        _deploy_dir = os.path.abspath(os.path.join(_exe_dir, '..', '..', '..'))
+    else:
+        _deploy_dir = _exe_dir
+    _env_file = os.path.join(_deploy_dir, '.env')
 else:
     _bundle_dir = os.path.dirname(os.path.abspath(__file__))
     _env_file = os.path.join(_bundle_dir, '.env')
