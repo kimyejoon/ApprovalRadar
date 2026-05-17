@@ -92,28 +92,42 @@ _shutdown_flag = threading.Event()
 
 def _run_server(port: int) -> None:
     """uvicorn 서버를 현재 스레드에서 실행 (blocking)"""
-    # pyrefly: ignore [missing-import]
-    import uvicorn
-    from main import app
+    try:
+        import sys
+        if sys.stdout is None or sys.stderr is None:
+            class DummyWriter:
+                def write(self, x): pass
+                def flush(self): pass
+                def isatty(self): return False
+            if sys.stdout is None:
+                sys.stdout = DummyWriter()
+            if sys.stderr is None:
+                sys.stderr = DummyWriter()
 
-    loop = "asyncio"  # PyInstaller 번들에서 uvloop 동적 라이브러리 로딩 불안정 → asyncio 고정
+        import uvicorn
+        from main import app
 
-    config = uvicorn.Config(
-        app=app,
-        host="127.0.0.1",
-        port=port,
-        loop=loop,          # Windows: asyncio, Mac/Linux: uvloop
-        log_level="info",
-    )
-    server = uvicorn.Server(config)
+        loop = "asyncio"  # PyInstaller 번들에서 uvloop 동적 라이브러리 로딩 불안정 → asyncio 고정
 
-    # 종료 플래그 감지 스레드
-    def _watch_shutdown() -> None:
-        _shutdown_flag.wait()
-        server.should_exit = True
+        config = uvicorn.Config(
+            app=app,
+            host="127.0.0.1",
+            port=port,
+            loop=loop,          # Windows: asyncio, Mac/Linux: uvloop
+            log_level="info",
+        )
+        server = uvicorn.Server(config)
 
-    threading.Thread(target=_watch_shutdown, daemon=True).start()
-    server.run()
+        # 종료 플래그 감지 스레드
+        def _watch_shutdown() -> None:
+            _shutdown_flag.wait()
+            server.should_exit = True
+
+        threading.Thread(target=_watch_shutdown, daemon=True).start()
+        server.run()
+    except BaseException as e:
+        import traceback
+        LOG_QUEUE.put(f"[ERROR] Server Thread Exception:\n{traceback.format_exc()}")
 
 
 def _wait_for_server(port: int, timeout: float = 30.0) -> bool:
