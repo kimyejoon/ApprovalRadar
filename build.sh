@@ -122,9 +122,22 @@ step "배포 패키지 정리"
 rm -rf "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
 
-# 실행 파일
-cp "$EXE_PATH" "$RELEASE_DIR/ApprovalRadar"
-chmod +x "$RELEASE_DIR/ApprovalRadar"
+# ── 실행 파일 복사 (.app 번들 우선, 없으면 단일 바이너리 폴백) ─────────────────
+APP_BUNDLE="$BE_DIR/dist_exe/ApprovalRadar.app"
+EXE_BIN="$BE_DIR/dist_exe/ApprovalRadar"
+
+if [ -d "$APP_BUNDLE" ]; then
+    info ".app 번들 감지 → dist_release/ApprovalRadar.app 로 복사 중..."
+    cp -r "$APP_BUNDLE" "$RELEASE_DIR/ApprovalRadar.app"
+    chmod -R +x "$RELEASE_DIR/ApprovalRadar.app"
+    success ".app 번들 복사 완료 (더블클릭으로 실행 가능)"
+elif [ -f "$EXE_BIN" ]; then
+    cp "$EXE_BIN" "$RELEASE_DIR/ApprovalRadar"
+    chmod +x "$RELEASE_DIR/ApprovalRadar"
+    warn ".app 번들 없음 → 단일 바이너리로 배포 (터미널 실행 필요)"
+else
+    error "빌드 결과물 없음: ApprovalRadar.app / ApprovalRadar 모두 찾을 수 없습니다."
+fi
 
 # .env (API 키 — 유저 편집 가능)
 cp "$BE_DIR/.env" "$RELEASE_DIR/.env"
@@ -168,10 +181,10 @@ echo    "║  ✅  빌드 성공!                                      ║"
 echo    "║                                                      ║"
 echo -e "║  📦  배포 폴더: ${NC}dist_release/${GREEN}                        ║"
 echo    "║  📂  포함 파일:                                      ║"
-echo    "║       • ApprovalRadar    (실행 파일)                 ║"
-echo    "║       • .env             (API 키 설정)               ║"
-echo    "║       • food_safety.db   (인허가 데이터 DB)          ║"
-echo    "║       • 실행방법.txt     (안내 문서)                 ║"
+echo    "║       • ApprovalRadar.app  (macOS 앱 — 더블클릭)    ║"
+echo    "║       • .env               (API 키 설정)             ║"
+echo    "║       • food_safety.db     (인허가 데이터 DB)        ║"
+echo    "║       • 실행방법.txt       (안내 문서)               ║"
 echo    "╚══════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
