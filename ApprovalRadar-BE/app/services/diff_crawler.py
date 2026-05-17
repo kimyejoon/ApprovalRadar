@@ -21,11 +21,20 @@ RELIABLE_TOTAL_COUNT_SERVICES = {"I2861"}
 CIRCUIT_BREAKER_THRESHOLD = 10_000
 
 
+# [B] Circuit Breaker 자가 복구: 연속 발동 시 bootstrap 자동 시도
+CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER = 3  # N회 연속 발동 시 자가 복구 트리거
+
+# [C] bootstrap 동시성 제한: WAF DDoS 패턴 감지 방지
+BOOTSTRAP_SEMAPHORE_LIMIT = 3  # 최대 동시 fetch_page 요청 수
+
+
 class DiffCrawlerEngine:
     def __init__(self, api_client: ApiClient, service_id: str):
         self.api_client = api_client
         self.service_id = service_id
         self.state_repo = StateRepository()
+        # [B] Circuit Breaker 연속 발동 카운터 (서버 재시작 시 리셋)
+        self._cb_consecutive_count: int = 0
 
     # ─── 저수준 API 유틸리티 ──────────────────────────────────────────────────
 
@@ -113,14 +122,25 @@ class DiffCrawlerEngine:
                 if block.get("RESULT", {}).get("CODE") in ("INFO-000", "INFO-200"):
                     total_count = int(block.get("total_count") or block.get("TOTAL_COUNT") or 0)
                     if total_count > 0:
-                        if known_tail > 0 and total_count == known_tail:
+                        # [A] 전략A 오응답 방어: total_count가 known_tail 대비 50% 이상 급감하면 신뢰 불가
+                        # → 전략B(이진탐색)로 자동 fallback
+                        if known_tail > 0 and total_count < known_tail * 0.5:
+                            logger.warning(
+                                f"[{svc}][전략A] ⚠️ total_count={total_count:,}이 "
+                                f"known_tail={known_tail:,}의 50% 미만 — API 오응답 의심. "
+                                f"전략B(이진탐색)로 자동 전환합니다."
+                            )
+                            # 전략B 진행 (아래 코드로 fall-through)
+                        elif known_tail > 0 and total_count == known_tail:
                             logger.debug(f"[{svc}][전략A] 변동 없음: total_count={total_count:,} == known_tail={known_tail:,}")
+                            return total_count
                         elif total_count > known_tail:
                             logger.info(f"[{svc}][전략A] 신규 감지: {total_count - known_tail:,}건 증가 ({known_tail:,} → {total_count:,})")
+                            return total_count
                         else:
                             logger.info(f"[{svc}][전략A] Tail 확정: {total_count:,}건 (total_count 직접)")
-                        return total_count
-            logger.warning(f"[{svc}][전략A] total_count 읽기 실패, 페이지 탐색(전략B)으로 폴백")
+                            return total_count
+            logger.warning(f"[{svc}][전략A] total_count 읽기 실패 또는 오응답, 페이지 탐색(전략B)으로 폴백")
 
         # ── 전략 B: 지수점프 + 이진탐색 + Gap허용 스캔 ───────────────────────
         logger.info(f"[{svc}][Bootstrapper] Tail 탐색 시작 (known_tail={known_tail:,})")
@@ -179,10 +199,13 @@ class DiffCrawlerEngine:
         logger.info(f"[{self.service_id}][Bootstrapper] 피벗 캐싱 시작 (간격: {settings.PIVOT_INTERVAL})...")
         pivot_indices = list(range(settings.PIVOT_INTERVAL, total_count, settings.PIVOT_INTERVAL))
 
-        # [Phase 2] fetch_page 1회로 1,000건을 받아 rows[0]/rows[-1]로 Boundary 구성
-        # 기존: _fetch_single × 2 (첫 행 + 마지막 행) → 개선: _fetch_page × 1
+        # [Phase 2 + C] fetch_page 1회로 1,000건을 받아 rows[0]/rows[-1]로 Boundary 구성
+        # [C] Semaphore로 최대 BOOTSTRAP_SEMAPHORE_LIMIT개 동시 요청 제한 (WAF DDoS 방지)
+        semaphore = asyncio.Semaphore(BOOTSTRAP_SEMAPHORE_LIMIT)
+
         async def _fetch_pivot(idx: int):
-            rows = await self._fetch_page(idx, idx + PAGE_SIZE - 1)
+            async with semaphore:
+                rows = await self._fetch_page(idx, idx + PAGE_SIZE - 1)
             if rows:
                 row = rows[0]
                 last_row = rows[-1]
@@ -394,17 +417,17 @@ class DiffCrawlerEngine:
 
         # ── [Phase 3] Circuit Breaker ────────────────────────────────────────────
         # diff_count가 임계값 초과 시 API 한도 보호를 위해 이번 주기를 안전하게 중단한다.
-        # Key 5개 × 1,000회 = 5,000회/일이 총 한도지만, 양 서비스(I2859+I2861) 동시 운용 고려.
+        # [B] 3회 연속 발동 시 자가 복구: last_total_count = new_tail 강제 업데이트
         if diff_count > CIRCUIT_BREAKER_THRESHOLD:
             svc_name = {
                 "I2859": "식품업소 인허가변경",
                 "I2861": "음식점업소 인허가변경",
             }.get(svc, svc)
+            self._cb_consecutive_count += 1
             logger.error(
-                f"[{svc}] 🚨 [Circuit Breaker] diff_count={diff_count:,}건이 "
+                f"[{svc}] 🚨 [Circuit Breaker #{self._cb_consecutive_count}] diff_count={diff_count:,}건이 "
                 f"임계값({CIRCUIT_BREAKER_THRESHOLD:,})을 초과! "
-                f"API 한도 초과 방지를 위해 이번 주기를 강제 중단합니다. "
-                f"수동으로 부트스트랩 재실행 또는 API Key를 추가하세요."
+                f"API 한도 초과 방지를 위해 이번 주기를 강제 중단합니다."
             )
             try:
                 from app.core.events import broadcaster
@@ -412,15 +435,38 @@ class DiffCrawlerEngine:
                 alert_msg = json.dumps({
                     "type": "ALERT",
                     "message": (
-                        f"[Circuit Breaker] {svc_name} 변동분 {diff_count:,}건 감지 — "
-                        f"API 한도 초과 위험으로 이번 주기를 중단했습니다. 수동 조치가 필요합니다."
+                        f"[Circuit Breaker #{self._cb_consecutive_count}] {svc_name} 변동분 {diff_count:,}건 감지 — "
+                        f"API 한도 초과 위험으로 이번 주기를 중단했습니다."
+                        + (f" ({CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER}회 연속 발동 시 자동 복구를 시도합니다.)" if self._cb_consecutive_count < CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER else "")
                     )
                 }, ensure_ascii=False)
                 broadcaster.broadcast_sync(alert_msg)
             except Exception:
                 pass
+
+            # [B] 자가 복구: N회 연속 발동 시 Tail을 new_tail로 강제 갱신 후 bootstrap 재실행
+            if self._cb_consecutive_count >= CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER:
+                logger.warning(
+                    f"[{svc}] 🔄 [CB 자가 복구] {CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER}회 연속 발동 감지. "
+                    f"Tail을 {new_tail:,}으로 강제 업데이트 후 피벗 재생성을 시도합니다. "
+                    f"(기존 businesses 데이터는 보존됩니다)"
+                )
+                self._cb_consecutive_count = 0
+                state["last_total_count"] = new_tail
+                state["pivots"] = {}
+                self.state_repo.save_state(self.service_id, state)
+                try:
+                    recovered_state = await self.bootstrap()
+                    logger.info(
+                        f"[{svc}] ✅ [CB 자가 복구 완료] 피벗 {len(recovered_state.get('pivots', {}))}개 재생성. "
+                        f"다음 주기부터 정상 차분 탐지를 재개합니다."
+                    )
+                except Exception as e:
+                    logger.error(f"[{svc}] ❌ [CB 자가 복구 실패] bootstrap 오류: {e}")
             return []
         # ────────────────────────────────────────────────────────────────────────
+        # Circuit Breaker 미발동 시 연속 카운터 리셋
+        self._cb_consecutive_count = 0
 
         logger.info(
             f"[{svc}] 🔍 [Delta 감지] Tail {old_tail:,} → {new_tail:,} (+{diff_count:,}건 신규 삽입)"
