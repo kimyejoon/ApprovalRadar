@@ -134,11 +134,18 @@ def full_scan_init(no_backup: bool = False, services: list | None = None):
             print("   ✓ businesses, api_raw_data 초기화")
         for svc in services:
             conn.execute("DELETE FROM crawler_state WHERE service_id = ?", (svc,))
-        conn.execute("VACUUM")
         conn.commit()
-        print("   ✓ crawler_state 초기화 + VACUUM 완료")
+        print("   ✓ crawler_state 초기화 완료")
     finally:
         conn.close()
+
+    # VACUUM은 트랜잭션 외부(autocommit 모드)에서만 실행 가능
+    vacuum_conn = sqlite3.connect(DB_FILE, isolation_level=None)
+    try:
+        vacuum_conn.execute("VACUUM")
+        print("   ✓ VACUUM 완료 (디스크 공간 회수)")
+    finally:
+        vacuum_conn.close()
 
     # ④ 서비스별 bootstrap 실행
     total_start = datetime.datetime.now()
