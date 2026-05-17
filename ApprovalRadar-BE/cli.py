@@ -169,9 +169,10 @@ def full_scan_init(no_backup: bool = False, services: list | None = None, resume
                     print(f"\n   (다음 서비스 전 5초 대기 - WAF 방지)")
                     await asyncio.sleep(5)
 
-                print(f"\n{'\u2500' * 50}")
-                print(f"🚀 [{svc}] {svc_names.get(svc, svc)} Bootstrap 시작...")
-                print(f"{'\u2500' * 50}")
+                sep = "\u2500" * 50
+                print(f"\n{sep}")
+                print(f"\ud83d\ude80 [{svc}] {svc_names.get(svc, svc)} Bootstrap \uc2dc\uc791...")
+                print(sep)
 
                 call_count_before = client.get_total_call_count()
 
