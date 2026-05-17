@@ -15,6 +15,11 @@ PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
 # I2861: 음식점업소 인허가변경 - 이벤트 로그 append 구조로 total_count가 정확
 RELIABLE_TOTAL_COUNT_SERVICES = {"I2861"}
 
+# [Phase 3] Circuit Breaker 임계값
+# diff_count가 이 값을 초과하면 API 한도 초과를 방지하기 위해 해당 주기를 즉시 중단하고
+# 관리자에게 ALERT SSE를 발송한다. (Key 5개 × 1,000회 = 5,000회 한도 고려)
+CIRCUIT_BREAKER_THRESHOLD = 10_000
+
 
 class DiffCrawlerEngine:
     def __init__(self, api_client: ApiClient, service_id: str):
@@ -174,14 +179,16 @@ class DiffCrawlerEngine:
         logger.info(f"[{self.service_id}][Bootstrapper] 피벗 캐싱 시작 (간격: {settings.PIVOT_INTERVAL})...")
         pivot_indices = list(range(settings.PIVOT_INTERVAL, total_count, settings.PIVOT_INTERVAL))
 
-        # ✅ asyncio.gather로 피벗 병렬 조회 (비동기 동시 실행)
+        # [Phase 2] fetch_page 1회로 1,000건을 받아 rows[0]/rows[-1]로 Boundary 구성
+        # 기존: _fetch_single × 2 (첫 행 + 마지막 행) → 개선: _fetch_page × 1
         async def _fetch_pivot(idx: int):
-            row = await self._fetch_single(idx)
-            if row:
-                last_row = await self._fetch_single(idx + PAGE_SIZE - 1)
+            rows = await self._fetch_page(idx, idx + PAGE_SIZE - 1)
+            if rows:
+                row = rows[0]
+                last_row = rows[-1]
                 return idx, {
                     "LCNS_NO": row.get("LCNS_NO", ""),
-                    "LAST_LCNS_NO": last_row.get("LCNS_NO", "") if last_row else "",
+                    "LAST_LCNS_NO": last_row.get("LCNS_NO", ""),
                     "CHNG_DT": row.get("CHNG_DT", ""),
                     "BSSH_NM": row.get("BSSH_NM", "")
                 }
@@ -203,19 +210,65 @@ class DiffCrawlerEngine:
     # ─── 델타 감지 ────────────────────────────────────────────────────────────
 
     async def _compute_shift_offsets(self, pivots: dict, pivot_indices: list, diff_count: int) -> dict:
-        """피벗별 Shift 오프셋을 계산합니다."""
+        """
+        [Phase 1] 피벗별 Shift 오프셋을 메모리 기반 청크 스캔으로 계산합니다.
+
+        기존 방식(단건 fetch_single 루프)의 문제:
+          - diff_count=500 시 API 500회 단건 호출 → 장기 다운타임 후 Key 고갈 위험
+
+        개선 방식(청크 스캔):
+          - 탐색 범위 [p_idx+current_shift, p_idx+diff_count]를 PAGE_SIZE(1,000건) 단위로
+            fetch_page 1~2회 호출 후 메모리 리스트에서 선형 탐색
+          - diff_count=500 시 피벗 1개당 API 1회 → 피벗 60개 전체 60회로 단축 (88% 절감)
+          - Fallback: 피벗 레코드가 삭제 등으로 발견되지 않으면 current_shift 유지 후 다음 피벗 진행
+        """
         shift_amounts = {}
         current_shift = 0
 
-        logger.info(f"[{self.service_id}] ⚙️ 피벗 {len(pivot_indices)}개 Shift 오프셋 보정 시작...")
+        logger.info(
+            f"[{self.service_id}] ⚙️ 피벗 {len(pivot_indices)}개 Shift 오프셋 보정 시작... "
+            f"(청크 스캔 모드, diff_count={diff_count:,})"
+        )
         for p_idx in pivot_indices:
             old_data = pivots[str(p_idx)]
-            found_offset = current_shift
-            for offset in range(current_shift, diff_count + 1):
-                row = await self._fetch_single(p_idx + offset)
-                if row and row.get("LCNS_NO") == old_data["LCNS_NO"] and row.get("CHNG_DT") == old_data["CHNG_DT"]:
-                    found_offset = offset
-                    break
+            # 레거시 문자열 포맷 및 신규 dict 포맷 모두 호환
+            expected_lcns_no = old_data["LCNS_NO"] if isinstance(old_data, dict) else str(old_data)
+            expected_chng_dt = old_data.get("CHNG_DT", "") if isinstance(old_data, dict) else ""
+
+            found_offset = current_shift  # 미발견 시 Fallback: 현재 shift 유지
+            found = False
+
+            # 탐색 범위: [p_idx + current_shift, p_idx + diff_count]
+            search_start = p_idx + current_shift
+            search_end = p_idx + diff_count
+            current_search_pos = search_start
+
+            while current_search_pos <= search_end and not found and not shutdown_event.is_set():
+                chunk_end = min(current_search_pos + PAGE_SIZE - 1, search_end)
+                rows = await self._fetch_page(current_search_pos, chunk_end)
+
+                for i, row in enumerate(rows):
+                    if (
+                        row.get("LCNS_NO") == expected_lcns_no
+                        and row.get("CHNG_DT") == expected_chng_dt
+                    ):
+                        # 실제 API 인덱스에서 p_idx를 빼면 offset
+                        found_offset = (current_search_pos - p_idx) + i
+                        found = True
+                        break
+
+                current_search_pos += PAGE_SIZE
+
+            if not found:
+                logger.warning(
+                    f"[{self.service_id}] ⚠️ [청크 스캔] p_idx={p_idx:,} 피벗 레코드 미발견 "
+                    f"(LCNS_NO={expected_lcns_no}). current_shift={current_shift} 유지 (Fallback)"
+                )
+            else:
+                logger.debug(
+                    f"[{self.service_id}] [청크 스캔] p_idx={p_idx:,} → offset={found_offset} 확정"
+                )
+
             shift_amounts[p_idx] = found_offset
             current_shift = found_offset
         return shift_amounts
@@ -262,7 +315,13 @@ class DiffCrawlerEngine:
         return new_data_rows
 
     async def _update_pivots(self, pivot_indices: list, pivots: dict, shift_amounts: dict, new_tail: int, diff_count: int) -> dict:
-        """피벗 인덱스를 Shift 오프셋에 맞게 갱신하고, 새 꼬리까지 추가 피벗을 생성합니다."""
+        """
+        [Phase 2] 피벗 인덱스를 Shift 오프셋에 맞게 갱신하고, 새 꼬리까지 추가 피벗을 생성합니다.
+
+        개선 사항:
+          - 새 피벗 생성 시 _fetch_single × 2 (첫 행 + 마지막 행) →
+            _fetch_page × 1 후 rows[0], rows[-1] 메모리 추출로 API 호출 50% 절감
+        """
         new_pivots = {}
         for p_idx in pivot_indices:
             shift = shift_amounts[p_idx]
@@ -275,16 +334,23 @@ class DiffCrawlerEngine:
             (max_pivot + shift_amounts.get(max_pivot, diff_count)) // settings.PIVOT_INTERVAL + 1
         ) * settings.PIVOT_INTERVAL
         while next_pivot < new_tail:
-            row = await self._fetch_single(next_pivot)
-            if row:
-                # ✅ Boundary 양방향 저장
-                last_row = await self._fetch_single(next_pivot + PAGE_SIZE - 1)
+            # [Phase 2] fetch_page 1회로 1,000건을 통째로 가져와 메모리에서 첫/마지막 행 추출
+            # 기존: _fetch_single(next_pivot) + _fetch_single(next_pivot + PAGE_SIZE - 1) = 2회
+            # 개선: _fetch_page(next_pivot, next_pivot + PAGE_SIZE - 1) = 1회
+            rows = await self._fetch_page(next_pivot, next_pivot + PAGE_SIZE - 1)
+            if rows:
+                row = rows[0]
+                last_row = rows[-1]
                 new_pivots[str(next_pivot)] = {
                     "LCNS_NO": row.get("LCNS_NO", ""),
-                    "LAST_LCNS_NO": last_row.get("LCNS_NO", "") if last_row else "",
+                    "LAST_LCNS_NO": last_row.get("LCNS_NO", ""),
                     "CHNG_DT": row.get("CHNG_DT", ""),
                     "BSSH_NM": row.get("BSSH_NM", "")
                 }
+                logger.debug(
+                    f"[{self.service_id}] [피벗 생성] idx={next_pivot:,} "
+                    f"LCNS_NO={row.get('LCNS_NO','')} ~ {last_row.get('LCNS_NO','')}"
+                )
             next_pivot += settings.PIVOT_INTERVAL
 
         return new_pivots
@@ -325,6 +391,37 @@ class DiffCrawlerEngine:
             return []
 
         diff_count = new_tail - old_tail
+
+        # ── [Phase 3] Circuit Breaker ────────────────────────────────────────────
+        # diff_count가 임계값 초과 시 API 한도 보호를 위해 이번 주기를 안전하게 중단한다.
+        # Key 5개 × 1,000회 = 5,000회/일이 총 한도지만, 양 서비스(I2859+I2861) 동시 운용 고려.
+        if diff_count > CIRCUIT_BREAKER_THRESHOLD:
+            svc_name = {
+                "I2859": "식품업소 인허가변경",
+                "I2861": "음식점업소 인허가변경",
+            }.get(svc, svc)
+            logger.error(
+                f"[{svc}] 🚨 [Circuit Breaker] diff_count={diff_count:,}건이 "
+                f"임계값({CIRCUIT_BREAKER_THRESHOLD:,})을 초과! "
+                f"API 한도 초과 방지를 위해 이번 주기를 강제 중단합니다. "
+                f"수동으로 부트스트랩 재실행 또는 API Key를 추가하세요."
+            )
+            try:
+                from app.core.events import broadcaster
+                import json
+                alert_msg = json.dumps({
+                    "type": "ALERT",
+                    "message": (
+                        f"[Circuit Breaker] {svc_name} 변동분 {diff_count:,}건 감지 — "
+                        f"API 한도 초과 위험으로 이번 주기를 중단했습니다. 수동 조치가 필요합니다."
+                    )
+                }, ensure_ascii=False)
+                broadcaster.broadcast_sync(alert_msg)
+            except Exception:
+                pass
+            return []
+        # ────────────────────────────────────────────────────────────────────────
+
         logger.info(
             f"[{svc}] 🔍 [Delta 감지] Tail {old_tail:,} → {new_tail:,} (+{diff_count:,}건 신규 삽입)"
         )
