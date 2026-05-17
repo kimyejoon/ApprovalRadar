@@ -45,7 +45,8 @@ class Settings:
         # 1차: DB에서 활성 키 로드
         try:
             import sqlite3
-            db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "food_safety.db")
+            from database import DB_FILE
+            db_path = DB_FILE
             if os.path.exists(db_path):
                 conn = sqlite3.connect(db_path)
                 rows = conn.execute(

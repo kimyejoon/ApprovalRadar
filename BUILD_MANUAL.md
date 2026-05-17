@@ -41,7 +41,9 @@ ApprovalRadar-BE/.env   ← API 키 포함, 반드시 존재해야 함
 ```
 
 ```env
-FOOD_SAFETY_API_KEYS=키1,키2,키3,키4,키5
+FOOD_SAFETY_API_KEY_1=키1
+FOOD_SAFETY_API_KEY_2=키2
+# 또는 FOOD_SAFETY_API_KEY=키1 (단일 키)
 ```
 
 ### 2-3. 프론트엔드 소스 상태 확인
