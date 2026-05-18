@@ -36,6 +36,8 @@ class DiffCrawlerEngine:
         self.state_repo = StateRepository()
         # [B] Circuit Breaker 연속 발동 카운터 (서버 재시작 시 리셋)
         self._cb_consecutive_count: int = 0
+        # [C] 빈 피벗 연속 주기 카운터: 일정 주기 초과 시 자동 re-bootstrap 트리거
+        self._empty_pivot_cycles: int = 0
 
     # ─── 저수준 API 유틸리티 ──────────────────────────────────────────────────
 
@@ -249,6 +251,21 @@ class DiffCrawlerEngine:
         }
         self.state_repo.save_state(self.service_id, state)
         logger.info(f"[{self.service_id}][Bootstrapper] 부트스트랩 완료! 총 {len(pivots)}개 피벗 색인 생성. (Tail: {total_count:,}건)")
+
+        # ✅ [Fix 1] Bootstrap 완료 직후 피벗 즉시 재검증
+        # Bootstrap 중(수 분 소요) API 데이터가 변동될 수 있어 피벗이 이미 stale할 수 있음
+        # → 미리 검증하여 첫 주기 false Delete 은폐 alarm 차단
+        changed = await pivot_manager.sample_check(state["pivots"], self.api_client, self.service_id)
+        if changed:
+            logger.warning(
+                f"[{self.service_id}] ⚠️ Bootstrap 직후 피벗 불일치 감지 (Bootstrap 중 API 변동됨). "
+                f"피벗 초기화 → 다음 주기에 Ping만으로 정상 탐색."
+            )
+            state["pivots"] = {}
+            self.state_repo.save_state(self.service_id, state)
+        else:
+            logger.info(f"[{self.service_id}] ✅ Bootstrap 피벗 정합성 검증 완료.")
+        self._empty_pivot_cycles = 0  # bootstrap 완료 시 카운터 리셋
         return state
 
     # ─── 델타 감지 ────────────────────────────────────────────────────────────
@@ -437,6 +454,18 @@ class DiffCrawlerEngine:
                 logger.info(
                     f"[{svc}] ✔️  이번 주기 신규 변동없음. (tail: {old_tail:,}건)"
                 )
+                # ✅ [Fix 3] 빈 피벗 연속 주기 자동 re-bootstrap
+                if not state.get("pivots"):  # pivots가 비어있는 경우
+                    self._empty_pivot_cycles += 1
+                    MAX_EMPTY = 3  # 3주기(기본 30분 * 3 = 90분) 이상이면 재부트스트랩
+                    if self._empty_pivot_cycles >= MAX_EMPTY:
+                        logger.warning(
+                            f"[{svc}] 🔄 피벗 빈 상태 {self._empty_pivot_cycles}주기 지속 "
+                            f"→ 자동 재부트스트랩 시작 (Delete 은폐 감지 복원)"
+                        )
+                        await self.bootstrap()  # bootstrap 내부에서 save_state + 피벗 검증 수행
+                else:
+                    self._empty_pivot_cycles = 0  # 피벗이 있으면 카운터 초기화
             return []
 
         diff_count = new_tail - old_tail

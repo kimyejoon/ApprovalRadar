@@ -144,10 +144,37 @@ cp "$BE_DIR/.env" "$RELEASE_DIR/.env"
 
 # DB 파일 (미러링/운영 데이터 포함)
 DB_FILE="$BE_DIR/food_safety.db"
+RELEASE_DB="$RELEASE_DIR/food_safety.db"
 if [ -f "$DB_FILE" ]; then
-    cp "$DB_FILE" "$RELEASE_DIR/food_safety.db"
+    # ✅ [Fix 2] 기존 dist_release DB에 crawler_state가 있으면 빌드 후 복원
+    # 개발 DB를 덮어쓰면 운영 중 저장된 Tail/피벗 상태가 리셋되는 문제 방지
+    CRAWLER_STATE_BACKUP=""
+    if [ -f "$RELEASE_DB" ] && command -v sqlite3 &>/dev/null; then
+        CRAWLER_STATE_CHECK=$(sqlite3 "$RELEASE_DB" \
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='crawler_state';" 2>/dev/null || echo "0")
+        if [ "$CRAWLER_STATE_CHECK" = "1" ]; then
+            CRAWLER_STATE_BACKUP=$(sqlite3 "$RELEASE_DB" \
+                "SELECT service_id, last_total_count, pivots, updated_at FROM crawler_state;" 2>/dev/null)
+            if [ -n "$CRAWLER_STATE_BACKUP" ]; then
+                info "기존 crawler_state 백업 완료 (재빌드 후 복원 예정)"
+            fi
+        fi
+    fi
+
+    cp "$DB_FILE" "$RELEASE_DB"
     DB_SIZE=$(du -sh "$DB_FILE" | cut -f1)
     success "DB 파일 포함 → food_safety.db ($DB_SIZE)"
+
+    # 기존 crawler_state 복원 (있는 경우)
+    if [ -n "$CRAWLER_STATE_BACKUP" ] && command -v sqlite3 &>/dev/null; then
+        while IFS='|' read -r svc_id tail_count pivots updated_at; do
+            [ -z "$svc_id" ] && continue
+            sqlite3 "$RELEASE_DB" \
+                "INSERT OR REPLACE INTO crawler_state (service_id, last_total_count, pivots, updated_at) \
+                 VALUES ('$svc_id', $tail_count, '$pivots', '$updated_at');" 2>/dev/null
+        done <<< "$CRAWLER_STATE_BACKUP"
+        success "crawler_state 복원 완료 → 재시작 시 Bootstrap 불필요"
+    fi
 else
     warn "food_safety.db 없음 → 앱 첫 실행 시 빈 DB 자동 생성됩니다."
 fi
