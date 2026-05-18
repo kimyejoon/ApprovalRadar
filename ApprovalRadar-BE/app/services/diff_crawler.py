@@ -615,7 +615,7 @@ class DiffCrawlerEngine:
             if state.get("pivots"):
                 logger.info(f"[{svc}] 🔍 기동 첫 주기: 저장 피벗 정합성 선제 검증 중...")
                 startup_stale, shift_info = await pivot_manager.sample_check(
-                    state["pivots"], self.api_client, svc
+                    state["pivots"], self.api_client, svc, max_samples=9
                 )
                 if startup_stale:
                     shift_amount = shift_info.get("shift_amount")
