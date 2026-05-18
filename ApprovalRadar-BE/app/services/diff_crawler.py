@@ -28,7 +28,13 @@ CIRCUIT_BREAKER_THRESHOLD: int = int(__import__('os').getenv('CIRCUIT_BREAKER_TH
 CIRCUIT_BREAKER_ALERT_AFTER = 3  # N회 연속 발동 시 강화 경고
 
 # [C] bootstrap 동시성 제한: WAF DDoS 패턴 감지 방지
-BOOTSTRAP_SEMAPHORE_LIMIT = 3  # 최대 동시 fetch_page 요청 수
+BOOTSTRAP_SEMAPHORE_LIMIT = 3  # 최대 동시 fetch_page 요청 수 (단일 Bootstrap 내부)
+
+# [WAF Fix] 전역 Bootstrap 직렬화 Semaphore
+# 서비스(I2859/I2861)의 Bootstrap 스레드가 동시에 실행되면
+# 같은 IP에서 복수 asyncio 루프가 API를 동시에 호출 → WAF 차단 위험
+# → Semaphore(1)로 한 번에 1개 서비스만 Bootstrap 실행하도록 직렬화
+_GLOBAL_BOOTSTRAP_SEMAPHORE = threading.Semaphore(1)
 
 
 class DiffCrawlerEngine:
@@ -59,34 +65,58 @@ class DiffCrawlerEngine:
         이 메서드는 독립적인 ApiClient를 새로 생성하여
         부트스트랩이 항상 정상 완료될 수 있도록 보장한다.
 
+        [WAF Fix] _GLOBAL_BOOTSTRAP_SEMAPHORE로 직렬화:
+        I2859/I2861이 동시에 Bootstrap을 실행하면 동일 IP에서
+        복수의 asyncio 루프가 API를 동시 호출 → WAF 차단 위험.
+        Semaphore(1)로 한 번에 1개 서비스만 Bootstrap 실행.
+
         실패 시: _bootstrapping 플래그를 DB에서 해제하여
         다음 주기에 재시도 가능하도록 복구한다.
         """
-        logger.info(f"[{self.service_id}] 🔄 Bootstrap 스레드 시작 (독립 ApiClient 사용)")
-        from app.clients.foodsafety_api import ApiClient as _ApiClient
-        async with _ApiClient() as fresh_client:
-            original_client = self.api_client
-            self.api_client = fresh_client
+        logger.info(f"[{self.service_id}] 🔄 Bootstrap 스레드 시작 — 전역 Bootstrap Semaphore 대기 중...")
+        acquired = _GLOBAL_BOOTSTRAP_SEMAPHORE.acquire(timeout=3600)  # 최대 1시간 대기
+        if not acquired:
+            logger.error(
+                f"[{self.service_id}] ❌ Bootstrap Semaphore 대기 시간 초과 (1시간). "
+                f"_bootstrapping 플래그 해제 후 다음 주기에 재시도."
+            )
             try:
-                await self.bootstrap()
-            except Exception as e:
-                logger.error(
-                    f"[{self.service_id}] ❌ Bootstrap 스레드 오류: {e}",
-                    exc_info=True
-                )
-                # 실패 시 _bootstrapping 플래그 해제 → 다음 주기에 재시도 가능
+                state = self.state_repo.load_state(self.service_id)
+                state.pop("_bootstrapping", None)
+                self.state_repo.save_state(self.service_id, state)
+            except Exception:
+                pass
+            return
+
+        logger.info(f"[{self.service_id}] 🔄 Bootstrap 스레드 시작 (독립 ApiClient 사용, 직렬화 진행 중)")
+        from app.clients.foodsafety_api import ApiClient as _ApiClient
+        try:
+            async with _ApiClient() as fresh_client:
+                original_client = self.api_client
+                self.api_client = fresh_client
                 try:
-                    state = self.state_repo.load_state(self.service_id)
-                    state.pop("_bootstrapping", None)
-                    self.state_repo.save_state(self.service_id, state)
-                    logger.warning(
-                        f"[{self.service_id}] ⚠️ Bootstrap 실패 — _bootstrapping 플래그 해제. "
-                        f"다음 주기에 재시도합니다."
+                    await self.bootstrap()
+                except Exception as e:
+                    logger.error(
+                        f"[{self.service_id}] ❌ Bootstrap 스레드 오류: {e}",
+                        exc_info=True
                     )
-                except Exception as cleanup_err:
-                    logger.error(f"[{self.service_id}] 플래그 해제 실패: {cleanup_err}")
-            finally:
-                self.api_client = original_client
+                    # 실패 시 _bootstrapping 플래그 해제 → 다음 주기에 재시도 가능
+                    try:
+                        state = self.state_repo.load_state(self.service_id)
+                        state.pop("_bootstrapping", None)
+                        self.state_repo.save_state(self.service_id, state)
+                        logger.warning(
+                            f"[{self.service_id}] ⚠️ Bootstrap 실패 — _bootstrapping 플래그 해제. "
+                            f"다음 주기에 재시도합니다."
+                        )
+                    except Exception as cleanup_err:
+                        logger.error(f"[{self.service_id}] 플래그 해제 실패: {cleanup_err}")
+                finally:
+                    self.api_client = original_client
+        finally:
+            _GLOBAL_BOOTSTRAP_SEMAPHORE.release()
+            logger.info(f"[{self.service_id}] 🔓 Bootstrap Semaphore 해제 — 다음 서비스 Bootstrap 가능")
 
     # ─── 저수준 API 유틸리티 ──────────────────────────────────────────────────
 
