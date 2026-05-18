@@ -93,3 +93,21 @@ def trigger_immediate_scrape():
         logger.info(f"[즉시 재가동] 크롤러 즉시 실행 잡 등록됨: {job_id}")
     except Exception as e:
         logger.error(f"[즉시 재가동] 잡 등록 실패: {e}")
+
+
+def reschedule_scraper_job(new_interval_minutes: int) -> None:
+    """크롤링 주기를 서버 재시작 없이 실시간 변경합니다.
+    기존 scraper_job을 제거하고 새 interval로 재등록합니다."""
+    try:
+        if scheduler.get_job("scraper_job"):
+            scheduler.remove_job("scraper_job")
+        scheduler.add_job(
+            _scraper_job,
+            'interval',
+            minutes=new_interval_minutes,
+            id="scraper_job",
+        )
+        logger.info(f"[스케줄러] 크롤링 주기 변경 완료: {new_interval_minutes}분")
+    except Exception as e:
+        logger.error(f"[스케줄러] 크롤링 주기 변경 실패: {e}")
+        raise
