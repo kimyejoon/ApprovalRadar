@@ -43,6 +43,33 @@ def _check_api_key_recovery():
     asyncio.run(_run())
 
 
+def _daily_bootstrap_job():
+    """매일 09:00 실행: 모든 서비스의 피벗을 재생성하여 당일 변동 감지 준비."""
+    from app.core.config import settings
+    from app.clients.foodsafety_api import ApiClient
+    from app.services.diff_crawler import DiffCrawlerEngine
+
+    async def _run():
+        logger.info("[일일 Bootstrap] 09:00 피벗 재생성 시작 — 전날 밤 API 재정렬 반영")
+        service_ids = getattr(settings, "SERVICES", ["I2859", "I2861"])
+        async with ApiClient() as api_client:
+            for svc_id in service_ids:
+                try:
+                    crawler = DiffCrawlerEngine(api_client=api_client, service_id=svc_id)
+                    state = await crawler.bootstrap()
+                    logger.info(
+                        f"[일일 Bootstrap] {svc_id} 피벗 재생성 완료 — "
+                        f"{len(state.get('pivots', {}))}개 피벗, "
+                        f"Tail={state.get('last_total_count', 0):,}건"
+                    )
+                except Exception as e:
+                    logger.error(f"[일일 Bootstrap] {svc_id} 실패: {e}")
+        logger.info("[일일 Bootstrap] 전체 완료 — 오늘 하루 변동 감지 준비됨")
+
+    asyncio.run(_run())
+
+
+
 def start_scheduler():
     logger.info("Configuring APScheduler jobs...")
 
@@ -64,9 +91,15 @@ def start_scheduler():
     # DB 백업 (매일 새벽 4시)
     scheduler.add_job(backup_db, 'cron', hour=4, minute=0, id="backup_job")
 
+    # ✅ 매일 09:00 fresh bootstrap — 야간 API 재정렬 후 피벗 재생성
+    # 이유: API는 가나다순 재정렬이 수시로 발생 → 전날 피벗이 당일 아침이면 stale
+    # 매일 업무 시작 전 피벗 재생성으로 당일 변동 감지 정확도 보장
+    scheduler.add_job(_daily_bootstrap_job, 'cron', hour=9, minute=0, id="daily_bootstrap_job")
+
     # 앱 시작 시 즉시 1회 실행 (blocking 방지를 위해 스케줄러에 위임)
     logger.info("Adding initial catch-up scraper job to background...")
     scheduler.add_job(_scraper_job, 'date', run_date=datetime.now(), id="initial_scraper_job")
+
 
     scheduler.start()
     logger.info("APScheduler started successfully.")
