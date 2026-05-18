@@ -507,73 +507,81 @@ class DiffCrawlerEngine:
 
         if new_tail <= old_tail:
             elapsed = time.time() - start_time
-            # ✅ Delete 은폐 감지: Tail이 같아도 Insert+Delete가 동시 발생했을 수 있음
-            changed, shift_info = await pivot_manager.sample_check(
-                state.get("pivots", {}), self.api_client, svc
-            )
-            if changed:
+
+            pivots = state.get("pivots", {})
+
+            # pivots가 없으면 sample_check 의미 없음 → 명시적 경고
+            if not pivots:
                 logger.warning(
-                    f"[{svc}] ⚠️ [Delete 은폐 감지] Tail 변동 없으나 피벗 불일치! "
-                    f"피벗 초기화 후 다음 주기에 정상 Delta 탐색으로 신규 변동분 수집 예정."
+                    f"[{svc}] ⚠️ 피벗 없음 → Delete 은폐 감지 불가 상태 (Ping Only 모드)"
+                    f" — 재부트스트랩 후 정상 복원 예정"
                 )
-
-                # ✅ Shift 진단으로 신규 데이터 즈시 수집
-                shift_amount = shift_info.get("shift_amount")
-                insert_range = shift_info.get("insert_range")
-                if shift_amount and shift_amount > 0 and insert_range:
-                    ins_start, ins_end = insert_range
-                    logger.info(
-                        f"[{svc}] 📥 Shift값({shift_amount})을 토대로 즉시 신규변동분 수집: "
-                        f"{ins_start:,} ~ {ins_end:,}번 구간 ({shift_amount}건)"
-                    )
-                    try:
-                        # shift_info에 new_rows가 있으면 이미 Shift 진단 시 확보됨 (추가 호출 불필요)
-                        immediate_rows = shift_info.get("new_rows") or []
-                        if not immediate_rows:
-                            # fallback: 직접 다운로드
-                            cs = ins_start
-                            while cs <= ins_end:
-                                ce = min(cs + 1000 - 1, ins_end)
-                                fetched = await self._fetch_page(cs, ce)
-                                immediate_rows.extend(fetched)
-                                cs += 1000
-                        if immediate_rows:
-                            logger.info(
-                                f"[{svc}] ✅ 즉시 수집 성공: {len(immediate_rows)}건 확보 — "
-                                f"기존 scraper 파이프라인으로 반환 (DB 저장 + SSE 발행)"
-                            )
-                            state["pivots"] = {}
-                            self.state_repo.save_state(self.service_id, state)
-                            return immediate_rows  # ← scraper가 정상 처리
-                        else:
-                            logger.warning(f"[{svc}] 즉시 수집: {ins_start:,}~{ins_end:,} 응답 없음")
-                    except Exception as e:
-                        logger.warning(f"[{svc}] 즉시 수집 실패 (다음 주기 재시도): {e}")
-
-
-
-                state["pivots"] = {}
-                self.state_repo.save_state(self.service_id, state)
             else:
-                logger.info(
-                    f"[{svc}] ✔️ 이번 주기 신규 변동없음. (tail: {old_tail:,}건)"
+                # ✅ Delete 은폐 감지: Tail이 같아도 Insert+Delete가 동시 발생했을 수 있음
+                changed, shift_info = await pivot_manager.sample_check(
+                    pivots, self.api_client, svc
                 )
-                # ✅ [Fix 3] 빈 피벗 연속 주기 자동 re-bootstrap
-                if not state.get("pivots"):  # pivots가 비어있는 경우
-                    self._empty_pivot_cycles += 1
-                    MAX_EMPTY = 3
-                    logger.info(
-                        f"[{svc}] 피벗 빈 상태 지속 중: {self._empty_pivot_cycles}/{MAX_EMPTY}주기 "
-                        f"({'재부트스트랩 시작!' if self._empty_pivot_cycles >= MAX_EMPTY else f'{MAX_EMPTY - self._empty_pivot_cycles}주기 후 자동 재부트스트랩 예정'})"
+                if changed:
+                    logger.warning(
+                        f"[{svc}] ⚠️ [Delete 은폐 감지] Tail 변동 없으나 피벗 불일치! "
+                        f"피벗 초기화 후 다음 주기에 정상 Delta 탐색으로 신규 변동분 수집 예정."
                     )
-                    if self._empty_pivot_cycles >= MAX_EMPTY:
-                        logger.warning(
-                            f"[{svc}] 🔄 피벗 빈 상태 {self._empty_pivot_cycles}주기 지속 "
-                            f"→ 자동 재부트스트랩 시작 (Delete 은폐 감지 복원)"
+
+                    # ✅ Shift 진단으로 신규 데이터 즉시 수집
+                    shift_amount = shift_info.get("shift_amount")
+                    insert_range = shift_info.get("insert_range")
+                    if shift_amount and shift_amount > 0 and insert_range:
+                        ins_start, ins_end = insert_range
+                        logger.info(
+                            f"[{svc}] 📥 Shift값({shift_amount})을 토대로 즉시 신규변동분 수집: "
+                            f"{ins_start:,} ~ {ins_end:,}번 구간 ({shift_amount}건)"
                         )
-                        await self.bootstrap()
-                else:
-                    self._empty_pivot_cycles = 0
+                        try:
+                            immediate_rows = shift_info.get("new_rows") or []
+                            if not immediate_rows:
+                                cs = ins_start
+                                while cs <= ins_end:
+                                    ce = min(cs + 1000 - 1, ins_end)
+                                    fetched = await self._fetch_page(cs, ce)
+                                    immediate_rows.extend(fetched)
+                                    cs += 1000
+                            if immediate_rows:
+                                logger.info(
+                                    f"[{svc}] ✅ 즉시 수집 성공: {len(immediate_rows)}건 확보 — "
+                                    f"기존 scraper 파이프라인으로 반환 (DB 저장 + SSE 발행)"
+                                )
+                                state["pivots"] = {}
+                                self.state_repo.save_state(self.service_id, state)
+                                return immediate_rows
+                            else:
+                                logger.warning(f"[{svc}] 즉시 수집: {ins_start:,}~{ins_end:,} 응답 없음")
+                        except Exception as e:
+                            logger.warning(f"[{svc}] 즉시 수집 실패 (다음 주기 재시도): {e}")
+
+                    state["pivots"] = {}
+                    self.state_repo.save_state(self.service_id, state)
+                    return []
+
+            logger.info(
+                f"[{svc}] ✔️ 이번 주기 신규 변동없음. (tail: {old_tail:,}건) "
+                f"[소요: {time.time() - start_time:.1f}초]"
+            )
+            # ✅ [Fix 3] 빈 피벗 연속 주기 자동 re-bootstrap
+            if not pivots:
+                self._empty_pivot_cycles += 1
+                MAX_EMPTY = 3
+                logger.info(
+                    f"[{svc}] 피벗 빈 상태 지속 중: {self._empty_pivot_cycles}/{MAX_EMPTY}주기 "
+                    f"({'재부트스트랩 시작!' if self._empty_pivot_cycles >= MAX_EMPTY else f'{MAX_EMPTY - self._empty_pivot_cycles}주기 후 자동 재부트스트랩 예정'})"
+                )
+                if self._empty_pivot_cycles >= MAX_EMPTY:
+                    logger.warning(
+                        f"[{svc}] 🔄 피벗 빈 상태 {self._empty_pivot_cycles}주기 지속 "
+                        f"→ 자동 재부트스트랩 시작 (Delete 은폐 감지 복원)"
+                    )
+                    await self.bootstrap()
+            else:
+                self._empty_pivot_cycles = 0
             return []
 
         diff_count = new_tail - old_tail
