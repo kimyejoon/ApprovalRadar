@@ -353,13 +353,19 @@ function CrawlIntervalSection() {
   const [localVal, setLocalVal] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const { data: currentInterval, isLoading } = useQuery({
+  const { data: currentInterval, isLoading } = useQuery<number>({
     queryKey: ['crawl-interval'],
     queryFn: fetchCrawlInterval,
-    onSuccess: (v: number) => { if (localVal === null) setLocalVal(v); },
-  } as any);
+  });
 
-  const displayVal = localVal ?? currentInterval ?? 30;
+  // 서버 값이 로드되면 로컬 슬라이더 초기값으로 설정 (한 번만)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initDone = localVal !== null;
+  if (!initDone && currentInterval !== undefined) {
+    setLocalVal(currentInterval);
+  }
+
+  const displayVal: number = localVal ?? currentInterval ?? 30;
 
   const mutation = useMutation({
     mutationFn: (m: number) => updateCrawlInterval(m),
