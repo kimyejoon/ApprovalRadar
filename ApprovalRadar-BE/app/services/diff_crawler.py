@@ -34,11 +34,13 @@ class DiffCrawlerEngine:
         self.api_client = api_client
         self.service_id = service_id
         self.state_repo = StateRepository()
-        # [B] Circuit Breaker 연속 발동 카운터 (서버 재시작 시 리셋)
+        # 아래 카운터들은 scan_for_updates 시작 시 state에서 복원됨 (in-memory 초기화 대신)
+        # [B] Circuit Breaker 연속 발동 카운터
         self._cb_consecutive_count: int = 0
         # [C] 빈 피벗 연속 주기 카운터: 일정 주기 초과 시 자동 re-bootstrap 트리거
         self._empty_pivot_cycles: int = 0
         # [D] 기동 첫 주기 플래그: 서버 재시작 시 저장된 피벗 stale 여부 선제 검증용
+        # → 서버 재시작 마다 True로 유지해야 하므로 state에 저장하지 않음 (의도적 in-memory)
         self._first_cycle: bool = True
 
     # ─── 저수준 API 유틸리티 ──────────────────────────────────────────────────
@@ -263,10 +265,12 @@ class DiffCrawlerEngine:
 
         state = {
             "last_total_count": total_count,
-            "pivots": pivots
+            "pivots": pivots,
+            "empty_pivot_cycles": 0,      # 재부트스트랩으로 카운터 초기화
+            "cb_consecutive_count": 0,    # 재부트스트랩으로 카운터 초기화
         }
         self.state_repo.save_state(self.service_id, state)
-        logger.info(f"[{self.service_id}][Bootstrapper] 부트스트랩 완료! 총 {len(pivots)}개 피벗 색인 생성. (Tail: {total_count:,}건)")
+        logger.info(f"[{self.service_id}][Bootstrapper] 부트스트랩 완료! 주 {len(pivots)}개 피벗 색인 생성. (Tail: {total_count:,}건)")
 
         # ✅ [Fix 1] Bootstrap 완료 직후 피벗 즉시 재검증
         changed, _ = await pivot_manager.sample_check(state["pivots"], self.api_client, self.service_id)
@@ -279,7 +283,8 @@ class DiffCrawlerEngine:
             self.state_repo.save_state(self.service_id, state)
         else:
             logger.info(f"[{self.service_id}] ✅ Bootstrap 피벗 정합성 검증 완료.")
-        self._empty_pivot_cycles = 0  # bootstrap 완료 시 카운터 리셋
+        self._empty_pivot_cycles = 0  # in-memory 동기화
+        self._cb_consecutive_count = 0
         return state
 
     # ─── 델타 감지 ────────────────────────────────────────────────────────────
@@ -450,6 +455,10 @@ class DiffCrawlerEngine:
         start_time = time.time()
         state = self.state_repo.load_state(self.service_id)
 
+        # ✅ 카운터 영속 복원: 매 주기 새 인스턴스이므로 state에서 읽어온다
+        self._empty_pivot_cycles = state.get("empty_pivot_cycles", 0)
+        self._cb_consecutive_count = state.get("cb_consecutive_count", 0)
+
         if state["last_total_count"] == 0:
             logger.info(f"[{svc}] 최초 실행: 베이스라인 부트스트랩을 시작합니다...")
             state = await self.bootstrap()
@@ -574,14 +583,20 @@ class DiffCrawlerEngine:
                     f"[{svc}] 피벗 빈 상태 지속 중: {self._empty_pivot_cycles}/{MAX_EMPTY}주기 "
                     f"({'재부트스트랩 시작!' if self._empty_pivot_cycles >= MAX_EMPTY else f'{MAX_EMPTY - self._empty_pivot_cycles}주기 후 자동 재부트스트랩 예정'})"
                 )
+                # 카운터 영속 저장
+                state["empty_pivot_cycles"] = self._empty_pivot_cycles
+                self.state_repo.save_state(self.service_id, state)
                 if self._empty_pivot_cycles >= MAX_EMPTY:
                     logger.warning(
                         f"[{svc}] 🔄 피벗 빈 상태 {self._empty_pivot_cycles}주기 지속 "
                         f"→ 자동 재부트스트랩 시작 (Delete 은폐 감지 복원)"
                     )
-                    await self.bootstrap()
+                    await self.bootstrap()  # bootstrap() 내부에서 _empty_pivot_cycles=0 리셋
             else:
-                self._empty_pivot_cycles = 0
+                if self._empty_pivot_cycles != 0:
+                    self._empty_pivot_cycles = 0
+                    state["empty_pivot_cycles"] = 0
+                    self.state_repo.save_state(self.service_id, state)
             return []
 
         diff_count = new_tail - old_tail
