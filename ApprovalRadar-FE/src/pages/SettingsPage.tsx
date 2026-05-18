@@ -29,13 +29,13 @@ import {
 
 const API_BASE = '';
 async function fetchCrawlInterval(): Promise<number> {
-  const res = await fetch(`${API_BASE}/api/v1/settings/crawl-interval`);
+  const res = await fetch(`${API_BASE}/api/v1/admin/settings/crawl-interval`);
   if (!res.ok) throw new Error('크롤 주기 조회 실패');
   const data = await res.json();
   return data.interval_minutes;
 }
 async function updateCrawlInterval(minutes: number): Promise<number> {
-  const res = await fetch(`${API_BASE}/api/v1/settings/crawl-interval`, {
+  const res = await fetch(`${API_BASE}/api/v1/admin/settings/crawl-interval`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ interval_minutes: minutes }),
