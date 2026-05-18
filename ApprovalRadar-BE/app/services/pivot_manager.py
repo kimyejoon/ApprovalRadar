@@ -39,18 +39,11 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
       3. 현재 (LCNS_NO, CHNG_DT) 복합키 fingerprint 계산
       4. 저장된 fingerprint와 비교 → 완전 일치 시 정상
       5. 불일치 시:
-         a. 저장된 첫 번째 복합키 (LCNS_NO, CHNG_DT) 를 현재 records에서 탐색
+         a. 저장된 첫 번째 복합키를 현재 records에서 탐색
          b. i번째에서 발견 → shift_amount = i (i건이 앞에 새로 삽입됨)
-         c. 삽입된 records 상세 로그 출력 (업소명, LCNS_NO, CHNG_DT)
+         c. 삽입된 records 상세 로그 출력
 
     Returns: (changed: bool, shift_info: dict)
-      shift_info keys:
-        - first_mismatch_idx: int       (불일치 피벗 인덱스)
-        - shift_amount: int | None      (양수=삽입, None=윈도우 내 미발견)
-        - insert_range: (start, end)    (shift_amount > 0 시 즉시 수집 가능 위치)
-        - new_rows: list                (shift_amount > 0 시 삽입된 레코드 목록)
-        - expected_lcns_no: str
-        - bssh_nm: str
     """
     if not pivots:
         return False, {}
@@ -67,6 +60,7 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
     if len(sampled_indices) > 5:
         idx_preview += f" 외 {len(sampled_indices)-5}개"
 
+    api_calls_before = getattr(api_client, "_call_count", 0)
     logger.info(
         f"[{service_id}][피벗 무결성 검사] 총 {len(pivot_items)}개 피벗 중 "
         f"{len(sampled)}개 샘플 선택 → 각 1,000건 전체 대조 시작\n"
@@ -77,7 +71,6 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
         idx = int(idx_str)
 
         if not isinstance(pivot_data, dict):
-            # 레거시 문자열 포맷 — fingerprint 없음, 스킵
             logger.debug(f"[{service_id}][피벗 무결성 검사] idx={idx:,} 레거시 포맷 → 스킵")
             continue
 
@@ -87,21 +80,33 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
         bssh_nm = pivot_data.get("BSSH_NM", "")
 
         try:
-            # ── 1,000건 일괄 조회 ─────────────────────────────────────────
-            res = await api_client.fetch_data(service_id, idx, idx + PAGE_SIZE - 1)
+            # ── 1,000건 일괄 조회 + 상세 페이지/API 로깅 ───────────────────
+            page_end = idx + PAGE_SIZE - 1
+            call_seq = getattr(api_client, "_call_count", 0) - api_calls_before + 1
+            logger.info(
+                f"[{service_id}][피벗 무결성 검사] 📡 API 호출 #{call_seq}: "
+                f"pages {idx:,}~{page_end:,} (1,000건 범위) 조회 중..."
+            )
+            res = await api_client.fetch_data(service_id, idx, page_end)
             await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
             items = res.get(service_id, {}).get("row", [])
+            total_from_api = res.get(service_id, {}).get("total_count", "?")
 
             if not items:
-                logger.debug(f"[{service_id}][피벗 무결성 검사] idx={idx:,} 응답 없음 → 스킵")
+                logger.info(f"[{service_id}][피벗 무결성 검사] idx={idx:,} 응답 없음 → 스킵")
                 continue
+
+            logger.info(
+                f"[{service_id}][피벗 무결성 검사] ✉️  pages {idx:,}~{page_end:,} 응답 수신: "
+                f"{len(items)}건 (API total_count={total_from_api})"
+            )
 
             # ── Fingerprint 전체 대조 ─────────────────────────────────────
             current_fingerprint = compute_page_fingerprint(items)
 
             if stored_fingerprint and current_fingerprint == stored_fingerprint:
-                logger.debug(
-                    f"[{service_id}][피벗 무결성 검사] ✅ idx={idx:,} "
+                logger.info(
+                    f"[{service_id}][피벗 무결성 검사] ✅ pages {idx:,}~{page_end:,} "
                     f"fingerprint 일치 — {len(items)}건 전체 정상"
                 )
                 continue
@@ -110,16 +115,15 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
             if stored_fingerprint:
                 logger.warning(
                     f"[{service_id}][피벗 무결성 검사] ❌ {idx:,}번 피벗 "
-                    f"fingerprint 불일치! (1,000건 전체 변동 감지)\n"
+                    f"fingerprint 불일치! (pages {idx:,}~{page_end:,}, 1,000건 전체 변동 감지)\n"
                     f"  저장 지문: {stored_fingerprint[:12]}...\n"
                     f"  현재 지문: {current_fingerprint[:12]}..."
                 )
             else:
-                # fingerprint 없는 피벗: 복합키로 직접 비교
                 actual_first_key = (items[0].get("LCNS_NO", ""), items[0].get("CHNG_DT", ""))
                 stored_first_key = (stored_lcns_no, stored_chng_dt)
                 if actual_first_key == stored_first_key:
-                    logger.debug(
+                    logger.info(
                         f"[{service_id}][피벗 무결성 검사] idx={idx:,} "
                         f"복합키 일치 (fingerprint 미저장 피벗) → 정상으로 간주"
                     )
@@ -130,10 +134,10 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                     f"  현재값: {actual_first_key}"
                 )
 
-            # ── Shift 진단: 저장된 첫 번째 복합키를 현재 records에서 탐색 ──
+            # ── Shift 진단: 저장된 첫 번째 복합키를 현재 records에서 선형 탐색 ──
             stored_first_key = (stored_lcns_no, stored_chng_dt)
             logger.info(
-                f"[{service_id}] 🔍 Shift 진단: 현재 {len(items)}건 내에서 "
+                f"[{service_id}] 🔍 Shift 진단: pages {idx:,}~{page_end:,}의 {len(items)}건 내에서 "
                 f"({stored_lcns_no}, {stored_chng_dt}) [{bssh_nm}] 탐색 중..."
             )
 
@@ -144,7 +148,7 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                 current_key = (row.get("LCNS_NO", ""), row.get("CHNG_DT", ""))
                 if current_key == stored_first_key:
                     shift_amount = i
-                    new_rows = items[:i]  # 저장값 앞에 새로 삽입된 records
+                    new_rows = items[:i]
                     break
 
             shift_info = {
@@ -155,6 +159,8 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                 "expected_lcns_no": stored_lcns_no,
                 "bssh_nm": bssh_nm,
             }
+
+            api_calls_used = getattr(api_client, "_call_count", 0) - api_calls_before
 
             if shift_amount is not None and shift_amount > 0:
                 new_rows_summary = "\n".join(
@@ -168,30 +174,36 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                     f"[{service_id}] 📊 Shift 진단 완료:\n"
                     f"  {idx:,}번 피벗의 첫 레코드가 {shift_amount}칸 뒤로 밀림\n"
                     f"  → 신규 삽입 {shift_amount}건 상세:\n{new_rows_summary}\n"
-                    f"  → [{idx:,} ~ {idx+shift_amount-1:,}] 구간 즉시 수집 가능"
+                    f"  → [{idx:,} ~ {idx+shift_amount-1:,}] 구간 즉시 수집 가능\n"
+                    f"  📡 피벗 검사 누적 API 호출: {api_calls_used}회 소모"
                 )
             elif shift_amount == 0:
                 logger.warning(
-                    f"[{service_id}] 📊 Shift=0: 저장된 복합키가 현재 records[0]과 일치하나 "
-                    f"fingerprint가 다름 → 페이지 중간 또는 끝 부분에서 레코드 교체/삭제 발생"
+                    f"[{service_id}] 📊 Shift=0: pages {idx:,}~{page_end:,} — "
+                    f"저장된 복합키가 records[0]과 일치하나 fingerprint 다름\n"
+                    f"  → 페이지 중간/끝 부분 레코드 교체·삭제 발생 추정\n"
+                    f"  📡 피벗 검사 누적 API 호출: {api_calls_used}회 소모"
                 )
             else:
                 logger.warning(
-                    f"[{service_id}] 📊 Shift 진단 실패: {len(items)}건 내에서 "
+                    f"[{service_id}] 📊 Shift 진단 실패: pages {idx:,}~{page_end:,}의 {len(items)}건 내에서 "
                     f"복합키({stored_lcns_no}, {stored_chng_dt}) 미발견\n"
-                    f"  → 대규모 변동(>1,000건) 또는 해당 레코드 자체 삭제 가능성"
+                    f"  → 대규모 변동(>1,000건) 또는 해당 레코드 자체 삭제 가능성\n"
+                    f"  📡 피벗 검사 누적 API 호출: {api_calls_used}회 소모"
                 )
 
             return True, shift_info
 
         except Exception as e:
-            logger.debug(
+            logger.warning(
                 f"[{service_id}][피벗 무결성 검사] idx={idx:,} 조회 실패 (무시): {e}"
             )
             continue
 
+    api_calls_used = getattr(api_client, "_call_count", 0) - api_calls_before
     logger.info(
         f"[{service_id}][피벗 무결성 검사] ✅ {len(sampled)}개 피벗 전체 정상 — "
-        f"API 데이터 변동 없음 확인됨. (각 1,000건 fingerprint 대조)"
+        f"API 데이터 변동 없음 확인됨. (각 1,000건 fingerprint 대조)\n"
+        f"  📡 총 API 호출 횟수: {api_calls_used}회 소모"
     )
     return False, {}

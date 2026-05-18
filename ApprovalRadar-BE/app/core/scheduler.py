@@ -127,10 +127,8 @@ def _evening_chng_dt_job():
                     if not all_rows:
                         continue
 
-                    # DB에 없는 신규 건만 필터링 (LCNS_NO + CHNG_DT 복합키)
+                    # DB에 없는 신규 건만 필터링 (api_raw_data 기준)
                     from database import get_db
-                    from app.repositories.raw_data_repository import RawDataRepository
-                    raw_repo = RawDataRepository()
                     new_rows = []
                     with get_db() as conn:
                         for row in all_rows:
@@ -138,13 +136,13 @@ def _evening_chng_dt_job():
                             chng_dt = row.get("CHNG_DT", "")
                             if not lcns_no:
                                 continue
-                            # raw_data에 이미 있으면 스킵
                             exists = conn.execute(
-                                "SELECT 1 FROM raw_data WHERE lcns_no=? LIMIT 1",
-                                (lcns_no,)
+                                "SELECT 1 FROM api_raw_data WHERE service_id=? AND response_data LIKE ? LIMIT 1",
+                                (svc_id, f'%"LCNS_NO": "{lcns_no}"%')
                             ).fetchone()
                             if not exists:
                                 new_rows.append(row)
+
 
                     if new_rows:
                         logger.info(
