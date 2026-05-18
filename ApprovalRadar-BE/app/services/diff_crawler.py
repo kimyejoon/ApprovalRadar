@@ -785,7 +785,7 @@ class DiffCrawlerEngine:
                     "message": (
                         f"[Circuit Breaker #{self._cb_consecutive_count}] {svc_name} 변동분 {diff_count:,}건 감지 — "
                         f"API 한도 초과 위험으로 이번 주기를 중단했습니다."
-                        + (f" ({CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER}회 연속 발동 시 자동 복구를 시도합니다.)" if self._cb_consecutive_count < CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER else "")
+                        + (f" ({CIRCUIT_BREAKER_ALERT_AFTER}회 연속 발동 시 강화 경고가 발송됩니다.)" if self._cb_consecutive_count < CIRCUIT_BREAKER_ALERT_AFTER else "")
                     )
                 }, ensure_ascii=False)
                 broadcaster.broadcast_sync(alert_msg)
