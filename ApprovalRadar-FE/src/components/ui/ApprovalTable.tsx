@@ -61,6 +61,7 @@ export function ApprovalTable({
       <TableHeader>
         <TableRow>
           <SortableHead label="업소명" sortKey="name" sortConfig={sortConfig} onSort={onSort} />
+          <SortableHead label="인허가번호" sortKey="id" sortConfig={sortConfig} onSort={onSort} />
           <TableHead>
             <button 
               className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
@@ -70,7 +71,6 @@ export function ApprovalTable({
               <CaretDown weight="bold" className="w-4 h-4" />
             </button>
           </TableHead>
-          <SortableHead label="인허가번호" sortKey="id" sortConfig={sortConfig} onSort={onSort} />
           <SortableHead label="대표자명" sortKey="owner" sortConfig={sortConfig} onSort={onSort} />
           <TableHead>
             <button 
@@ -112,7 +112,7 @@ export function ApprovalTable({
             <TableRow 
               key={item.id + '-' + index} 
               onClick={() => onRowClick(item)}
-              className={`cursor-pointer group ${!item.isRead ? 'bg-brand/5 hover:bg-brand/10' : ''}`}
+              className={`cursor-pointer group ${!item.isRead ? 'bg-emerald-400/20 hover:bg-emerald-400/30' : ''}`}
             >
               <TableCell className="font-medium text-text-primary group-hover:text-brand transition-colors">
                 <div className="flex flex-col">
@@ -124,8 +124,8 @@ export function ApprovalTable({
                   )}
                 </div>
               </TableCell>
-              <TableCell>{item.location}</TableCell>
               <TableCodeCell>{item.id}</TableCodeCell>
+              <TableCell>{item.location}</TableCell>
               <TableCell>
                 <div className="flex flex-col">
                   <span>{item.owner}</span>

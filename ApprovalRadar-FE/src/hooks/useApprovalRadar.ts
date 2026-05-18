@@ -14,7 +14,7 @@ export function useApprovalRadar() {
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilters, setStatusFilters] = useState<string[]>(DEFAULT_STATUS_FILTERS);
-  const [locationFilters, setLocationFilters] = useState<string[]>([]);
+  const [locationFilters, setLocationFilters] = useState<string[]>(['서울특별시', '인천광역시', '경기도', '강원도']); // 기본값: 수도권
   const [industryFilters, setIndustryFilters] = useState<string[]>(DEFAULT_INDUSTRY_FILTERS);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>({
     from: startOfToday(),
