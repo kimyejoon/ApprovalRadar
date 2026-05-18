@@ -161,7 +161,9 @@ class LauncherApp(tk.Tk):
     def _build_window(self) -> None:
         self.title("ApprovalRadar")
         self.configure(bg=COLORS['bg'])
-        self.resizable(False, False)
+        # 가로 고정 / 세로 자유 (사용자가 로그 완창 크기 조절 가능)
+        self.resizable(False, True)
+        self.minsize(WINDOW_W, WINDOW_H)  # 최소 크기 보장
 
         # 화면 중앙 배치
         self.update_idletasks()
@@ -299,6 +301,8 @@ class LauncherApp(tk.Tk):
         self._log_area.bind('<Command-c>', self._copy_selection)  # macOS
         self._log_area.bind('<Control-a>', self._select_all)
         self._log_area.bind('<Command-a>', self._select_all)  # macOS
+        # 드래그 선택 중 자동 스크롤 (엓 부분 드래그 시 스크롤)
+        self._log_area.bind('<B1-Motion>', self._on_log_drag)
         # 우클릭 컨텍스트 메뉴
         self._ctx_menu = tk.Menu(self, tearoff=0, bg=COLORS['surface2'],
                                   fg=COLORS['text'], activebackground=COLORS['accent_dim'])
@@ -430,6 +434,16 @@ class LauncherApp(tk.Tk):
         self._log_area.config(state='normal')
         self._log_area.delete('1.0', tk.END)
         self._log_area.config(state='disabled')
+
+    def _on_log_drag(self, event) -> None:
+        """드래그 선택 중 위/아래 가장자리 접근 시 자동 스크롤.
+        state=disabled에서는 자동 스크롤이 맙히므로 직접 구현."""
+        h = self._log_area.winfo_height()
+        edge = 24  # 엣지 연그 (px)
+        if event.y < edge:
+            self._log_area.yview_scroll(-1, 'units')
+        elif event.y > h - edge:
+            self._log_area.yview_scroll(1, 'units')
 
     # ── 종료 처리 ─────────────────────────────────────────────────────────────
     def _on_close(self) -> None:
