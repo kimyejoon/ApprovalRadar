@@ -113,10 +113,17 @@ async def run_scraper_for_service(service_id: str):
             if not new_data_rows:
                 return
 
+            svc_name = {"I2859": "식품업소", "I2861": "음식점업소"}.get(service_id, service_id)
             logger.info(
-                f"🚀 {len(new_data_rows)}건의 새로운 인허가 변경분이 {service_id}에서 감지되었습니다. "
-                f"DB 업데이트를 시작합니다..."
+                f"🆕 [{svc_name}] 신규 인허가 변동분 {len(new_data_rows)}건 발견! DB 저장 시작..."
             )
+            # 발견된 건 요약 (업소명 + 인허가번호)
+            for i, row in enumerate(new_data_rows[:10]):  # 최대 10건만 요약 표시
+                biz_name = row.get("BSSH_NM") or row.get("BSSH_NM_INFO") or "업소명미상"
+                lcns = row.get("LCNS_NO") or "인허가번호미상"
+                logger.info(f"   └ [{i+1}] {biz_name} ({lcns})")
+            if len(new_data_rows) > 10:
+                logger.info(f"   └ ... 외 {len(new_data_rows)-10}건")
             now = datetime.datetime.now().isoformat()
 
             from database import get_db

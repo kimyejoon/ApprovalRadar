@@ -425,12 +425,13 @@ class DiffCrawlerEngine:
             if changed:
                 logger.warning(
                     f"[{svc}] ⚠️ [Delete 은폐 감지] Tail 변동 없으나 피벗 불일치! "
-                    f"Insert+Delete 동시 발생 가능성. 피벗 초기화 후 다음 주기에 재부트스트랩 예정."
+                    f"피벗 초기화 후 다음 주기에 정상 Delta 탐색으로 신규 변동분 수집 예정."
                 )
-                # 피벗 값(LCNS_NO)이 API 재정렬로 영구 불일치 상태가 되면 무한루프 발생.
-                # → 피벗 전체 초기화 + last_total_count=0으로 다음 주기에 깨끗한 부트스트랩 트리거.
+                # ✅ 올바른 처리:
+                # - pivots만 초기화 (다음 주기 sample_check 스킵 → 무한루프 방지)
+                # - last_total_count는 유지 → 다음 주기에 find_true_tail이 실제 신규건 감지
+                # - 이전 방식(last_total_count=0)은 bootstrap을 강제해 +N건 데이터를 유실시킴
                 state["pivots"] = {}
-                state["last_total_count"] = 0
                 self.state_repo.save_state(self.service_id, state)
             else:
                 logger.info(
