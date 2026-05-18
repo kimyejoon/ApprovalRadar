@@ -265,13 +265,13 @@ async def run_scraper_for_service(service_id: str):
             broadcaster.broadcast_sync(update_data)
 
             # ── I2500 백필 (daemon thread) — SSE 발행 후 비동기 실행 ────────────
-            # 백필은 UI 팝업 출력 이후 백그라운드에서 실행 (지연 없이 즉시 알림)
-            # 완료 후 DB에 반영되므로, 상세 모달 클릭 시 채워진 값 확인 가능
-            all_lcns = [
+            # 동일 LCNS_NO 중복 제거 (같은 업소의 여러 변동분은 1회만 조회)
+            # dict.fromkeys: 순서 보존 + 중복 제거
+            all_lcns = list(dict.fromkeys(
                 row.get("LCNS_NO")
                 for row in new_data_rows
                 if row.get("LCNS_NO")
-            ]
+            ))
             if all_lcns:
                 logger.info(
                     f"[Backfill] {len(all_lcns)}건 I2500 백필 → 백그라운드 시작 "
