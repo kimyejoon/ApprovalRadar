@@ -433,7 +433,9 @@ class DiffCrawlerEngine:
                 state["last_total_count"] = 0
                 self.state_repo.save_state(self.service_id, state)
             else:
-                logger.info(f"[{svc}] ✨ [소요: {elapsed:.2f}초] Tail 변동 없음. (tail: {old_tail:,}건)")
+                logger.info(
+                    f"[{svc}] ✔️  이번 주기 신규 변동없음. (tail: {old_tail:,}건)"
+                )
             return []
 
         diff_count = new_tail - old_tail
@@ -510,4 +512,7 @@ class DiffCrawlerEngine:
         state["pivots"] = new_pivots
         self.state_repo.save_state(self.service_id, state)  # ← Tail 영속화
 
+        logger.info(
+            f"[{svc}] 💾 신규 변동분 {len(new_data_rows):,}건 수집 완료. (tail {old_tail:,} → {new_tail:,})"
+        )
         return new_data_rows

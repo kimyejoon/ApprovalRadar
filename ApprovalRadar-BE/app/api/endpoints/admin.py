@@ -226,10 +226,17 @@ async def download_today_log():
             detail=f"오늘({today}) 날짜의 로그 파일이 없습니다. (경로: {log_file})"
         )
 
-    return FileResponse(
-        path=log_file,
-        filename=f"approvalradar_{today}.log",
+    try:
+        with open(log_file, "rb") as f:
+            content = f.read()
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"로그 파일 읽기 실패: {e}")
+
+    from fastapi.responses import Response
+    return Response(
+        content=content,
         media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename=approvalradar_{today}.log"},
     )
 
 

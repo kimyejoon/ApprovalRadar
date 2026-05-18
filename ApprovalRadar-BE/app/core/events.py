@@ -1,5 +1,6 @@
 import asyncio
 import threading
+from collections import deque
 from typing import List
 
 shutdown_event = threading.Event()
@@ -36,17 +37,17 @@ class Broadcaster:
 class LogBroadcaster:
     """
     Queue 기반 WebSocket 로그 브로드캐스터.
-
-    각 WebSocket 연결마다 독립적인 asyncio.Queue를 사용합니다.
-    - broadcast_log()는 call_soon_threadsafe로 Queue에 메시지를 넣습니다.
-    - WebSocket 엔드포인트는 자신의 Queue에서만 읽어 send_text()를 호출합니다.
-    - 이 분리 덕분에 WebSocket send 동시성 문제와 소켓 상태 추적 문제가 모두 해소됩니다.
+    
+    - broadcast_log(): 동기 스레드에서 호출, call_soon_threadsafe로 Queue에 안전 전달
+    - add_queue(): 신규 연결 시 최근 {LOG_BUFFER_SIZE}건 버퍼 자동 재전송 (과거 로그 즉시 표시)
     """
+    LOG_BUFFER_SIZE = 200  # 연결 시 재전송할 최근 로그 건수
 
     def __init__(self):
         self._queues: List[asyncio.Queue] = []
         self._lock = threading.Lock()
         self.loop = None
+        self._buffer: deque = deque(maxlen=self.LOG_BUFFER_SIZE)  # 최근 로그 버퍼
 
     def set_loop(self, loop: asyncio.AbstractEventLoop):
         self.loop = loop
@@ -54,6 +55,10 @@ class LogBroadcaster:
     def add_queue(self, queue: asyncio.Queue) -> None:
         with self._lock:
             self._queues.append(queue)
+        # 신규 연결 시 버퍼에 저장된 최근 로그 재전송 (과거 로그 즉시 표시)
+        if self.loop:
+            for msg in list(self._buffer):
+                self.loop.call_soon_threadsafe(queue.put_nowait, msg)
 
     def remove_queue(self, queue: asyncio.Queue) -> None:
         with self._lock:
@@ -74,6 +79,8 @@ class LogBroadcaster:
         """
         if not self.loop:
             return
+        # 버퍼에 저장 (신규 연결 시 재전송용)
+        self._buffer.append(message)
         with self._lock:
             queues_snapshot = list(self._queues)
         if not queues_snapshot:
