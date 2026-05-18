@@ -267,3 +267,41 @@ async def delete_api_key(key_id: int):
     _reload_settings_keys()
     logger.info(f"[settings] API 키 삭제: {masked}")
     return {"status": "ok", "deleted_key": masked}
+
+# ─── 크롤링 주기 설정 ─────────────────────────────────────────────────────────
+
+class CrawlIntervalResponse(BaseModel):
+    interval_minutes: int
+
+class CrawlIntervalUpdateRequest(BaseModel):
+    interval_minutes: int
+
+@router.get(
+    "/crawl-interval",
+    response_model=CrawlIntervalResponse,
+    summary="현재 크롤링 주기 조회",
+)
+async def get_crawl_interval():
+    from app.core.config import settings as _s
+    return CrawlIntervalResponse(interval_minutes=_s.SCRAPER_INTERVAL_MINUTES)
+
+
+@router.put(
+    "/crawl-interval",
+    response_model=CrawlIntervalResponse,
+    summary="크롤링 주기 변경",
+    description="크롤링 주기를 변경합니다. 5~120분 범위에서 설정 가능. 서버 재시작 없이 즉시 반영됩니다.",
+)
+async def update_crawl_interval(body: CrawlIntervalUpdateRequest):
+    if not (5 <= body.interval_minutes <= 120):
+        raise HTTPException(status_code=422, detail="크롤링 주기는 5~120분 범위여야 합니다.")
+    try:
+        from app.core.config import settings as _s
+        from app.core.scheduler import reschedule_scraper_job
+        _s.SCRAPER_INTERVAL_MINUTES = body.interval_minutes
+        reschedule_scraper_job(body.interval_minutes)
+        logger.info(f"[settings] 크롤링 주기 변경: {body.interval_minutes}분")
+    except Exception as e:
+        logger.error(f"[settings] 크롤링 주기 변경 오류: {e}")
+        raise HTTPException(status_code=500, detail="크롤링 주기 변경 실패")
+    return CrawlIntervalResponse(interval_minutes=body.interval_minutes)

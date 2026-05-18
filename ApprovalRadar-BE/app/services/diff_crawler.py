@@ -425,13 +425,18 @@ class DiffCrawlerEngine:
             if changed:
                 logger.warning(
                     f"[{svc}] ⚠️ [Delete 은폐 감지] Tail 변동 없으나 피벗 불일치! "
-                    f"Insert+Delete 동시 발생 가능성. 다음 주기에 Tail 재탐색 예정."
+                    f"피벗 초기화 후 다음 주기에 정상 Delta 탐색으로 신규 변동분 수집 예정."
                 )
-                # 은폐 감지 시 last_total_count를 -1 감소시켜 다음 주기에 강제 탐색 유도
-                state["last_total_count"] = max(0, old_tail - 1)
+                # ✅ 올바른 처리:
+                # - pivots만 초기화 (다음 주기 sample_check 스킵 → 무한루프 방지)
+                # - last_total_count는 유지 → 다음 주기에 find_true_tail이 실제 신규건 감지
+                # - 이전 방식(last_total_count=0)은 bootstrap을 강제해 +N건 데이터를 유실시킴
+                state["pivots"] = {}
                 self.state_repo.save_state(self.service_id, state)
             else:
-                logger.info(f"[{svc}] ✨ [소요: {elapsed:.2f}초] Tail 변동 없음. (tail: {old_tail:,}건)")
+                logger.info(
+                    f"[{svc}] ✔️  이번 주기 신규 변동없음. (tail: {old_tail:,}건)"
+                )
             return []
 
         diff_count = new_tail - old_tail
@@ -508,4 +513,7 @@ class DiffCrawlerEngine:
         state["pivots"] = new_pivots
         self.state_repo.save_state(self.service_id, state)  # ← Tail 영속화
 
+        logger.info(
+            f"[{svc}] 💾 신규 변동분 {len(new_data_rows):,}건 수집 완료. (tail {old_tail:,} → {new_tail:,})"
+        )
         return new_data_rows
