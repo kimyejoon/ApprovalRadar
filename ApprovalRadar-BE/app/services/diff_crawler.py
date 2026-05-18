@@ -432,13 +432,15 @@ class DiffCrawlerEngine:
             # 개선: _fetch_page(next_pivot, next_pivot + PAGE_SIZE - 1) = 1회
             rows = await self._fetch_page(next_pivot, next_pivot + PAGE_SIZE - 1)
             if rows:
+                from app.services.pivot_manager import compute_page_fingerprint
                 row = rows[0]
                 last_row = rows[-1]
                 new_pivots[str(next_pivot)] = {
                     "LCNS_NO": row.get("LCNS_NO", ""),
                     "LAST_LCNS_NO": last_row.get("LCNS_NO", ""),
                     "CHNG_DT": row.get("CHNG_DT", ""),
-                    "BSSH_NM": row.get("BSSH_NM", "")
+                    "BSSH_NM": row.get("BSSH_NM", ""),
+                    "fingerprint": compute_page_fingerprint(rows),  # ✅ 1,000건 전체 해시
                 }
                 logger.debug(
                     f"[{self.service_id}] [피벗 생성] idx={next_pivot:,} "
@@ -458,6 +460,19 @@ class DiffCrawlerEngine:
         # ✅ 카운터 영속 복원: 매 주기 새 인스턴스이므로 state에서 읽어온다
         self._empty_pivot_cycles = state.get("empty_pivot_cycles", 0)
         self._cb_consecutive_count = state.get("cb_consecutive_count", 0)
+
+        # ✅ 피벗 재건 중이면 Ping Only 모드
+        if state.get("_bootstrapping"):
+            logger.info(
+                f"[{svc}] 🔄 피벗 재건 백그라운드 진행 중... 이번 주기 Ping Only"
+            )
+            new_tail = await self.find_true_tail(known_tail=state["last_total_count"])
+            if new_tail > state["last_total_count"]:
+                logger.info(
+                    f"[{svc}] 📌 피벗 재건 중 신규 {new_tail - state['last_total_count']:,}건 감지 "
+                    f"→ 재건 완료 후 다음 주기에 수집"
+                )
+            return []
 
         if state["last_total_count"] == 0:
             logger.info(f"[{svc}] 최초 실행: 베이스라인 부트스트랩을 시작합니다...")
@@ -500,8 +515,18 @@ class DiffCrawlerEngine:
                             logger.info(
                                 f"[{svc}] ✅ 기동 즉시 수집 성공: {len(immediate_rows)}건 확보"
                             )
+                            # 피벗 무효화 + 백그라운드 재건 시작 (플래그 설정)
                             state["pivots"] = {}
+                            state["_bootstrapping"] = True
                             self.state_repo.save_state(self.service_id, state)
+                            # 백그라운드 bootstrap: SSE/DB 저장 지연 없이 피벗 즈시 재건
+                            import threading
+                            threading.Thread(
+                                target=lambda: asyncio.run(self.bootstrap()),
+                                daemon=True,
+                                name=f"BootstrapThread-{svc}"
+                            ).start()
+                            logger.info(f"[{svc}] 🔄 피벗 재건 백그라운드 시작 (SSE/DB 저장과 병렬 실행)")
                             return immediate_rows  # scraper가 정상 처리
                     logger.warning(
                         f"[{svc}] ⚠️ 기동 시 피벗 stale 감지 (저장 후 API 변동됨). "
@@ -554,8 +579,17 @@ class DiffCrawlerEngine:
                                     f"[{svc}] ✅ 즉시 수집 성공: {len(immediate_rows)}건 확보 — "
                                     f"기존 scraper 파이프라인으로 반환 (DB 저장 + SSE 발행)"
                                 )
+                                # 피벗 무효화 + 백그라운드 재건
                                 state["pivots"] = {}
+                                state["_bootstrapping"] = True
                                 self.state_repo.save_state(self.service_id, state)
+                                import threading
+                                threading.Thread(
+                                    target=lambda: asyncio.run(self.bootstrap()),
+                                    daemon=True,
+                                    name=f"BootstrapThread-{svc}"
+                                ).start()
+                                logger.info(f"[{svc}] 🔄 피벗 재건 백그라운드 시작")
                                 return immediate_rows
                             else:
                                 logger.warning(f"[{svc}] 즉시 수집: {ins_start:,}~{ins_end:,} 응답 없음")
@@ -584,10 +618,15 @@ class DiffCrawlerEngine:
                 state["empty_pivot_cycles"] = self._empty_pivot_cycles
                 self.state_repo.save_state(self.service_id, state)
                 if self._empty_pivot_cycles >= MAX_EMPTY:
-                    logger.warning(
-                        f"[{svc}] 🔄 피벗 재건 시작 → Delete 은폐 감지 복원 중..."
-                    )
-                    await self.bootstrap()  # bootstrap() 내부에서 _empty_pivot_cycles=0 리셋
+                    logger.warning(f"[{svc}] 🔄 피벗 재건 백그라운드 시작 → Delete 은폐 감지 복원 중...")
+                    state["_bootstrapping"] = True
+                    self.state_repo.save_state(self.service_id, state)
+                    import threading
+                    threading.Thread(
+                        target=lambda: asyncio.run(self.bootstrap()),
+                        daemon=True,
+                        name=f"BootstrapThread-{svc}"
+                    ).start()
             else:
                 if self._empty_pivot_cycles != 0:
                     self._empty_pivot_cycles = 0
