@@ -32,35 +32,43 @@ def _map_row_fields(service_id: str, row: dict) -> Optional[Dict[str, Any]]:
       LCNS_NO, BSSH_NM, SITE_ADDR, INDUTY_CD_NM, CHNG_DT, TELNO,
       CHNG_PRVNS (변경사유), CHNG_BF_CN (변경 전), CHNG_AF_CN (변경 후)
     """
+    chng_prvns = row.get("CHNG_PRVNS", "")
+    chng_af    = row.get("CHNG_AF_CN", "")
+
+    # 지위승계(양도.양수 / 합병) 변경사유일 때만 CHNG_AF_CN = 신규 대표자명으로 확정
+    # 그 외(주소변경, 상호변경 등)는 CHNG_AF_CN이 다른 내용이므로 I2500 백필로 보완
+    is_succession = "지위승계" in chng_prvns
+    rep_from_api = chng_af if is_succession else ""
+
     if service_id == "I2859":
         return {
             "lcns_no":             row.get("LCNS_NO", ""),
             "business_name":       row.get("BSSH_NM", ""),
-            "address":             row.get("SITE_ADDR", ""),    # ← LOCP_ADDR(X) → SITE_ADDR(O)
-            "representative_name": "",                          # ← API 미제공 (Backfill 필요)
-            "business_status":     None,                        # ← API 미제공
-            "license_date":        "",                          # ← PRMS_DT 미제공
+            "address":             row.get("SITE_ADDR", ""),
+            "representative_name": rep_from_api,  # 지위승계 시 즉시 추출, 나머지는 I2500 백필
+            "business_status":     None,           # API 미제공
+            "license_date":        "",              # PRMS_DT 미제공
             "phone_number":        row.get("TELNO", ""),
             "industry_type":       row.get("INDUTY_CD_NM", ""),
-            "event_date_raw":      row.get("CHNG_DT", ""),      # ← LAST_UPDT_DTM(X) → CHNG_DT(O)
-            "change_reason":       row.get("CHNG_PRVNS", ""),   # 변경사유 (변경민원, 관할이전 등)
-            "change_before":       row.get("CHNG_BF_CN", ""),   # 변경 전 내용 (infer 활용 가능)
-            "change_after":        row.get("CHNG_AF_CN", ""),   # 변경 후 내용
+            "event_date_raw":      row.get("CHNG_DT", ""),
+            "change_reason":       chng_prvns,
+            "change_before":       row.get("CHNG_BF_CN", ""),
+            "change_after":        chng_af,
         }
     elif service_id == "I2861":
         return {
             "lcns_no":             row.get("LCNS_NO", ""),
             "business_name":       row.get("BSSH_NM", ""),
             "address":             row.get("SITE_ADDR", "") or row.get("ADDR", ""),
-            "representative_name": "",                          # ← API 미제공 (Backfill 필요)
-            "business_status":     None,                        # ← API 미제공
-            "license_date":        "",                          # ← PRMS_DT 미제공
+            "representative_name": rep_from_api,  # 지위승계 시 즉시 추출, 나머지는 I2500 백필
+            "business_status":     None,           # API 미제공
+            "license_date":        "",              # PRMS_DT 미제공
             "phone_number":        row.get("TELNO", ""),
             "industry_type":       row.get("INDUTY_CD_NM", ""),
             "event_date_raw":      row.get("CHNG_DT", ""),
-            "change_reason":       row.get("CHNG_PRVNS", ""),
+            "change_reason":       chng_prvns,
             "change_before":       row.get("CHNG_BF_CN", ""),
-            "change_after":        row.get("CHNG_AF_CN", ""),
+            "change_after":        chng_af,
         }
     else:
         logger.warning(f"Unknown service_id: {service_id}. Skipping row mapping.")
@@ -248,31 +256,27 @@ async def run_scraper_for_service(service_id: str):
                 f"모든 변경분({len(new_data_rows)}건)의 DB 업데이트 및 커밋 완료."
             )
 
-            # SSE 브로드캐스트
+            # ── DB 삽입 후 즉시 I2500 백필 (대표자 + 세부업종 + 연락처) ──────────
+            # ✅ 백필 완료 후 SSE 발행: 팝업에서 처음부터 완성된 데이터 표시
+            all_lcns = [
+                row.get("LCNS_NO")
+                for row in new_data_rows
+                if row.get("LCNS_NO")
+            ]
+            if all_lcns:
+                logger.info(
+                    f"[즉시 Backfill] {len(all_lcns)}건 I2500 백필 시작 "
+                    f"(대표자+세부업종+연락처) → 완료 후 SSE 발행"
+                )
+                from app.services.industry_filler import fill_industry_for_licenses
+                await fill_industry_for_licenses(all_lcns)  # ← await: 완료 후 SSE
+
+            # SSE 브로드캐스트 (백필 완료 후)
             from app.core.events import broadcaster
             update_data = json.dumps(
                 {"type": "UPDATE", "message": "신규 업데이트가 발생했다"}, ensure_ascii=False
             )
             broadcaster.broadcast_sync(update_data)
-
-            # 즉시 Backfill 트리거 (industry_type 누락 건)
-            licenses_needing_industry = [
-                row.get("LCNS_NO")
-                for row in new_data_rows
-                if row.get("LCNS_NO") and not row.get("INDUTY_CD_NM", "")
-            ]
-            if licenses_needing_industry:
-                logger.info(
-                    f"[즉시 Backfill 트리거] {len(licenses_needing_industry)}건의 신규 삽입 건에 "
-                    f"세부업종 없음 → 즉시 Backfill 데몬 스레드 시작"
-                )
-                import threading
-                from app.services.industry_filler import fill_industry_for_licenses
-                threading.Thread(
-                    target=lambda: asyncio.run(fill_industry_for_licenses(licenses_needing_industry)),
-                    daemon=True,
-                    name=f"ImmediateBackfillThread-{service_id}",
-                ).start()
 
         except Exception as e:
             logger.error(f"❌ {service_id} 크롤러 스케줄 작업 중 치명적인 오류 발생: {e}")
