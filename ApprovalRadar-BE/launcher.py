@@ -293,6 +293,22 @@ class LauncherApp(tk.Tk):
         self._log_area.tag_config('WARNING', foreground=COLORS['warn'])
         self._log_area.tag_config('INFO', foreground='#94a3b8')
 
+        # 복사 기능: disabled 상태에서도 선택/복사 허용
+        self._log_area.bind('<Button-1>', lambda e: self._log_area.focus_set())
+        self._log_area.bind('<Control-c>', self._copy_selection)
+        self._log_area.bind('<Command-c>', self._copy_selection)  # macOS
+        self._log_area.bind('<Control-a>', self._select_all)
+        self._log_area.bind('<Command-a>', self._select_all)  # macOS
+        # 우클릭 컨텍스트 메뉴
+        self._ctx_menu = tk.Menu(self, tearoff=0, bg=COLORS['surface2'],
+                                  fg=COLORS['text'], activebackground=COLORS['accent_dim'])
+        self._ctx_menu.add_command(label='전체 선택  (Cmd+A)', command=lambda: self._select_all(None))
+        self._ctx_menu.add_command(label='복사       (Cmd+C)', command=lambda: self._copy_selection(None))
+        self._ctx_menu.add_separator()
+        self._ctx_menu.add_command(label='로그 지우기', command=self._clear_log)
+        self._log_area.bind('<Button-2>', self._show_ctx_menu)   # macOS 우클릭
+        self._log_area.bind('<Button-3>', self._show_ctx_menu)   # Windows/Linux 우클릭
+
     # ── 백엔드 시작 ───────────────────────────────────────────────────────────
     def _start_backend(self) -> None:
         """별도 스레드에서 포트 탐지 → 서버 시작 → GUI 상태 업데이트"""
@@ -383,6 +399,37 @@ class LauncherApp(tk.Tk):
     def _open_browser(self) -> None:
         if self._url:
             webbrowser.open(self._url)
+
+    # ── 로그 복사 헬퍼 ────────────────────────────────────────────────────────
+    def _copy_selection(self, event) -> str:
+        """선택된 텍스트를 클립보드에 복사 (disabled 위젯 우회)"""
+        try:
+            selected = self._log_area.get(tk.SEL_FIRST, tk.SEL_LAST)
+            self.clipboard_clear()
+            self.clipboard_append(selected)
+        except tk.TclError:
+            pass  # 선택 없음
+        return 'break'  # 기본 이벤트 전파 차단
+
+    def _select_all(self, event) -> str:
+        """로그 전체 선택"""
+        self._log_area.tag_add(tk.SEL, '1.0', tk.END)
+        self._log_area.mark_set(tk.INSERT, '1.0')
+        self._log_area.see(tk.INSERT)
+        return 'break'
+
+    def _show_ctx_menu(self, event) -> None:
+        """우클릭 컨텍스트 메뉴 표시"""
+        try:
+            self._ctx_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self._ctx_menu.grab_release()
+
+    def _clear_log(self) -> None:
+        """로그 뷰어 내용 지우기"""
+        self._log_area.config(state='normal')
+        self._log_area.delete('1.0', tk.END)
+        self._log_area.config(state='disabled')
 
     # ── 종료 처리 ─────────────────────────────────────────────────────────────
     def _on_close(self) -> None:

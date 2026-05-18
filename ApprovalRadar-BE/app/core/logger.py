@@ -9,12 +9,18 @@ from logging.handlers import TimedRotatingFileHandler
 
 def _get_app_base_dir() -> str:
     """실행 환경에 따른 앱 기준 디렉토리 반환.
-    - PyInstaller 번들: exe 옆 폴더 (sys.executable 기준)
+    - PyInstaller 번들 (.app): .app 파일 옆 폴더 (배포 폴더)
+    - PyInstaller 번들 (단일 exe): exe 옆 폴더
     - 개발 환경: 소스 루트 폴더 (__file__ 기준)
     """
     if getattr(sys, 'frozen', False):
-        # PyInstaller: exe 위치 기준 (임시 압축해제 폴더 아님)
-        return os.path.dirname(sys.executable)
+        _exe_dir = os.path.dirname(sys.executable)
+        # macOS .app 번들 내부 구조: .app/Contents/MacOS/ApprovalRadar
+        # 로그/DB는 .app 파일과 같은 배포 폴더에 저장
+        if (os.path.basename(_exe_dir) == 'MacOS'
+                and os.path.basename(os.path.dirname(_exe_dir)) == 'Contents'):
+            return os.path.abspath(os.path.join(_exe_dir, '..', '..', '..'))
+        return _exe_dir  # Windows/Linux 단일 바이너리
     # 개발: logger.py → app/core/ → app/ → BE루트
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -137,7 +143,13 @@ def setup_logger(name: str = "ApprovalRadar") -> logging.Logger:
         ws_handler = WebSocketLogHandler()
         ws_handler.setFormatter(formatter)
         logger.addHandler(ws_handler)
-        
+
+        # 5. uvicorn 로거에도 WebSocket 핸들러 연결 (access/error 로그 실시간 표시)
+        for uvicorn_logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+            uv_logger = logging.getLogger(uvicorn_logger_name)
+            if not any(isinstance(h, WebSocketLogHandler) for h in uv_logger.handlers):
+                uv_logger.addHandler(ws_handler)
+
     return logger
 
 # 앱 전역에서 import 할 수 있는 기본 로거 인스턴스

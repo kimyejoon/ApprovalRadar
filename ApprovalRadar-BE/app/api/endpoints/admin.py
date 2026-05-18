@@ -201,11 +201,22 @@ async def get_crawler_status():
 )
 async def download_today_log():
     """오늘 날짜 로그 파일을 텍스트 파일로 다운로드합니다."""
+    import sys
     today = datetime.now().strftime("%Y%m%d")
-    # admin.py 기준 프로젝트 루트 탐색: app/api/endpoints/admin.py → 루트
-    base_dir = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    )
+    # logger.py의 _get_app_base_dir과 동일한 로직으로 경로 통일
+    if getattr(sys, 'frozen', False):
+        _exe_dir = os.path.dirname(sys.executable)
+        # macOS .app 번들: .app/Contents/MacOS → 배포 폴더
+        if (os.path.basename(_exe_dir) == 'MacOS'
+                and os.path.basename(os.path.dirname(_exe_dir)) == 'Contents'):
+            base_dir = os.path.abspath(os.path.join(_exe_dir, '..', '..', '..'))
+        else:
+            base_dir = _exe_dir  # Windows/Linux 단일 exe
+    else:
+        # 개발: admin.py → app/api/endpoints/ → app/api/ → app/ → BE루트
+        base_dir = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        )
     log_dir = os.path.join(base_dir, "logs")
     log_file = os.path.join(log_dir, f"app_{today}.log")
 
