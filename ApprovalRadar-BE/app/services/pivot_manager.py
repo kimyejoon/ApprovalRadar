@@ -2,12 +2,17 @@
 피벗 샘플링 및 갱신 전담 모듈.
 diff_crawler.py에서 분리된 책임 단위입니다.
 
-⚠️ API 중요 특성 (실증 확인):
-  - 동일한 position(예: 35000)이라도 쿼리 범위(end-start+1)에 따라 반환 레코드가 다름
-  - 단건(35000/35000) vs 1000건(35000/35999): 완전히 다른 레코드 반환
-  - 따라서 피벗은 반드시 저장 당시와 동일한 PAGE_SIZE(1,000건)로 조회해야 일관성 보장
+핵심 설계 원칙:
+  1. (LCNS_NO, CHNG_DT) 복합키 사용 — 인허가 변동분 DB 특성 반영
+     (동일 업소가 여러 건의 변동분을 가질 수 있으므로 LCNS_NO 단독 사용 불가)
+  2. 1,000건 단위 조회 고정 — API 특성상 요청 범위(PAGE_SIZE)에 따라 반환 레코드가 달라짐
+     (실증: 35000/35000 단건 vs 35000/35999 1000건은 완전히 다른 레코드 반환)
+  3. fingerprint 기반 전체 대조 — 1,000건 모두의 복합키를 해시하여 한 번에 비교
+  4. Shift 진단 — 불일치 시 새로 삽입된 레코드 목록과 위치를 즉시 특정
 """
 import asyncio
+import hashlib
+import json
 import random
 from app.core.config import settings
 from app.core.logger import logger
@@ -15,20 +20,35 @@ from app.core.logger import logger
 PAGE_SIZE = 1000  # diff_crawler.py와 동일한 상수
 
 
+def compute_page_fingerprint(rows: list) -> str:
+    """
+    1,000건의 (LCNS_NO, CHNG_DT) 복합키 순서 목록의 MD5 해시.
+    동일한 1,000건이 동일한 순서로 있으면 반드시 같은 fingerprint를 반환.
+    """
+    keys = [(r.get("LCNS_NO", ""), r.get("CHNG_DT", "")) for r in rows]
+    return hashlib.md5(json.dumps(keys, ensure_ascii=False).encode()).hexdigest()
+
+
 async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: float = 0.2) -> tuple:
     """
-    저장된 피벗 중 일부를 무작위 샘플링하여 API 현재 응답과 비교합니다.
+    저장된 피벗 페이지를 1,000건 단위로 전체 조회하여 fingerprint 비교.
 
-    ✅ 핵심 수정: 단건 조회 → 1,000건 윈도우 조회로 전환
-       - API는 요청 크기(PAGE_SIZE)에 따라 반환 레코드가 달라짐 (실증 확인)
-       - 피벗 저장 방식(1,000건)과 동일한 범위로 검증해야 정확한 비교 가능
-    ✅ Shift 진단: 불일치 감지 시 1,000건 윈도우 내 저장값 위치 탐색 → 정확한 삽입 위치 반환
+    알고리즘:
+      1. 무작위 샘플 피벗 선택 (sample_ratio%)
+      2. 각 피벗을 1,000건 일괄 조회 (저장 당시와 동일한 PAGE_SIZE)
+      3. 현재 (LCNS_NO, CHNG_DT) 복합키 fingerprint 계산
+      4. 저장된 fingerprint와 비교 → 완전 일치 시 정상
+      5. 불일치 시:
+         a. 저장된 첫 번째 복합키 (LCNS_NO, CHNG_DT) 를 현재 records에서 탐색
+         b. i번째에서 발견 → shift_amount = i (i건이 앞에 새로 삽입됨)
+         c. 삽입된 records 상세 로그 출력 (업소명, LCNS_NO, CHNG_DT)
 
     Returns: (changed: bool, shift_info: dict)
       shift_info keys:
-        - first_mismatch_idx: int
-        - shift_amount: int | None  (양수=삽입, None=윈도우 초과)
-        - insert_range: (start, end) | None
+        - first_mismatch_idx: int       (불일치 피벗 인덱스)
+        - shift_amount: int | None      (양수=삽입, None=윈도우 내 미발견)
+        - insert_range: (start, end)    (shift_amount > 0 시 즉시 수집 가능 위치)
+        - new_rows: list                (shift_amount > 0 시 삽입된 레코드 목록)
         - expected_lcns_no: str
         - bssh_nm: str
     """
@@ -49,109 +69,129 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
 
     logger.info(
         f"[{service_id}][피벗 무결성 검사] 총 {len(pivot_items)}개 피벗 중 "
-        f"{len(sampled)}개 샘플 검사 시작 → 인덱스: [{idx_preview}]"
+        f"{len(sampled)}개 샘플 선택 → 각 1,000건 전체 대조 시작\n"
+        f"  검사 인덱스: [{idx_preview}]"
     )
 
     for idx_str, pivot_data in sampled:
         idx = int(idx_str)
-        if isinstance(pivot_data, dict):
-            expected_lcns_no = pivot_data.get("LCNS_NO", "")
-            expected_last_lcns_no = pivot_data.get("LAST_LCNS_NO", "")
-            bssh_nm = pivot_data.get("BSSH_NM", "")
-        else:
-            expected_lcns_no = str(pivot_data)
-            expected_last_lcns_no = ""
-            bssh_nm = ""
+
+        if not isinstance(pivot_data, dict):
+            # 레거시 문자열 포맷 — fingerprint 없음, 스킵
+            logger.debug(f"[{service_id}][피벗 무결성 검사] idx={idx:,} 레거시 포맷 → 스킵")
+            continue
+
+        stored_lcns_no = pivot_data.get("LCNS_NO", "")
+        stored_chng_dt = pivot_data.get("CHNG_DT", "")
+        stored_fingerprint = pivot_data.get("fingerprint", "")
+        bssh_nm = pivot_data.get("BSSH_NM", "")
 
         try:
-            # ── 1,000건 단위 조회 ─────────────────────────────────────────────
-            # 피벗은 fetch_page(idx, idx+PAGE_SIZE-1) 방식으로 저장됐으므로
-            # 동일한 범위로 조회해야 같은 레코드 반환 (API 특성)
-            logger.debug(
-                f"[{service_id}][피벗 무결성 검사] idx={idx:,} "
-                f"1,000건 조회 ({idx:,}~{idx+PAGE_SIZE-1:,})..."
-            )
+            # ── 1,000건 일괄 조회 ─────────────────────────────────────────
             res = await api_client.fetch_data(service_id, idx, idx + PAGE_SIZE - 1)
             await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
             items = res.get(service_id, {}).get("row", [])
+
             if not items:
                 logger.debug(f"[{service_id}][피벗 무결성 검사] idx={idx:,} 응답 없음 → 스킵")
                 continue
 
-            actual_lcns_no = items[0].get("LCNS_NO", "")        # 1,000건 첫 행 = 피벗 첫 행
-            actual_last_lcns_no = items[-1].get("LCNS_NO", "") if len(items) > 1 else ""
+            # ── Fingerprint 전체 대조 ─────────────────────────────────────
+            current_fingerprint = compute_page_fingerprint(items)
 
-            # ── 첫 행 비교 ────────────────────────────────────────────────────
-            if actual_lcns_no != expected_lcns_no:
+            if stored_fingerprint and current_fingerprint == stored_fingerprint:
+                logger.debug(
+                    f"[{service_id}][피벗 무결성 검사] ✅ idx={idx:,} "
+                    f"fingerprint 일치 — {len(items)}건 전체 정상"
+                )
+                continue
+
+            # ── 불일치 감지 ───────────────────────────────────────────────
+            if stored_fingerprint:
                 logger.warning(
-                    f"[{service_id}][피벗 무결성 검사] ❌ {idx:,}번 위치 첫 행 불일치!\n"
-                    f"  저장값: {expected_lcns_no} ({bssh_nm or '업소명 미상'})\n"
-                    f"  현재값: {actual_lcns_no}\n"
-                    f"  → 이 위치 이전 구간에 Insert+Delete 동시 발생 가능성."
+                    f"[{service_id}][피벗 무결성 검사] ❌ {idx:,}번 피벗 "
+                    f"fingerprint 불일치! (1,000건 전체 변동 감지)\n"
+                    f"  저장 지문: {stored_fingerprint[:12]}...\n"
+                    f"  현재 지문: {current_fingerprint[:12]}..."
+                )
+            else:
+                # fingerprint 없는 피벗: 복합키로 직접 비교
+                actual_first_key = (items[0].get("LCNS_NO", ""), items[0].get("CHNG_DT", ""))
+                stored_first_key = (stored_lcns_no, stored_chng_dt)
+                if actual_first_key == stored_first_key:
+                    logger.debug(
+                        f"[{service_id}][피벗 무결성 검사] idx={idx:,} "
+                        f"복합키 일치 (fingerprint 미저장 피벗) → 정상으로 간주"
+                    )
+                    continue
+                logger.warning(
+                    f"[{service_id}][피벗 무결성 검사] ❌ {idx:,}번 피벗 복합키 불일치!\n"
+                    f"  저장값: ({stored_lcns_no}, {stored_chng_dt}) [{bssh_nm}]\n"
+                    f"  현재값: {actual_first_key}"
                 )
 
-                # Shift 진단: 현재 1,000건 윈도우 내에서 저장값 탐색
-                logger.info(
-                    f"[{service_id}] 🔍 Shift 진단: 반환된 {len(items)}건 내에서 "
-                    f"{expected_lcns_no} 탐색 중..."
+            # ── Shift 진단: 저장된 첫 번째 복합키를 현재 records에서 탐색 ──
+            stored_first_key = (stored_lcns_no, stored_chng_dt)
+            logger.info(
+                f"[{service_id}] 🔍 Shift 진단: 현재 {len(items)}건 내에서 "
+                f"({stored_lcns_no}, {stored_chng_dt}) [{bssh_nm}] 탐색 중..."
+            )
+
+            shift_amount = None
+            new_rows = []
+
+            for i, row in enumerate(items):
+                current_key = (row.get("LCNS_NO", ""), row.get("CHNG_DT", ""))
+                if current_key == stored_first_key:
+                    shift_amount = i
+                    new_rows = items[:i]  # 저장값 앞에 새로 삽입된 records
+                    break
+
+            shift_info = {
+                "first_mismatch_idx": idx,
+                "shift_amount": shift_amount,
+                "insert_range": (idx, idx + shift_amount - 1) if shift_amount and shift_amount > 0 else None,
+                "new_rows": new_rows,
+                "expected_lcns_no": stored_lcns_no,
+                "bssh_nm": bssh_nm,
+            }
+
+            if shift_amount is not None and shift_amount > 0:
+                new_rows_summary = "\n".join(
+                    f"    [{i+1}] {r.get('BSSH_NM', '업소명미상')} "
+                    f"(LCNS_NO={r.get('LCNS_NO', '')}, CHNG_DT={r.get('CHNG_DT', '')})"
+                    for i, r in enumerate(new_rows[:10])
                 )
-                shift_amount = None
-                for i, row in enumerate(items):
-                    if row.get("LCNS_NO") == expected_lcns_no:
-                        shift_amount = i
-                        break
+                if len(new_rows) > 10:
+                    new_rows_summary += f"\n    ... 외 {len(new_rows)-10}건"
+                logger.warning(
+                    f"[{service_id}] 📊 Shift 진단 완료:\n"
+                    f"  {idx:,}번 피벗의 첫 레코드가 {shift_amount}칸 뒤로 밀림\n"
+                    f"  → 신규 삽입 {shift_amount}건 상세:\n{new_rows_summary}\n"
+                    f"  → [{idx:,} ~ {idx+shift_amount-1:,}] 구간 즉시 수집 가능"
+                )
+            elif shift_amount == 0:
+                logger.warning(
+                    f"[{service_id}] 📊 Shift=0: 저장된 복합키가 현재 records[0]과 일치하나 "
+                    f"fingerprint가 다름 → 페이지 중간 또는 끝 부분에서 레코드 교체/삭제 발생"
+                )
+            else:
+                logger.warning(
+                    f"[{service_id}] 📊 Shift 진단 실패: {len(items)}건 내에서 "
+                    f"복합키({stored_lcns_no}, {stored_chng_dt}) 미발견\n"
+                    f"  → 대규모 변동(>1,000건) 또는 해당 레코드 자체 삭제 가능성"
+                )
 
-                shift_info = {
-                    "first_mismatch_idx": idx,
-                    "shift_amount": shift_amount,
-                    "insert_range": (idx, idx + shift_amount - 1) if shift_amount and shift_amount > 0 else None,
-                    "expected_lcns_no": expected_lcns_no,
-                    "bssh_nm": bssh_nm,
-                }
-
-                if shift_amount is not None and shift_amount > 0:
-                    logger.warning(
-                        f"[{service_id}] 📊 Shift 진단 완료:\n"
-                        f"  {idx:,}번 위치 레코드({expected_lcns_no})가 {shift_amount}칸 뒤로 밀림\n"
-                        f"  → 신규 {shift_amount}건이 [{idx:,} ~ {idx+shift_amount-1:,}] 구간에 삽입됨!\n"
-                        f"  → 즉시 해당 구간 데이터를 수집 가능"
-                    )
-                elif shift_amount == 0:
-                    logger.warning(
-                        f"[{service_id}] 📊 Shift=0: 저장값이 현재 첫 번째 위치에서 발견됨. "
-                        f"(1,000건 정상 일치 — API 재조회 필요)"
-                    )
-                else:
-                    logger.warning(
-                        f"[{service_id}] 📊 Shift 진단: {len(items)}건 윈도우 내에서 "
-                        f"{expected_lcns_no} 미발견 → 대규모 변동 또는 레코드 삭제 가능성"
-                    )
-
-                return True, shift_info
-
-            # ── 마지막 행 비교 (LAST_LCNS_NO 저장된 경우만) ──────────────────
-            if expected_last_lcns_no and actual_last_lcns_no:
-                if actual_last_lcns_no != expected_last_lcns_no:
-                    logger.warning(
-                        f"[{service_id}][피벗 무결성 검사] ❌ {idx:,}번 페이지 마지막 행 불일치!\n"
-                        f"  저장값(마지막): {expected_last_lcns_no}\n"
-                        f"  현재값(마지막): {actual_last_lcns_no}\n"
-                        f"  → {idx:,}~{idx+PAGE_SIZE-1:,} 경계 구간 내 삽입 발생 가능성"
-                    )
-                    return True, {
-                        "first_mismatch_idx": idx,
-                        "shift_amount": None,
-                        "insert_range": None,
-                        "expected_lcns_no": expected_last_lcns_no,
-                        "bssh_nm": bssh_nm,
-                    }
+            return True, shift_info
 
         except Exception as e:
-            logger.debug(f"[{service_id}][피벗 무결성 검사] idx={idx:,} 조회 실패 (무시): {e}")
+            logger.debug(
+                f"[{service_id}][피벗 무결성 검사] idx={idx:,} 조회 실패 (무시): {e}"
+            )
             continue
 
     logger.info(
-        f"[{service_id}][피벗 무결성 검사] ✅ {len(sampled)}개 샘플 전부 정상 — "
-        f"API 데이터 재정렬 없음 확인됨."
+        f"[{service_id}][피벗 무결성 검사] ✅ {len(sampled)}개 피벗 전체 정상 — "
+        f"API 데이터 변동 없음 확인됨. (각 1,000건 fingerprint 대조)"
     )
     return False, {}

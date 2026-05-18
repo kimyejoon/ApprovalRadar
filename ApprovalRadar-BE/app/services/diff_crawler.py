@@ -243,13 +243,16 @@ class DiffCrawlerEngine:
             async with semaphore:
                 rows = await self._fetch_page(idx, idx + PAGE_SIZE - 1)
             if rows:
+                from app.services.pivot_manager import compute_page_fingerprint
                 row = rows[0]
                 last_row = rows[-1]
                 return idx, {
                     "LCNS_NO": row.get("LCNS_NO", ""),
-                    "LAST_LCNS_NO": last_row.get("LCNS_NO", ""),
                     "CHNG_DT": row.get("CHNG_DT", ""),
-                    "BSSH_NM": row.get("BSSH_NM", "")
+                    "LAST_LCNS_NO": last_row.get("LCNS_NO", ""),
+                    "LAST_CHNG_DT": last_row.get("CHNG_DT", ""),
+                    "BSSH_NM": row.get("BSSH_NM", ""),
+                    "fingerprint": compute_page_fingerprint(rows),
                 }
             return idx, None
 
@@ -495,17 +498,20 @@ class DiffCrawlerEngine:
                 if shift_amount and shift_amount > 0 and insert_range:
                     ins_start, ins_end = insert_range
                     logger.info(
-                        f"[{svc}] 📥 Shift값({shift_amount})을 토대로 즉시 신규변동분 수집 시도: "
+                        f"[{svc}] 📥 Shift값({shift_amount})을 토대로 즉시 신규변동분 수집: "
                         f"{ins_start:,} ~ {ins_end:,}번 구간 ({shift_amount}건)"
                     )
                     try:
-                        immediate_rows = []
-                        cs = ins_start
-                        while cs <= ins_end:
-                            ce = min(cs + 1000 - 1, ins_end)
-                            rows = await self._fetch_page(cs, ce)
-                            immediate_rows.extend(rows)
-                            cs += 1000
+                        # shift_info에 new_rows가 있으면 이미 Shift 진단 시 확보됨 (추가 호출 불필요)
+                        immediate_rows = shift_info.get("new_rows") or []
+                        if not immediate_rows:
+                            # fallback: 직접 다운로드
+                            cs = ins_start
+                            while cs <= ins_end:
+                                ce = min(cs + 1000 - 1, ins_end)
+                                fetched = await self._fetch_page(cs, ce)
+                                immediate_rows.extend(fetched)
+                                cs += 1000
                         if immediate_rows:
                             logger.info(
                                 f"[{svc}] ✅ 즉시 수집 성공: {len(immediate_rows)}건 확보 — "
@@ -518,6 +524,7 @@ class DiffCrawlerEngine:
                             logger.warning(f"[{svc}] 즉시 수집: {ins_start:,}~{ins_end:,} 응답 없음")
                     except Exception as e:
                         logger.warning(f"[{svc}] 즉시 수집 실패 (다음 주기 재시도): {e}")
+
 
 
                 state["pivots"] = {}
