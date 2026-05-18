@@ -1,5 +1,6 @@
 import asyncio
 import random
+import threading
 from app.core.config import settings
 from app.clients.foodsafety_api import ApiClient
 from app.repositories.state_repository import StateRepository
@@ -520,7 +521,6 @@ class DiffCrawlerEngine:
                             state["_bootstrapping"] = True
                             self.state_repo.save_state(self.service_id, state)
                             # 백그라운드 bootstrap: SSE/DB 저장 지연 없이 피벗 즈시 재건
-                            import threading
                             threading.Thread(
                                 target=lambda: asyncio.run(self.bootstrap()),
                                 daemon=True,
@@ -583,7 +583,6 @@ class DiffCrawlerEngine:
                                 state["pivots"] = {}
                                 state["_bootstrapping"] = True
                                 self.state_repo.save_state(self.service_id, state)
-                                import threading
                                 threading.Thread(
                                     target=lambda: asyncio.run(self.bootstrap()),
                                     daemon=True,
@@ -621,7 +620,6 @@ class DiffCrawlerEngine:
                     logger.warning(f"[{svc}] 🔄 피벗 재건 백그라운드 시작 → Delete 은폐 감지 복원 중...")
                     state["_bootstrapping"] = True
                     self.state_repo.save_state(self.service_id, state)
-                    import threading
                     threading.Thread(
                         target=lambda: asyncio.run(self.bootstrap()),
                         daemon=True,
