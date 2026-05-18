@@ -38,6 +38,8 @@ class DiffCrawlerEngine:
         self._cb_consecutive_count: int = 0
         # [C] 빈 피벗 연속 주기 카운터: 일정 주기 초과 시 자동 re-bootstrap 트리거
         self._empty_pivot_cycles: int = 0
+        # [D] 기동 첫 주기 플래그: 서버 재시작 시 저장된 피벗 stale 여부 선제 검증용
+        self._first_cycle: bool = True
 
     # ─── 저수준 API 유틸리티 ──────────────────────────────────────────────────
 
@@ -430,7 +432,27 @@ class DiffCrawlerEngine:
 
         old_tail = state["last_total_count"]
 
-        # find_true_tail 내부에서 Ping → 지수점프 → 이진탐색 → Gap스캔 전체 처리
+        # ✅ [Fix D] 기동 첫 주기: 저장된 피벗 stale 여부 선제 검증
+        # 서버 재시작 시 저장된 피벗이 수 시간~하루 이상 지난 값일 수 있음
+        # → Ping 전에 먼저 피벗 검증 → stale이면 즉시 초기화 후 조기 종료
+        # → 다음 주기는 pivots={}이므로 sample_check 스킵 → false Delete 은폐 alarm 차단
+        if self._first_cycle:
+            self._first_cycle = False
+            if state.get("pivots"):
+                logger.info(f"[{svc}] 🔍 기동 첫 주기: 저장 피벗 정합성 선제 검증 중...")
+                startup_stale = await pivot_manager.sample_check(
+                    state["pivots"], self.api_client, svc
+                )
+                if startup_stale:
+                    logger.warning(
+                        f"[{svc}] ⚠️ 기동 시 피벗 stale 감지 (저장 후 API 변동됨). "
+                        f"피벗 초기화 → 다음 주기부터 Ping만으로 정상 감지."
+                    )
+                    state["pivots"] = {}
+                    self.state_repo.save_state(self.service_id, state)
+                    return []
+                else:
+                    logger.info(f"[{svc}] ✅ 기동 피벗 정합성 확인됨. 정상 탐색 진행.")
         new_tail = await self.find_true_tail(known_tail=old_tail)
 
         if new_tail <= old_tail:
