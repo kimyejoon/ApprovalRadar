@@ -366,8 +366,13 @@ class DiffCrawlerEngine:
         except Exception as e:
             logger.warning(f"[{self.service_id}] Bootstrap 후 Tail 재확인 실패 (무시): {e}")
 
-        # ✅ [Fix 1] Bootstrap 완료 직후 피벗 즉시 재검증
-        changed, _ = await pivot_manager.sample_check(state["pivots"], self.api_client, self.service_id)
+        # ✅ [Fix 1] Bootstrap 완료 직후 피벗 즉시 재검증 (경량 모드)
+        # 방금 생성한 피벗이므로 stale 가능성이 낮음 → 5%, 최대 5개 샘플만 확인
+        # 기동 첫 주기(오래된 피벗)의 20% 전체 검증과 달리 빠르게 완료
+        changed, _ = await pivot_manager.sample_check(
+            state["pivots"], self.api_client, self.service_id,
+            sample_ratio=0.05, max_samples=5
+        )
         if changed:
             logger.warning(
                 f"[{self.service_id}] ⚠️ Bootstrap 직후 피벗 불일치 감지 (Bootstrap 중 API 변동됨). "

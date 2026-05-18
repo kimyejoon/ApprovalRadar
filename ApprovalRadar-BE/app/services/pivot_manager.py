@@ -29,12 +29,12 @@ def compute_page_fingerprint(rows: list) -> str:
     return hashlib.md5(json.dumps(keys, ensure_ascii=False).encode()).hexdigest()
 
 
-async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: float = 0.2) -> tuple:
+async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: float = 0.2, max_samples: int = None) -> tuple:
     """
     저장된 피벗 페이지를 1,000건 단위로 전체 조회하여 fingerprint 비교.
 
     알고리즘:
-      1. 무작위 샘플 피벗 선택 (sample_ratio%)
+      1. 무작위 샘플 피벗 선택 (sample_ratio%, 상한 max_samples개)
       2. 각 피벗을 1,000건 일괄 조회 (저장 당시와 동일한 PAGE_SIZE)
       3. 현재 (LCNS_NO, CHNG_DT) 복합키 fingerprint 계산
       4. 저장된 fingerprint와 비교 → 완전 일치 시 정상
@@ -43,6 +43,11 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
          b. i번째에서 발견 → shift_amount = i (i건이 앞에 새로 삽입됨)
          c. 삽입된 records 상세 로그 출력
 
+    Args:
+        sample_ratio: 전체 피벗 대비 샘플 비율 (0.0~1.0)
+        max_samples:  샘플 수 절대 상한 (None=무제한). 피벗이 많아도 API 호출을 제한할 때 사용.
+                      예: Bootstrap 직후 검증은 max_samples=5로 경량화
+
     Returns: (changed: bool, shift_info: dict)
     """
     if not pivots:
@@ -50,6 +55,9 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
 
     pivot_items = list(pivots.items())
     sample_size = max(1, int(len(pivot_items) * sample_ratio))
+    # max_samples 상한 적용
+    if max_samples is not None:
+        sample_size = min(sample_size, max_samples)
     sampled = sorted(
         random.sample(pivot_items, min(sample_size, len(pivot_items))),
         key=lambda x: int(x[0])
