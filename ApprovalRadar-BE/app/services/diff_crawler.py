@@ -614,8 +614,9 @@ class DiffCrawlerEngine:
             _STARTUP_CHECK_DONE.add(svc)
             if state.get("pivots"):
                 logger.info(f"[{svc}] 🔍 기동 첫 주기: 저장 피벗 정합성 선제 검증 중...")
+                # max_samples=20: 1주기 99%(I2859), 2주기 누적 89%(I2861) 감지 보장
                 startup_stale, shift_info = await pivot_manager.sample_check(
-                    state["pivots"], self.api_client, svc, max_samples=9
+                    state["pivots"], self.api_client, svc, max_samples=20
                 )
                 if startup_stale:
                     shift_amount = shift_info.get("shift_amount")
@@ -671,10 +672,10 @@ class DiffCrawlerEngine:
             # pivots 있으면 Delete 은폐 감지 실행
             if pivots:
                 # ✅ Delete 은폐 감지: Tail이 같아도 Insert+Delete가 동시 발생했을 수 있음
-                # [Perf Fix] max_samples=9 제한: Delete 은폐는 극히 드문 시나리오 → 소량 샘플로 충분
-                # I2861 기준: 38회 → 최대 9회 (기존 ~130초 → ~36초로 단축)
+                # max_samples=20: 1주기 99%(I2859), 2주기 누적 89%(I2861) 감지 보장
+                # I2861 기준 20샘플 × 3.5s ≈ 70s (30분 주기 내 충분)
                 changed, shift_info = await pivot_manager.sample_check(
-                    pivots, self.api_client, svc, max_samples=9
+                    pivots, self.api_client, svc, max_samples=20
                 )
                 if changed:
                     logger.warning(
