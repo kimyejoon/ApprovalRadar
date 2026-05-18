@@ -138,9 +138,15 @@ class DiffCrawlerEngine:
                             # 전략B 진행 (아래 코드로 fall-through)
                         elif known_tail > 0 and total_count == known_tail:
                             logger.debug(f"[{svc}][전략A] 변동 없음: total_count={total_count:,} == known_tail={known_tail:,}")
+                            logger.info(
+                                f"[{svc}] ✔️ Tail 조사 완료: 현재 전체 {total_count:,}건 — 이번 주기 신규 인허가변동 없음."
+                            )
                             return total_count
                         elif total_count > known_tail:
-                            logger.info(f"[{svc}][전략A] 신규 감지: {total_count - known_tail:,}건 증가 ({known_tail:,} → {total_count:,})")
+                            logger.info(
+                                f"[{svc}] 🚨 Tail 조사 결과: 전체 {total_count:,}건 감지 → 이전({known_tail:,})보다 "
+                                f"+{total_count - known_tail:,}건 신규 인허가변동 가능성 포착!"
+                            )
                             return total_count
                         else:
                             logger.info(f"[{svc}][전략A] Tail 확정: {total_count:,}건 (total_count 직접)")
@@ -154,9 +160,14 @@ class DiffCrawlerEngine:
         if known_tail > 0:
             ping = await self._fetch_page(known_tail + 1, known_tail + PAGE_SIZE)
             if not ping:
-                logger.info(f"[{svc}][전략B] Ping: 변동 없음 ({known_tail:,}건)")
+                logger.info(
+                    f"[{svc}] ✔️ Tail 조사 완료: 현재 전체 {known_tail:,}건 — "
+                    f"{known_tail+1:,}번 이후 데이터 없음 → 이번 주기 신규 발생 없음."
+                )
                 return known_tail
-            logger.info(f"[{svc}][전략B] Ping: {len(ping)}건 신규 감지, 탐색 계속")
+            logger.info(
+                f"[{svc}] 📌 Ping: {known_tail+1:,}번 이후에 {len(ping)}건 데이터 감지 → 정확한 신규 건수 탐색 시작..."
+            )
 
 
         # Step 0 (NEW): 소규모 데이터 Pre-check
@@ -289,8 +300,8 @@ class DiffCrawlerEngine:
         current_shift = 0
 
         logger.info(
-            f"[{self.service_id}] ⚙️ 피벗 {len(pivot_indices)}개 Shift 오프셋 보정 시작... "
-            f"(청크 스캔 모드, diff_count={diff_count:,})"
+            f"[{self.service_id}] ⏳ 피벗 Shift 분석 시작: 저장된 피벗 {len(pivot_indices)}개를 구간별로 스캔 "
+            f"(diff_count={diff_count:,}, 포트 모드로 API 호출 최소화)"
         )
         for p_idx in pivot_indices:
             old_data = pivots[str(p_idx)]
@@ -334,6 +345,18 @@ class DiffCrawlerEngine:
 
             shift_amounts[p_idx] = found_offset
             current_shift = found_offset
+
+        # 분석 완료: shift가 발생한 인덱스 범위 요약
+        shifted_pivots = [(p_idx, shift_amounts[p_idx]) for p_idx in pivot_indices if shift_amounts[p_idx] > 0]
+        if shifted_pivots:
+            first_shifted_idx = shifted_pivots[0][0]
+            logger.info(
+                f"[{self.service_id}] 📍 피벗 분석 결과: "
+                f"{first_shifted_idx:,}번 인덱스 앞에서 Shift 발생 → "
+                f"해당 구간에 신규 데이터 삽입 가능성 확인"
+            )
+        else:
+            logger.info(f"[{self.service_id}] 피벗 분석 결과: 모든 피벗 Shift=0 (데이터 타일단 나타남)")
         return shift_amounts
 
     async def _download_new_rows(self, pivot_indices: list, shift_amounts: dict, old_tail: int, new_tail: int, diff_count: int) -> list:
@@ -357,8 +380,9 @@ class DiffCrawlerEngine:
             new_start = seg_start + base_shift
             new_end = seg_end + base_shift + count
             logger.info(
-                f"📥 [구간 {seg_start}~{seg_end}] 내에 {count}건의 중간 삽입 감지. "
-                f"(실제 요청: {new_start}~{new_end}) 다운로드 진행..."
+                f"[{self.service_id}] 📥 피벗 조사 결과: "
+                f"{seg_start:,}당~{seg_end:,}당 구간에 신규 데이터 {count}건 존재 가능성 포착!"
+                f" (API 실제 요청 범위: {new_start:,}~{new_end:,})"
             )
             fetched_rows = []
             current_start = new_start
@@ -474,20 +498,24 @@ class DiffCrawlerEngine:
                 self.state_repo.save_state(self.service_id, state)
             else:
                 logger.info(
-                    f"[{svc}] ✔️  이번 주기 신규 변동없음. (tail: {old_tail:,}건)"
+                    f"[{svc}] ✔️ 이번 주기 신규 변동없음. (tail: {old_tail:,}건)"
                 )
                 # ✅ [Fix 3] 빈 피벗 연속 주기 자동 re-bootstrap
                 if not state.get("pivots"):  # pivots가 비어있는 경우
                     self._empty_pivot_cycles += 1
-                    MAX_EMPTY = 3  # 3주기(기본 30분 * 3 = 90분) 이상이면 재부트스트랩
+                    MAX_EMPTY = 3
+                    logger.info(
+                        f"[{svc}] 피벗 빈 상태 지속 중: {self._empty_pivot_cycles}/{MAX_EMPTY}주기 "
+                        f"({'재부트스트랩 시작!' if self._empty_pivot_cycles >= MAX_EMPTY else f'{MAX_EMPTY - self._empty_pivot_cycles}주기 후 자동 재부트스트랩 예정'})"
+                    )
                     if self._empty_pivot_cycles >= MAX_EMPTY:
                         logger.warning(
                             f"[{svc}] 🔄 피벗 빈 상태 {self._empty_pivot_cycles}주기 지속 "
                             f"→ 자동 재부트스트랩 시작 (Delete 은폐 감지 복원)"
                         )
-                        await self.bootstrap()  # bootstrap 내부에서 save_state + 피벗 검증 수행
+                        await self.bootstrap()
                 else:
-                    self._empty_pivot_cycles = 0  # 피벗이 있으면 카운터 초기화
+                    self._empty_pivot_cycles = 0
             return []
 
         diff_count = new_tail - old_tail
@@ -546,11 +574,22 @@ class DiffCrawlerEngine:
         self._cb_consecutive_count = 0
 
         logger.info(
-            f"[{svc}] 🔍 [Delta 감지] Tail {old_tail:,} → {new_tail:,} (+{diff_count:,}건 신규 삽입)"
+            f"[{svc}] 🔍 [Delta 감지] Tail {old_tail:,} → {new_tail:,} (+{diff_count:,}건)"
+            f" — 신규 인허가변동 {diff_count:,}건 포착! 구간 분석 시작..."
         )
 
         pivots = state["pivots"]
         pivot_indices = sorted([int(k) for k in pivots.keys()])
+        if pivot_indices:
+            logger.info(
+                f"[{svc}] 피벗 {len(pivot_indices)}개 구성됨 — "
+                f"({pivot_indices[0]:,} ~ {pivot_indices[-1]:,} 범위를 {len(pivot_indices)}구간으로 분할)"
+            )
+        else:
+            logger.warning(
+                f"[{svc}] 피벗 없음! Tail만으로 신규 구간 플립을 특정할 수 없음. "
+                f"Tail 다운로드만 진행."
+            )
 
         # Step 3: Pivot 검사 (Shift 오프셋 확인)
         shift_amounts = await self._compute_shift_offsets(pivots, pivot_indices, diff_count)
