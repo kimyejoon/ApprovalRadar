@@ -169,6 +169,11 @@ async def run_scraper_for_service(service_id: str):
 
                     else:
                         # ── 변경 감지 ──────────────────────────────────────────
+                        prev_infer_type = db_record.get("infer_update_type", "")
+                        prev_event_date = db_record.get("last_event_date", "")
+                        is_mirror_upgrade = prev_infer_type == "mirror"  # CLI 초기 스캔 레코드
+                        is_event_date_changed = prev_event_date and event_date and prev_event_date != event_date
+
                         change: ChangeResult = detector.detect(
                             db_record=db_record,
                             new_rep_name=fields["representative_name"],
@@ -177,9 +182,31 @@ async def run_scraper_for_service(service_id: str):
                             now=now,
                         )
 
-                        if change.is_updated or (
-                            fields["industry_type"] and not db_record.get("industry_type")
-                        ):
+                        # ── mirror 레코드가 diff로 재발견되거나 이벤트일자 변경 시 업데이트 ──
+                        # (1) mirror 레코드: CLI 초기 스캔값이 diff로 재발견 → '변동확인'으로 승급
+                        # (2) last_event_date 변경: 동일 업소의 새로운 인허가 변동 이벤트 발생
+                        should_update = (
+                            change.is_updated
+                            or (fields["industry_type"] and not db_record.get("industry_type"))
+                            or is_mirror_upgrade
+                            or is_event_date_changed
+                        )
+
+                        if should_update:
+                            # infer_update_type 결정
+                            if change.infer_update_type:
+                                resolved_infer_type = change.infer_update_type
+                                resolved_infer_detail = change.infer_update_detail
+                            elif is_event_date_changed:
+                                resolved_infer_type = "인허가변동"
+                                resolved_infer_detail = f"변동일자: {prev_event_date} → {event_date}"
+                            elif is_mirror_upgrade:
+                                resolved_infer_type = "변동확인"
+                                resolved_infer_detail = None
+                            else:
+                                resolved_infer_type = change.infer_update_type
+                                resolved_infer_detail = change.infer_update_detail
+
                             updates = {
                                 "business_name": fields["business_name"],
                                 "address": fields["address"],
@@ -203,14 +230,15 @@ async def run_scraper_for_service(service_id: str):
                                 "prev_business_status": change.prev_business_status,
                                 "prev_representative_name": change.prev_representative_name,
                                 "prev_business_name": change.prev_business_name,
-                                "infer_update_type": change.infer_update_type,
-                                "infer_update_detail": change.infer_update_detail,
+                                "infer_update_type": resolved_infer_type,
+                                "infer_update_detail": resolved_infer_detail,
                                 "last_event_date": event_date,
                                 "last_event_time": event_time,
                                 "license_time": license_time,
                                 "updated_at": now,
                             }
                             business_repo.update_business(lcns_no, updates, conn=conn)
+
 
                 conn.commit()
 
