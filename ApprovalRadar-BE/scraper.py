@@ -274,5 +274,70 @@ async def run_all_scrapers():
         await run_scraper_for_service(svc)
 
 
+async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list):
+    """
+    [전략 C 전용] 외부에서 수집된 rows를 직접 주입하여 DB 저장 + SSE 발행 파이프라인 실행.
+    scan_for_updates() 없이 이미 확보된 rows를 기존 scraper 파이프라인으로 처리.
+    """
+    import time
+    import datetime
+    from database import get_db, init_db
+    from app.repositories.business_repository import BusinessRepository
+    from app.repositories.raw_data_repository import RawDataRepository
+    from app.services.change_detector import ChangeDetector
+
+    init_db()
+    business_repo = BusinessRepository()
+    raw_repo = RawDataRepository()
+    detector = ChangeDetector()
+    now = datetime.datetime.now().isoformat()
+
+    svc_name = {"I2859": "식품업소", "I2861": "음식점업소"}.get(service_id, service_id)
+    logger.info(f"🆕 [전략C/{svc_name}] {len(new_data_rows)}건 DB 저장 시작...")
+
+    with get_db() as conn:
+        for row in new_data_rows:
+            fields = _map_row_fields(service_id, row)
+            if not fields or not fields["lcns_no"]:
+                continue
+            lcns_no = fields["lcns_no"]
+            raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
+
+            event_date, event_time, license_date, license_time = _parse_datetime_fields(
+                fields["event_date_raw"], fields["license_date"]
+            )
+            db_record = business_repo.get_business_by_license_no(lcns_no, conn=conn)
+            if not db_record:
+                infer_update_type = (
+                    "신규등록" if license_date == event_date else "초기수집(과거변경있음)"
+                )
+                record = {
+                    "license_no": lcns_no,
+                    "business_name": fields["business_name"],
+                    "address": fields["address"],
+                    "representative_name": fields["representative_name"],
+                    "business_status": fields["business_status"],
+                    "license_date": license_date,
+                    "phone_number": fields["phone_number"],
+                    "industry_type": fields["industry_type"],
+                    "last_event_date": event_date,
+                    "infer_update_type": infer_update_type,
+                    "infer_update_detail": None,
+                    "last_event_time": event_time,
+                    "license_time": license_time,
+                }
+                business_repo.insert_business(record, conn=conn)
+        conn.commit()
+
+    logger.info(f"✅ [전략C/{svc_name}] {len(new_data_rows)}건 DB 저장 완료")
+
+    # SSE 브로드캐스트
+    from app.core.events import broadcaster
+    update_data = json.dumps(
+        {"type": "UPDATE", "message": "신규 업데이트가 발생했다"}, ensure_ascii=False
+    )
+    broadcaster.broadcast_sync(update_data)
+
+
 if __name__ == "__main__":
     asyncio.run(run_all_scrapers())
