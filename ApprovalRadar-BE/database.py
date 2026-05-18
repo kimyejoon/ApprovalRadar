@@ -132,6 +132,7 @@ def init_db():
                     service_id TEXT PRIMARY KEY,
                     last_total_count INTEGER DEFAULT 0,
                     pivots TEXT DEFAULT '{}',
+                    extra_state TEXT DEFAULT '{}',
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
@@ -141,13 +142,17 @@ def init_db():
             ''')
             cursor.execute('DROP TABLE crawler_state')
             cursor.execute('ALTER TABLE crawler_state_new RENAME TO crawler_state')
-    
+        # extra_state 컬럼 마이그레이션 (기존 테이블에 없는 경우)
+        if "extra_state" not in columns:
+            cursor.execute("ALTER TABLE crawler_state ADD COLUMN extra_state TEXT DEFAULT '{}'")
+
     # 크롤러 상태 관리 테이블 (다중 API 지원)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS crawler_state (
             service_id TEXT PRIMARY KEY,
             last_total_count INTEGER DEFAULT 0,
             pivots TEXT DEFAULT '{}',
+            extra_state TEXT DEFAULT '{}',
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')

@@ -12,7 +12,7 @@ PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
 
 # total_count 필드가 신뢰 가능한 서비스 목록
 # → 1회 API 호출로 정확한 Tail을 바로 얻을 수 있음 (페이지 스캔 불필요)
-# I2859: API 버그로 9 등 엉덩한 값 반환 (기존 알려진 문제)
+# I2859: API 버그로 9 등 엉땅한 값 반환 (기존 알려진 문제)
 # I2861: total_count=8 반환으로 신뢰 불가 확인 (2026-05-17 실증)
 # → 향후 신뢰 가능한 서비스가 확인될 때만 이 set에 추가할 것.
 RELIABLE_TOTAL_COUNT_SERVICES: set[str] = set()
@@ -20,11 +20,12 @@ RELIABLE_TOTAL_COUNT_SERVICES: set[str] = set()
 # [Phase 3] Circuit Breaker 임계값
 # diff_count가 이 값을 초과하면 API 한도 초과를 방지하기 위해 해당 주기를 즉시 중단하고
 # 관리자에게 ALERT SSE를 발송한다. (Key 5개 × 1,000회 = 5,000회 한도 고려)
-CIRCUIT_BREAKER_THRESHOLD = 10_000
+# .env CIRCUIT_BREAKER_THRESHOLD로 오버라이드 가능
+CIRCUIT_BREAKER_THRESHOLD: int = int(__import__('os').getenv('CIRCUIT_BREAKER_THRESHOLD', '10000'))
 
-
-# [B] Circuit Breaker 자가 복구: 연속 발동 시 bootstrap 자동 시도
-CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER = 3  # N회 연속 발동 시 자가 복구 트리거
+# [B] Circuit Breaker 연속 발동 경고 임계값
+# 타일 전진 대신 관리자 확인 요청만 수행 (데이터 손실 방지)
+CIRCUIT_BREAKER_ALERT_AFTER = 3  # N회 연속 발동 시 강화 경고
 
 # [C] bootstrap 동시성 제한: WAF DDoS 패턴 감지 방지
 BOOTSTRAP_SEMAPHORE_LIMIT = 3  # 최대 동시 fetch_page 요청 수
@@ -44,7 +45,51 @@ class DiffCrawlerEngine:
         # → 서버 재시작 마다 True로 유지해야 하므로 state에 저장하지 않음 (의도적 in-memory)
         self._first_cycle: bool = True
 
+    # ─── Bootstrap 독립 실행 ─────────────────────────────────────────────────
+
+    async def _run_bootstrap_standalone(self) -> None:
+        """
+        [Bug-B Fix] Bootstrap 전용 독립 ApiClient 사용.
+
+        run_scraper_for_service()의 async with ApiClient() 블록이
+        scan_for_updates() 반환 직후 종료되어 api_client 세션이 닫힌다.
+        threading.Thread에서 기존 api_client를 그대로 사용하면
+        닫힌 세션으로 API 호출이 전부 실패한다.
+
+        이 메서드는 독립적인 ApiClient를 새로 생성하여
+        부트스트랩이 항상 정상 완료될 수 있도록 보장한다.
+
+        실패 시: _bootstrapping 플래그를 DB에서 해제하여
+        다음 주기에 재시도 가능하도록 복구한다.
+        """
+        logger.info(f"[{self.service_id}] 🔄 Bootstrap 스레드 시작 (독립 ApiClient 사용)")
+        from app.clients.foodsafety_api import ApiClient as _ApiClient
+        async with _ApiClient() as fresh_client:
+            original_client = self.api_client
+            self.api_client = fresh_client
+            try:
+                await self.bootstrap()
+            except Exception as e:
+                logger.error(
+                    f"[{self.service_id}] ❌ Bootstrap 스레드 오류: {e}",
+                    exc_info=True
+                )
+                # 실패 시 _bootstrapping 플래그 해제 → 다음 주기에 재시도 가능
+                try:
+                    state = self.state_repo.load_state(self.service_id)
+                    state.pop("_bootstrapping", None)
+                    self.state_repo.save_state(self.service_id, state)
+                    logger.warning(
+                        f"[{self.service_id}] ⚠️ Bootstrap 실패 — _bootstrapping 플래그 해제. "
+                        f"다음 주기에 재시도합니다."
+                    )
+                except Exception as cleanup_err:
+                    logger.error(f"[{self.service_id}] 플래그 해제 실패: {cleanup_err}")
+            finally:
+                self.api_client = original_client
+
     # ─── 저수준 API 유틸리티 ──────────────────────────────────────────────────
+
 
     async def _fetch_page(self, start: int, end: int) -> list:
         """
@@ -273,6 +318,24 @@ class DiffCrawlerEngine:
         self.state_repo.save_state(self.service_id, state)
         logger.info(f"[{self.service_id}][Bootstrapper] 부트스트랩 완료! 주 {len(pivots)}개 피벗 색인 생성. (Tail: {total_count:,}건)")
 
+        # [Feedback-2 Fix] Bootstrap 완료 후 Tail 재조회
+        # Bootstrap 진행 중(수 분 소요) 신규 변동분이 발생했을 경우
+        # last_total_count가 실제 Tail보다 낮아 다음 주기에 정상 감지될 수 있도록 보장
+        logger.info(f"[{self.service_id}] 🔍 Bootstrap 완료 후 Tail 재확인 중...")
+        try:
+            post_tail = await self.find_true_tail(known_tail=total_count)
+            if post_tail > total_count:
+                logger.info(
+                    f"[{self.service_id}] 📌 Bootstrap 진행 중 {post_tail - total_count:,}건 추가 발생 감지 "
+                    f"→ last_total_count를 {post_tail:,}으로 업데이트 (다음 주기 Delta 수집 보장)"
+                )
+                state["last_total_count"] = post_tail
+                self.state_repo.save_state(self.service_id, state)
+            else:
+                logger.info(f"[{self.service_id}] ✅ Bootstrap 완료 후 Tail 변동 없음.")
+        except Exception as e:
+            logger.warning(f"[{self.service_id}] Bootstrap 후 Tail 재확인 실패 (무시): {e}")
+
         # ✅ [Fix 1] Bootstrap 완료 직후 피벗 즉시 재검증
         changed, _ = await pivot_manager.sample_check(state["pivots"], self.api_client, self.service_id)
         if changed:
@@ -310,7 +373,7 @@ class DiffCrawlerEngine:
             f"[{self.service_id}] ⏳ 피벗 Shift 분석 시작: 저장된 피벗 {len(pivot_indices)}개를 구간별로 스캔 "
             f"(diff_count={diff_count:,}, 포트 모드로 API 호출 최소화)"
         )
-        for p_idx in pivot_indices:
+        for i, p_idx in enumerate(pivot_indices):
             old_data = pivots[str(p_idx)]
             # 레거시 문자열 포맷 및 신규 dict 포맷 모두 호환
             expected_lcns_no = old_data["LCNS_NO"] if isinstance(old_data, dict) else str(old_data)
@@ -319,10 +382,26 @@ class DiffCrawlerEngine:
             found_offset = current_shift  # 미발견 시 Fallback: 현재 shift 유지
             found = False
 
-            # 탐색 범위: [p_idx + current_shift, p_idx + diff_count]
-            search_start = p_idx + current_shift
+            # [Feedback-1 Fix] 탐색 범위: 피벗 이전 구간도 포함
+            # 삽입이 피벗 인덱스보다 앞 구간에서 발생하면 해당 피벗 레코드가 뒤로 밀림
+            # → 기존: [p_idx+current_shift, p_idx+diff_count] (앞 구간 miss 가능)
+            # → 수정: [max(prev_pivot_end, p_idx-diff_count), p_idx+diff_count]
+            if i > 0:
+                prev_p_idx = pivot_indices[i - 1]
+                prev_shift = shift_amounts.get(prev_p_idx, current_shift)
+                # 이전 피벗의 새 위치 이후부터 탐색 (중복 탐색 방지)
+                search_start = max(prev_p_idx + prev_shift + 1, p_idx - diff_count)
+            else:
+                # 첫 피벗: diff_count만큼 앞으로 확장
+                search_start = max(1, p_idx - diff_count)
             search_end = p_idx + diff_count
             current_search_pos = search_start
+
+            logger.debug(
+                f"[{self.service_id}] [청크 스캔] p_idx={p_idx:,} "
+                f"탐색범위=[{search_start:,}~{search_end:,}] "
+                f"(앞 구간 확장: {max(0, p_idx - search_start):,}건 추가 커버)"
+            )
 
             while current_search_pos <= search_end and not found and not shutdown_event.is_set():
                 chunk_end = min(current_search_pos + PAGE_SIZE - 1, search_end)
@@ -520,9 +599,9 @@ class DiffCrawlerEngine:
                             state["pivots"] = {}
                             state["_bootstrapping"] = True
                             self.state_repo.save_state(self.service_id, state)
-                            # 백그라운드 bootstrap: SSE/DB 저장 지연 없이 피벗 즈시 재건
+                            # [Bug-B Fix] 독립 ApiClient로 부트스트랩 실행
                             threading.Thread(
-                                target=lambda: asyncio.run(self.bootstrap()),
+                                target=lambda: asyncio.run(self._run_bootstrap_standalone()),
                                 daemon=True,
                                 name=f"BootstrapThread-{svc}"
                             ).start()
@@ -583,8 +662,9 @@ class DiffCrawlerEngine:
                                 state["pivots"] = {}
                                 state["_bootstrapping"] = True
                                 self.state_repo.save_state(self.service_id, state)
+                                # [Bug-B Fix] 독립 ApiClient로 부트스트랩 실행
                                 threading.Thread(
-                                    target=lambda: asyncio.run(self.bootstrap()),
+                                    target=lambda: asyncio.run(self._run_bootstrap_standalone()),
                                     daemon=True,
                                     name=f"BootstrapThread-{svc}"
                                 ).start()
@@ -620,10 +700,11 @@ class DiffCrawlerEngine:
                     logger.warning(f"[{svc}] 🔄 피벗 재건 백그라운드 시작 → Delete 은폐 감지 복원 중...")
                     state["_bootstrapping"] = True
                     self.state_repo.save_state(self.service_id, state)
+                    # [Bug-B Fix] 독립 ApiClient로 부트스트랩 실행
                     threading.Thread(
-                        target=lambda: asyncio.run(self.bootstrap()),
+                        target=lambda: asyncio.run(self._run_bootstrap_standalone()),
                         daemon=True,
-                        name=f"BootstrapThread-{svc}"
+                        name=f"BootstrapThread-{self.service_id}"
                     ).start()
             else:
                 if self._empty_pivot_cycles != 0:
@@ -664,25 +745,30 @@ class DiffCrawlerEngine:
             except Exception:
                 pass
 
-            # [B] 자가 복구: N회 연속 발동 시 Tail을 new_tail로 강제 갱신 후 bootstrap 재실행
-            if self._cb_consecutive_count >= CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER:
-                logger.warning(
-                    f"[{svc}] 🔄 [CB 자가 복구] {CIRCUIT_BREAKER_AUTO_RECOVERY_AFTER}회 연속 발동 감지. "
-                    f"Tail을 {new_tail:,}으로 강제 업데이트 후 피벗 재생성을 시도합니다. "
-                    f"(기존 businesses 데이터는 보존됩니다)"
+            # [A-Tier Fix] CB 연속 발동 시: Tail 강제 전진(데이터 손실) 대신 관리자 확인 요구
+            if self._cb_consecutive_count >= CIRCUIT_BREAKER_ALERT_AFTER:
+                logger.critical(
+                    f"[{svc}] 🚨 [CB {self._cb_consecutive_count}회 연속] "
+                    f"diff_count={diff_count:,}건 — 자동 복구 중단. "
+                    f"관리자 확인 필요: API 재정렬 가능성 또는 실제 대량 신규 등록. "
+                    f"크롤링 주기를 늘리거나 .env CIRCUIT_BREAKER_THRESHOLD를 조정하세요."
                 )
-                self._cb_consecutive_count = 0
-                state["last_total_count"] = new_tail
-                state["pivots"] = {}
-                self.state_repo.save_state(self.service_id, state)
                 try:
-                    recovered_state = await self.bootstrap()
-                    logger.info(
-                        f"[{svc}] ✅ [CB 자가 복구 완료] 피벗 {len(recovered_state.get('pivots', {}))}개 재생성. "
-                        f"다음 주기부터 정상 차분 탐지를 재개합니다."
-                    )
-                except Exception as e:
-                    logger.error(f"[{svc}] ❌ [CB 자가 복구 실패] bootstrap 오류: {e}")
+                    from app.core.events import broadcaster
+                    import json
+                    alert_msg = json.dumps({
+                        "type": "ALERT",
+                        "message": (
+                            f"[CB {self._cb_consecutive_count}회 연속] {svc_name} {diff_count:,}건 감지 — "
+                            f"자동 복구 중단됨. 관리자 확인 필요."
+                        )
+                    }, ensure_ascii=False)
+                    broadcaster.broadcast_sync(alert_msg)
+                except Exception:
+                    pass
+            # Tail 전진 없음 → 다음 주기에 동일한 diff_count로 재평가
+            state["cb_consecutive_count"] = self._cb_consecutive_count
+            self.state_repo.save_state(self.service_id, state)
             return []
         # ────────────────────────────────────────────────────────────────────────
         # Circuit Breaker 미발동 시 연속 카운터 리셋

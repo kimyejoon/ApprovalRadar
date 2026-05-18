@@ -127,7 +127,11 @@ def _evening_chng_dt_job():
                     if not all_rows:
                         continue
 
-                    # DB에 없는 신규 건만 필터링 (api_raw_data 기준)
+                    # DB에 없는 신규 건만 필터링
+                    # [Feedback-3 Fix] api_raw_data LIKE 풀스캔 → businesses.license_no 직접 조회 (O(1))
+                    # 기존: "SELECT 1 FROM api_raw_data WHERE service_id=? AND response_data LIKE ?"
+                    # → api_raw_data에 service_id 컬럼 없음 + LIKE 풀스캔 O(n) 성능 문제
+                    # 변경: businesses.license_no PK 조회 (인덱스 활용, O(1))
                     from database import get_db
                     new_rows = []
                     with get_db() as conn:
@@ -136,12 +140,15 @@ def _evening_chng_dt_job():
                             chng_dt = row.get("CHNG_DT", "")
                             if not lcns_no:
                                 continue
+                            # businesses 테이블에서 license_no + last_event_date 복합 조건으로 중복 체크
+                            # LCNS_NO가 같아도 CHNG_DT가 다른 변동분은 신규로 처리
                             exists = conn.execute(
-                                "SELECT 1 FROM api_raw_data WHERE service_id=? AND response_data LIKE ? LIMIT 1",
-                                (svc_id, f'%"LCNS_NO": "{lcns_no}"%')
+                                "SELECT 1 FROM businesses WHERE license_no = ? AND last_event_date = ? LIMIT 1",
+                                (lcns_no, chng_dt)
                             ).fetchone()
                             if not exists:
                                 new_rows.append(row)
+
 
 
                     if new_rows:
