@@ -51,7 +51,7 @@ function KeyStatusCard() {
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['admin-key-status'],
     queryFn: fetchKeyStatus,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
 
   const activeCount = data?.keys.filter(k => k.status === 'active').length ?? 0;

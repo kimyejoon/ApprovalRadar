@@ -32,35 +32,43 @@ def _map_row_fields(service_id: str, row: dict) -> Optional[Dict[str, Any]]:
       LCNS_NO, BSSH_NM, SITE_ADDR, INDUTY_CD_NM, CHNG_DT, TELNO,
       CHNG_PRVNS (변경사유), CHNG_BF_CN (변경 전), CHNG_AF_CN (변경 후)
     """
+    chng_prvns = row.get("CHNG_PRVNS", "")
+    chng_af    = row.get("CHNG_AF_CN", "")
+
+    # 지위승계(양도.양수 / 합병) 변경사유일 때만 CHNG_AF_CN = 신규 대표자명으로 확정
+    # 그 외(주소변경, 상호변경 등)는 CHNG_AF_CN이 다른 내용이므로 I2500 백필로 보완
+    is_succession = "지위승계" in chng_prvns
+    rep_from_api = chng_af if is_succession else ""
+
     if service_id == "I2859":
         return {
             "lcns_no":             row.get("LCNS_NO", ""),
             "business_name":       row.get("BSSH_NM", ""),
-            "address":             row.get("SITE_ADDR", ""),    # ← LOCP_ADDR(X) → SITE_ADDR(O)
-            "representative_name": "",                          # ← API 미제공 (Backfill 필요)
-            "business_status":     None,                        # ← API 미제공
-            "license_date":        "",                          # ← PRMS_DT 미제공
+            "address":             row.get("SITE_ADDR", ""),
+            "representative_name": rep_from_api,  # 지위승계 시 즉시 추출, 나머지는 I2500 백필
+            "business_status":     None,           # API 미제공
+            "license_date":        "",              # PRMS_DT 미제공
             "phone_number":        row.get("TELNO", ""),
             "industry_type":       row.get("INDUTY_CD_NM", ""),
-            "event_date_raw":      row.get("CHNG_DT", ""),      # ← LAST_UPDT_DTM(X) → CHNG_DT(O)
-            "change_reason":       row.get("CHNG_PRVNS", ""),   # 변경사유 (변경민원, 관할이전 등)
-            "change_before":       row.get("CHNG_BF_CN", ""),   # 변경 전 내용 (infer 활용 가능)
-            "change_after":        row.get("CHNG_AF_CN", ""),   # 변경 후 내용
+            "event_date_raw":      row.get("CHNG_DT", ""),
+            "change_reason":       chng_prvns,
+            "change_before":       row.get("CHNG_BF_CN", ""),
+            "change_after":        chng_af,
         }
     elif service_id == "I2861":
         return {
             "lcns_no":             row.get("LCNS_NO", ""),
             "business_name":       row.get("BSSH_NM", ""),
             "address":             row.get("SITE_ADDR", "") or row.get("ADDR", ""),
-            "representative_name": "",                          # ← API 미제공 (Backfill 필요)
-            "business_status":     None,                        # ← API 미제공
-            "license_date":        "",                          # ← PRMS_DT 미제공
+            "representative_name": rep_from_api,  # 지위승계 시 즉시 추출, 나머지는 I2500 백필
+            "business_status":     None,           # API 미제공
+            "license_date":        "",              # PRMS_DT 미제공
             "phone_number":        row.get("TELNO", ""),
             "industry_type":       row.get("INDUTY_CD_NM", ""),
             "event_date_raw":      row.get("CHNG_DT", ""),
-            "change_reason":       row.get("CHNG_PRVNS", ""),
+            "change_reason":       chng_prvns,
             "change_before":       row.get("CHNG_BF_CN", ""),
-            "change_after":        row.get("CHNG_AF_CN", ""),
+            "change_after":        chng_af,
         }
     else:
         logger.warning(f"Unknown service_id: {service_id}. Skipping row mapping.")
@@ -169,6 +177,11 @@ async def run_scraper_for_service(service_id: str):
 
                     else:
                         # ── 변경 감지 ──────────────────────────────────────────
+                        prev_infer_type = db_record.get("infer_update_type", "")
+                        prev_event_date = db_record.get("last_event_date", "")
+                        is_mirror_upgrade = prev_infer_type == "mirror"  # CLI 초기 스캔 레코드
+                        is_event_date_changed = prev_event_date and event_date and prev_event_date != event_date
+
                         change: ChangeResult = detector.detect(
                             db_record=db_record,
                             new_rep_name=fields["representative_name"],
@@ -177,9 +190,31 @@ async def run_scraper_for_service(service_id: str):
                             now=now,
                         )
 
-                        if change.is_updated or (
-                            fields["industry_type"] and not db_record.get("industry_type")
-                        ):
+                        # ── mirror 레코드가 diff로 재발견되거나 이벤트일자 변경 시 업데이트 ──
+                        # (1) mirror 레코드: CLI 초기 스캔값이 diff로 재발견 → '변동확인'으로 승급
+                        # (2) last_event_date 변경: 동일 업소의 새로운 인허가 변동 이벤트 발생
+                        should_update = (
+                            change.is_updated
+                            or (fields["industry_type"] and not db_record.get("industry_type"))
+                            or is_mirror_upgrade
+                            or is_event_date_changed
+                        )
+
+                        if should_update:
+                            # infer_update_type 결정
+                            if change.infer_update_type:
+                                resolved_infer_type = change.infer_update_type
+                                resolved_infer_detail = change.infer_update_detail
+                            elif is_event_date_changed:
+                                resolved_infer_type = "인허가변동"
+                                resolved_infer_detail = f"변동일자: {prev_event_date} → {event_date}"
+                            elif is_mirror_upgrade:
+                                resolved_infer_type = "변동확인"
+                                resolved_infer_detail = None
+                            else:
+                                resolved_infer_type = change.infer_update_type
+                                resolved_infer_detail = change.infer_update_detail
+
                             updates = {
                                 "business_name": fields["business_name"],
                                 "address": fields["address"],
@@ -203,14 +238,15 @@ async def run_scraper_for_service(service_id: str):
                                 "prev_business_status": change.prev_business_status,
                                 "prev_representative_name": change.prev_representative_name,
                                 "prev_business_name": change.prev_business_name,
-                                "infer_update_type": change.infer_update_type,
-                                "infer_update_detail": change.infer_update_detail,
+                                "infer_update_type": resolved_infer_type,
+                                "infer_update_detail": resolved_infer_detail,
                                 "last_event_date": event_date,
                                 "last_event_time": event_time,
                                 "license_time": license_time,
                                 "updated_at": now,
                             }
                             business_repo.update_business(lcns_no, updates, conn=conn)
+
 
                 conn.commit()
 
@@ -220,30 +256,33 @@ async def run_scraper_for_service(service_id: str):
                 f"모든 변경분({len(new_data_rows)}건)의 DB 업데이트 및 커밋 완료."
             )
 
-            # SSE 브로드캐스트
+            # ── SSE 즉시 발행 (백필 전) — count 포함 ────────────────────────
+            # 프론트에서 count만큼 팝업을 생성하기 위해 변동 건수를 페이로드에 포함
             from app.core.events import broadcaster
             update_data = json.dumps(
-                {"type": "UPDATE", "message": "신규 업데이트가 발생했다"}, ensure_ascii=False
+                {"type": "UPDATE", "count": len(new_data_rows)}, ensure_ascii=False
             )
             broadcaster.broadcast_sync(update_data)
 
-            # 즉시 Backfill 트리거 (industry_type 누락 건)
-            licenses_needing_industry = [
+            # ── I2500 백필 (daemon thread) — SSE 발행 후 비동기 실행 ────────────
+            # 동일 LCNS_NO 중복 제거 (같은 업소의 여러 변동분은 1회만 조회)
+            # dict.fromkeys: 순서 보존 + 중복 제거
+            all_lcns = list(dict.fromkeys(
                 row.get("LCNS_NO")
                 for row in new_data_rows
-                if row.get("LCNS_NO") and not row.get("INDUTY_CD_NM", "")
-            ]
-            if licenses_needing_industry:
+                if row.get("LCNS_NO")
+            ))
+            if all_lcns:
                 logger.info(
-                    f"[즉시 Backfill 트리거] {len(licenses_needing_industry)}건의 신규 삽입 건에 "
-                    f"세부업종 없음 → 즉시 Backfill 데몬 스레드 시작"
+                    f"[Backfill] {len(all_lcns)}건 I2500 백필 → 백그라운드 시작 "
+                    f"(대표자+세부업종+연락처, SSE는 이미 발행 완료)"
                 )
                 import threading
                 from app.services.industry_filler import fill_industry_for_licenses
                 threading.Thread(
-                    target=lambda: asyncio.run(fill_industry_for_licenses(licenses_needing_industry)),
+                    target=lambda lcns=all_lcns: asyncio.run(fill_industry_for_licenses(lcns)),
                     daemon=True,
-                    name=f"ImmediateBackfillThread-{service_id}",
+                    name=f"BackfillThread-{service_id}",
                 ).start()
 
         except Exception as e:
@@ -272,6 +311,71 @@ async def run_all_scrapers():
     services = getattr(settings, "SERVICES", ["I2859", "I2861"])
     for svc in services:
         await run_scraper_for_service(svc)
+
+
+async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list):
+    """
+    [전략 C 전용] 외부에서 수집된 rows를 직접 주입하여 DB 저장 + SSE 발행 파이프라인 실행.
+    scan_for_updates() 없이 이미 확보된 rows를 기존 scraper 파이프라인으로 처리.
+    """
+    import time
+    import datetime
+    from database import get_db, init_db
+    from app.repositories.business_repository import BusinessRepository
+    from app.repositories.raw_data_repository import RawDataRepository
+    from app.services.change_detector import ChangeDetector
+
+    init_db()
+    business_repo = BusinessRepository()
+    raw_repo = RawDataRepository()
+    detector = ChangeDetector()
+    now = datetime.datetime.now().isoformat()
+
+    svc_name = {"I2859": "식품업소", "I2861": "음식점업소"}.get(service_id, service_id)
+    logger.info(f"🆕 [전략C/{svc_name}] {len(new_data_rows)}건 DB 저장 시작...")
+
+    with get_db() as conn:
+        for row in new_data_rows:
+            fields = _map_row_fields(service_id, row)
+            if not fields or not fields["lcns_no"]:
+                continue
+            lcns_no = fields["lcns_no"]
+            raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
+
+            event_date, event_time, license_date, license_time = _parse_datetime_fields(
+                fields["event_date_raw"], fields["license_date"]
+            )
+            db_record = business_repo.get_business_by_license_no(lcns_no, conn=conn)
+            if not db_record:
+                infer_update_type = (
+                    "신규등록" if license_date == event_date else "초기수집(과거변경있음)"
+                )
+                record = {
+                    "license_no": lcns_no,
+                    "business_name": fields["business_name"],
+                    "address": fields["address"],
+                    "representative_name": fields["representative_name"],
+                    "business_status": fields["business_status"],
+                    "license_date": license_date,
+                    "phone_number": fields["phone_number"],
+                    "industry_type": fields["industry_type"],
+                    "last_event_date": event_date,
+                    "infer_update_type": infer_update_type,
+                    "infer_update_detail": None,
+                    "last_event_time": event_time,
+                    "license_time": license_time,
+                }
+                business_repo.insert_business(record, conn=conn)
+        conn.commit()
+
+    logger.info(f"✅ [전략C/{svc_name}] {len(new_data_rows)}건 DB 저장 완료")
+
+    # SSE 브로드캐스트
+    from app.core.events import broadcaster
+    update_data = json.dumps(
+        {"type": "UPDATE", "message": "신규 업데이트가 발생했다"}, ensure_ascii=False
+    )
+    broadcaster.broadcast_sync(update_data)
 
 
 if __name__ == "__main__":

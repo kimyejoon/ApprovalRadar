@@ -14,8 +14,8 @@ declare global {
 }
 
 const envApiUrl = import.meta.env.VITE_API_URL;
-const API_BASE_URL = envApiUrl !== undefined 
-  ? (envApiUrl === '' ? window.location.origin : envApiUrl) 
+const API_BASE_URL = envApiUrl !== undefined
+  ? (envApiUrl === '' ? window.location.origin : envApiUrl)
   : 'http://localhost:8000';
 
 export function useSSE() {
@@ -32,56 +32,73 @@ export function useSSE() {
 
       eventSource.onopen = () => {
         console.log('SSE Connection Opened:', url);
-        // 이전에 크롤러 이상 팝업이 발생한 이력이 있을 때만 복구 알림 표시
         if (reconnectAttempts.current >= 5) {
           emitSystemAlert('WARN', '서버와의 연결이 복구되었습니다. 정상적으로 모니터링을 재개합니다.');
         }
         reconnectAttempts.current = 0;
       };
 
-      const handleUpdateEvent = async (isTest = false) => {
+      // count만큼 최신 N건을 조회해 N개의 팝업을 토스트 큐에 적재
+      const handleUpdateEvent = async (count = 1, isTest = false) => {
         try {
-          const latestResponse = await fetchApprovals({
+          const response = await fetchApprovals({
             page: 1,
-            size: 1,
+            size: count,          // ← 백엔드가 전달한 변동 건수만큼 조회
             sort_by: 'updated_at',
-            sort_order: 'desc'
+            sort_order: 'desc',
           });
 
-          if (latestResponse.data && latestResponse.data.length > 0) {
-            const latestItem = latestResponse.data[0];
-            const statusName = latestItem.infer_update_type ? CATEGORY_NAMES[latestItem.infer_update_type] || latestItem.infer_update_type : '상태 변경';
-            
-            const metadata: Array<{label: string, value: string}> = [];
-            if (latestItem.industry_type) metadata.push({ label: '업종', value: latestItem.industry_type });
-            if (latestItem.representative_name) {
-              const prevRep = latestItem.prev_representative_name ? ` (이전: ${latestItem.prev_representative_name})` : '';
-              metadata.push({ label: '대표자', value: `${latestItem.representative_name}${prevRep}` });
-            }
-            if (latestItem.phone_number) metadata.push({ label: '연락처', value: latestItem.phone_number });
-            if (latestItem.business_status) {
-              const prevStatus = latestItem.prev_business_status ? ` (이전: ${latestItem.prev_business_status})` : '';
-              metadata.push({ label: '영업상태', value: `${latestItem.business_status}${prevStatus}` });
-            }
-            if (latestItem.infer_update_detail || latestItem.update_type) {
-               metadata.push({ label: '변경 상세내역', value: latestItem.infer_update_detail || latestItem.update_type || '' });
-            }
+          if (!response.data || response.data.length === 0) return;
 
-            playNotificationSound();
+          // 최신순 수신 → 역순 적재 (큐: 오래된 것이 먼저 보임)
+          const items = [...response.data].reverse();
+
+          for (const item of items) {
+            const statusName = item.infer_update_type
+              ? CATEGORY_NAMES[item.infer_update_type] || item.infer_update_type
+              : '상태 변경';
+
+            const metadata: Array<{ label: string; value: string }> = [];
+            if (item.industry_type)
+              metadata.push({ label: '업종', value: item.industry_type });
+            if (item.representative_name) {
+              const prevRep = item.prev_representative_name
+                ? ` (이전: ${item.prev_representative_name})`
+                : '';
+              metadata.push({ label: '대표자', value: `${item.representative_name}${prevRep}` });
+            }
+            if (item.phone_number)
+              metadata.push({ label: '연락처', value: item.phone_number });
+            if (item.business_status) {
+              const prevStatus = item.prev_business_status
+                ? ` (이전: ${item.prev_business_status})`
+                : '';
+              metadata.push({ label: '영업상태', value: `${item.business_status}${prevStatus}` });
+            }
+            if (item.infer_update_detail || item.update_type) {
+              metadata.push({
+                label: '변경 상세내역',
+                value: item.infer_update_detail || item.update_type || '',
+              });
+            }
 
             addToast({
-              title: isTest ? `[테스트] 새로운 인허가 변동 감지!` : `새로운 인허가 변동 감지!`,
-              description: `[${statusName}] ${latestItem.business_name} (${latestItem.address})`,
+              title: isTest ? '[테스트] 새로운 인허가 변동 감지!' : '새로운 인허가 변동 감지!',
+              description: `[${statusName}] ${item.business_name} (${item.address})`,
               type: 'default',
               duration: 0,
               metadata,
             });
+          }
 
-            queryClient.invalidateQueries({ queryKey: ['approvals'] });
-            queryClient.invalidateQueries({ queryKey: ['indicators'] });
-            if (isTest) {
-              console.log("Test notification triggered and query cache invalidated with real data.");
-            }
+          // 알림음은 건수와 무관하게 1회만
+          playNotificationSound();
+
+          queryClient.invalidateQueries({ queryKey: ['approvals'] });
+          queryClient.invalidateQueries({ queryKey: ['indicators'] });
+
+          if (isTest) {
+            console.log(`Test notification: ${items.length}건 팝업 적재 완료`);
           }
         } catch (err) {
           console.error('Failed to fetch latest data:', err);
@@ -92,15 +109,16 @@ export function useSSE() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'UPDATE') {
-            await handleUpdateEvent();
+            // 백엔드 SSE 페이로드에 count 포함 → N개 팝업 생성
+            const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;
+            await handleUpdateEvent(count);
           } else if (data.type === 'WARN' || data.type === 'ALERT') {
-            // 시스템 경고/오류 → 우측 하단 팝업 표시
             emitSystemAlert(data.type as SystemAlertType, data.message || '시스템 알림');
           }
         } catch {
-          // JSON 파싱 실패 시 기존 텍스트 메시지 방식 호환 처리
+          // JSON 파싱 실패 시 레거시 텍스트 메시지 호환
           if (event.data === '신규 업데이트가 발생했다') {
-            await handleUpdateEvent();
+            await handleUpdateEvent(1);
           }
         }
       };
@@ -110,7 +128,7 @@ export function useSSE() {
         const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
         reconnectAttempts.current += 1;
 
-        // 5회 이상 연속 실패 시 크롤러 이상 팝업 (중복 방지: 최초 1회만 표시)
+        // 5회 이상 연속 실패 시 크롤러 이상 팝업 (최초 1회만)
         if (reconnectAttempts.current === 5) {
           emitSystemAlert(
             'ALERT',
@@ -124,7 +142,7 @@ export function useSSE() {
       // 개발 환경에서만 테스트 트리거 노출 (프로덕션 빌드 시 제거됨)
       if (import.meta.env.DEV && typeof window !== 'undefined') {
         window.triggerTestNotification = async () => {
-          await handleUpdateEvent(true);
+          await handleUpdateEvent(1, true);
         };
       }
     };

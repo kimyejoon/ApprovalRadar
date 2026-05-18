@@ -19,13 +19,16 @@ export function useLogStream() {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 언마운트 후 onclose 재연결 타이머 누수 방지:
+  // cleanup이 실행된 후에도 onclose가 비동기로 발화하므로 flag로 차단
+  const shouldReconnectRef = useRef(true);
 
-  // onclose에서 connect를 직접 참조하면 useCallback deps 자기참조 lint 오류 발생
-  // → ref를 통해 간접 참조하여 해결
   const connectRef = useRef<(() => void) | null>(null);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    // 수동 연결 시 재연결 허용 상태로 복원
+    shouldReconnectRef.current = true;
 
     const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
@@ -38,7 +41,7 @@ export function useLogStream() {
     ws.onmessage = (event) => {
       try {
         const entry: LogEntry = JSON.parse(event.data);
-        if (entry.level === 'PING') return; // keep-alive 무시
+        if (entry.level === 'PING') return;
         setLogs(prev => {
           const next = [...prev, entry];
           return next.length > MAX_LOGS ? next.slice(next.length - MAX_LOGS) : next;
@@ -50,8 +53,10 @@ export function useLogStream() {
 
     ws.onclose = () => {
       setIsConnected(false);
-      // connectRef로 간접 참조 → 자기참조 없이 재연결
-      reconnectTimerRef.current = setTimeout(() => connectRef.current?.(), 5000);
+      // shouldReconnectRef가 false면 언마운트/의도적 종료 → 재연결 하지 않음
+      if (shouldReconnectRef.current) {
+        reconnectTimerRef.current = setTimeout(() => connectRef.current?.(), 5000);
+      }
     };
 
     ws.onerror = () => {
@@ -59,12 +64,12 @@ export function useLogStream() {
     };
   }, []);
 
-  // connectRef를 항상 최신 connect 함수로 유지 (렌더 외부, 페인트 전 동기 실행)
   useLayoutEffect(() => {
     connectRef.current = connect;
   });
 
   const disconnect = useCallback(() => {
+    shouldReconnectRef.current = false;
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     wsRef.current?.close();
     wsRef.current = null;
@@ -72,10 +77,13 @@ export function useLogStream() {
   }, []);
 
   useEffect(() => {
-    connect(); // 마운트 시 자동 연결
+    connect();
     return () => {
+      // 언마운트 시: 재연결 차단 후 close (onclose가 이후 발화해도 재연결 안 함)
+      shouldReconnectRef.current = false;
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       wsRef.current?.close();
+      wsRef.current = null;
     };
   }, [connect]);
 

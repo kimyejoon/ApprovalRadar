@@ -104,6 +104,10 @@ def init_db():
         cursor.execute("ALTER TABLE businesses ADD COLUMN is_read INTEGER DEFAULT 0")
     if "read_at" not in biz_columns:
         cursor.execute("ALTER TABLE businesses ADD COLUMN read_at TEXT")
+    if "representative_history" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN representative_history TEXT DEFAULT '[]'")
+    if "licensing_history" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN licensing_history TEXT DEFAULT '[]'")
 
     # 인허가 변동건 메모 테이블 (license_date + business_name 당 1건)
     cursor.execute('''
