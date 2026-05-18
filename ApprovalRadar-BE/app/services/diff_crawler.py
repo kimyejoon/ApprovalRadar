@@ -671,8 +671,10 @@ class DiffCrawlerEngine:
             # pivots 있으면 Delete 은폐 감지 실행
             if pivots:
                 # ✅ Delete 은폐 감지: Tail이 같아도 Insert+Delete가 동시 발생했을 수 있음
+                # [Perf Fix] max_samples=9 제한: Delete 은폐는 극히 드문 시나리오 → 소량 샘플로 충분
+                # I2861 기준: 38회 → 최대 9회 (기존 ~130초 → ~36초로 단축)
                 changed, shift_info = await pivot_manager.sample_check(
-                    pivots, self.api_client, svc
+                    pivots, self.api_client, svc, max_samples=9
                 )
                 if changed:
                     logger.warning(
