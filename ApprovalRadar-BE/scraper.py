@@ -256,8 +256,17 @@ async def run_scraper_for_service(service_id: str):
                 f"모든 변경분({len(new_data_rows)}건)의 DB 업데이트 및 커밋 완료."
             )
 
-            # ── DB 삽입 후 즉시 I2500 백필 (대표자 + 세부업종 + 연락처) ──────────
-            # ✅ 백필 완료 후 SSE 발행: 팝업에서 처음부터 완성된 데이터 표시
+            # ── SSE 즉시 발행 (백필 전) — count 포함 ────────────────────────
+            # 프론트에서 count만큼 팝업을 생성하기 위해 변동 건수를 페이로드에 포함
+            from app.core.events import broadcaster
+            update_data = json.dumps(
+                {"type": "UPDATE", "count": len(new_data_rows)}, ensure_ascii=False
+            )
+            broadcaster.broadcast_sync(update_data)
+
+            # ── I2500 백필 (daemon thread) — SSE 발행 후 비동기 실행 ────────────
+            # 백필은 UI 팝업 출력 이후 백그라운드에서 실행 (지연 없이 즉시 알림)
+            # 완료 후 DB에 반영되므로, 상세 모달 클릭 시 채워진 값 확인 가능
             all_lcns = [
                 row.get("LCNS_NO")
                 for row in new_data_rows
@@ -265,18 +274,16 @@ async def run_scraper_for_service(service_id: str):
             ]
             if all_lcns:
                 logger.info(
-                    f"[즉시 Backfill] {len(all_lcns)}건 I2500 백필 시작 "
-                    f"(대표자+세부업종+연락처) → 완료 후 SSE 발행"
+                    f"[Backfill] {len(all_lcns)}건 I2500 백필 → 백그라운드 시작 "
+                    f"(대표자+세부업종+연락처, SSE는 이미 발행 완료)"
                 )
+                import threading
                 from app.services.industry_filler import fill_industry_for_licenses
-                await fill_industry_for_licenses(all_lcns)  # ← await: 완료 후 SSE
-
-            # SSE 브로드캐스트 (백필 완료 후)
-            from app.core.events import broadcaster
-            update_data = json.dumps(
-                {"type": "UPDATE", "message": "신규 업데이트가 발생했다"}, ensure_ascii=False
-            )
-            broadcaster.broadcast_sync(update_data)
+                threading.Thread(
+                    target=lambda lcns=all_lcns: asyncio.run(fill_industry_for_licenses(lcns)),
+                    daemon=True,
+                    name=f"BackfillThread-{service_id}",
+                ).start()
 
         except Exception as e:
             logger.error(f"❌ {service_id} 크롤러 스케줄 작업 중 치명적인 오류 발생: {e}")
