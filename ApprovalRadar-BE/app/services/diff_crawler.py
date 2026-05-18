@@ -519,13 +519,8 @@ class DiffCrawlerEngine:
 
             pivots = state.get("pivots", {})
 
-            # pivots가 없으면 sample_check 의미 없음 → 명시적 경고
-            if not pivots:
-                logger.warning(
-                    f"[{svc}] ⚠️ 피벗 없음 → Delete 은폐 감지 불가 상태 (Ping Only 모드)"
-                    f" — 재부트스트랩 후 정상 복원 예정"
-                )
-            else:
+            # pivots 있으면 Delete 은폐 감지 실행
+            if pivots:
                 # ✅ Delete 은폐 감지: Tail이 같아도 Insert+Delete가 동시 발생했을 수 있음
                 changed, shift_info = await pivot_manager.sample_check(
                     pivots, self.api_client, svc
@@ -575,21 +570,22 @@ class DiffCrawlerEngine:
                 f"[{svc}] ✔️ 이번 주기 신규 변동없음. (tail: {old_tail:,}건) "
                 f"[소요: {time.time() - start_time:.1f}초]"
             )
-            # ✅ [Fix 3] 빈 피벗 연속 주기 자동 re-bootstrap
+            # ✅ 피벗 없음 → 다음 주기 즉시 재부트스트랩 (1주기 후)
+            # - 피벗이 비어있으면 Delete 은폐 감지 불가 → 최대한 빠르게 복원
+            # - MAX_EMPTY=1: Tail 변동 없음 확인 직후 즉시 재부트스트랩 실행
             if not pivots:
                 self._empty_pivot_cycles += 1
-                MAX_EMPTY = 3
+                MAX_EMPTY = 1
                 logger.info(
-                    f"[{svc}] 피벗 빈 상태 지속 중: {self._empty_pivot_cycles}/{MAX_EMPTY}주기 "
-                    f"({'재부트스트랩 시작!' if self._empty_pivot_cycles >= MAX_EMPTY else f'{MAX_EMPTY - self._empty_pivot_cycles}주기 후 자동 재부트스트랩 예정'})"
+                    f"[{svc}] 📋 피벗 없음 (Ping Only 모드) → "
+                    f"{'즉시 재부트스트랩 시작!' if self._empty_pivot_cycles >= MAX_EMPTY else '다음 주기 재부트스트랩 예정'}"
                 )
                 # 카운터 영속 저장
                 state["empty_pivot_cycles"] = self._empty_pivot_cycles
                 self.state_repo.save_state(self.service_id, state)
                 if self._empty_pivot_cycles >= MAX_EMPTY:
                     logger.warning(
-                        f"[{svc}] 🔄 피벗 빈 상태 {self._empty_pivot_cycles}주기 지속 "
-                        f"→ 자동 재부트스트랩 시작 (Delete 은폐 감지 복원)"
+                        f"[{svc}] 🔄 피벗 재건 시작 → Delete 은폐 감지 복원 중..."
                     )
                     await self.bootstrap()  # bootstrap() 내부에서 _empty_pivot_cycles=0 리셋
             else:
@@ -598,6 +594,7 @@ class DiffCrawlerEngine:
                     state["empty_pivot_cycles"] = 0
                     self.state_repo.save_state(self.service_id, state)
             return []
+
 
         diff_count = new_tail - old_tail
 
