@@ -48,11 +48,11 @@ cd /d "%FE_DIR%"
 
 echo [INFO]  Installing npm packages...
 call npm install
-if errorlevel 1 ( echo [ERROR] npm install failed. & rem pause & rem exit /b 1 )
+if errorlevel 1 ( echo [ERROR] npm install failed. & exit /b 1 )
 
 echo [INFO]  Building React app...
 call npm run build
-if errorlevel 1 ( echo [ERROR] npm run build failed. & rem pause & rem exit /b 1 )
+if errorlevel 1 ( echo [ERROR] npm run build failed. & exit /b 1 )
 
 if not exist "%FE_DIR%\dist" (
     echo [ERROR] Frontend build failed: dist\ not found.
@@ -65,7 +65,7 @@ REM ── STEP 2: Copy FE dist to BE folder ───────────�
 echo ====  STEP 2 / 4 -- Copy Build Files  ====
 if exist "%BE_DIR%\dist" rmdir /s /q "%BE_DIR%\dist"
 xcopy /E /I /Q "%FE_DIR%\dist" "%BE_DIR%\dist"
-if errorlevel 1 ( echo [ERROR] File copy failed. & rem pause & rem exit /b 1 )
+if errorlevel 1 ( echo [ERROR] File copy failed. & exit /b 1 )
 echo [OK]    FE dist copied
 echo.
 
@@ -76,7 +76,7 @@ cd /d "%BE_DIR%"
 if not exist "%BE_DIR%\venv" (
     echo [INFO]  Creating virtual environment...
     python -m venv venv
-    if errorlevel 1 ( echo [ERROR] venv creation failed. & rem pause & rem exit /b 1 )
+    if errorlevel 1 ( echo [ERROR] venv creation failed. & exit /b 1 )
 )
 
 call "%BE_DIR%\venv\Scripts\activate.bat"
@@ -98,7 +98,7 @@ cd /d "%BE_DIR%"
 
 echo [INFO]  Starting PyInstaller build... (may take several minutes)
 pyinstaller ApprovalRadar.spec --clean --noconfirm
-if errorlevel 1 ( echo [ERROR] PyInstaller build failed. & rem pause & rem exit /b 1 )
+if errorlevel 1 ( echo [ERROR] PyInstaller build failed. & exit /b 1 )
 
 if not exist "%BE_DIR%\dist\ApprovalRadar.exe" (
     echo [ERROR] Build failed: ApprovalRadar.exe not found.
