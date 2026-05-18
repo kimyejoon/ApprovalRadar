@@ -19,11 +19,16 @@ async def _fetch_and_update_industry(
     business_repo: BusinessRepository,
 ) -> bool:
     """
-    I2500 API로 특정 업소의 세부업종을 조회하여 DB에 업데이트합니다.
+    I2500 API로 특정 업소의 세부업종 + 대표자 + 연락처를 조회하여 DB에 업데이트합니다.
+
+    I2500 제공 필드:
+      - INDUTY_CD_NM : 세부업종
+      - PRSDNT_NM    : 대표자 (기존 빈 필드만 채움)
+      - TELNO        : 연락처 (기존 빈 필드만 채움)
 
     Returns:
-        True  = 세부업종 업데이트 성공
-        False = 데이터 없음 또는 필드 비어있음
+        True  = 1개 이상 필드 업데이트 성공
+        False = 데이터 없음
     Raises:
         ApiKeysExhaustedError: 키 소진 시 상위로 전파
     """
@@ -40,10 +45,19 @@ async def _fetch_and_update_industry(
         return False
 
     industry_type = rows[0].get("INDUTY_CD_NM", "")
-    if not industry_type:
+    representative_name = rows[0].get("PRSDNT_NM", "")
+    phone_number = rows[0].get("TELNO", "")
+
+    # 모두 빈값이면 업데이트할 것 없음
+    if not industry_type and not representative_name and not phone_number:
         return False
 
-    business_repo.update_industry_type(lcns_no, industry_type)
+    business_repo.update_from_i2500(
+        license_no=lcns_no,
+        industry_type=industry_type,
+        representative_name=representative_name,
+        phone_number=phone_number,
+    )
     return True
 
 

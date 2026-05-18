@@ -240,6 +240,43 @@ class BusinessRepository:
                 c.execute(query, params)
                 c.commit()
 
+    def update_from_i2500(
+        self,
+        license_no: str,
+        industry_type: str = "",
+        representative_name: str = "",
+        phone_number: str = "",
+        conn=None,
+    ):
+        """
+        I2500 API 백필 결과 반영.
+        - 이미 값이 있는 필드는 덮어쓰지 않음 (COALESCE)
+        - 빈 문자열은 NULL로 처리하여 기존값 보호
+        """
+        query = """
+            UPDATE businesses
+            SET
+                industry_type      = COALESCE(NULLIF(?, ''), industry_type),
+                representative_name = COALESCE(
+                    CASE WHEN representative_name = '' OR representative_name IS NULL
+                         THEN NULLIF(?, '') ELSE representative_name END,
+                    representative_name
+                ),
+                phone_number       = COALESCE(
+                    CASE WHEN phone_number = '' OR phone_number IS NULL
+                         THEN NULLIF(?, '') ELSE phone_number END,
+                    phone_number
+                )
+            WHERE license_no = ?
+        """
+        params = (industry_type, representative_name, phone_number, license_no)
+        if conn:
+            conn.execute(query, params)
+        else:
+            with get_db() as c:
+                c.execute(query, params)
+                c.commit()
+
     def update_read_info(self, license_no: str, conn=None):
         from datetime import datetime
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
