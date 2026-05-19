@@ -140,6 +140,8 @@ class ApiClient:
     # ─── 인스턴스 초기화 ────────────────────────────────────────────────────
 
     def __init__(self):
+        # 매 생성 시 DB에서 최신 키 리로드 (런타임 중 추가된 키 즉시 반영)
+        settings._load_api_keys()
         self.api_keys = settings.API_KEYS.copy()
         self.current_key_idx = 0
         self.key_lock = threading.Lock()
@@ -149,6 +151,34 @@ class ApiClient:
         self._session = self._create_session()
         # 이 세션에서의 총 API 호출 횟수 카운터 (CLI 보고용)
         self._call_count: int = 0
+
+    def refresh_keys(self):
+        """DB에서 최신 API 키 리스트를 리프레시합니다.
+        런타임 중 추가/삭제된 키를 반영합니다."""
+        settings._load_api_keys()
+        new_keys = settings.API_KEYS.copy()
+        with self.key_lock:
+            old_keys = set(self.api_keys)
+            new_set = set(new_keys)
+            added = new_set - old_keys
+            removed = old_keys - new_set
+
+            if added or removed:
+                self.api_keys = new_keys
+                # 제거된 키가 있으면 exhausted에서도 제거
+                self.exhausted_keys -= removed
+                # 인덱스 보정
+                if self.current_key_idx >= len(self.api_keys):
+                    self.current_key_idx = 0
+                if added:
+                    logger.info(
+                        f"🔑 [키 리프레시] {len(added)}개 키 추가 감지 → "
+                        f"총 {len(self.api_keys)}개 활성 (소진: {len(self.exhausted_keys)}개)"
+                    )
+                if removed:
+                    logger.info(
+                        f"🔑 [키 리프레시] {len(removed)}개 키 제거 감지"
+                    )
 
     @staticmethod
     def _create_session() -> httpx.AsyncClient:
