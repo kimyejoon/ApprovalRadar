@@ -167,6 +167,74 @@ async def trigger_job(job_type: str):
         return TriggerResponse(success=False, message=str(e))
 
 
+class RangeScanRequest(BaseModel):
+    start: int   # 스캔 시작 레코드 번호 (예: 1, 500001)
+    end: int     # 스캔 종료 레코드 번호 (예: 10000, 952999)
+
+
+@router.post("/trigger/range-scan", response_model=TriggerResponse)
+async def trigger_range_scan(req: RangeScanRequest):
+    """지정 범위를 즉시 스캔합니다. start~end 구간의 페이지를 순차 스캔."""
+    try:
+        if req.start < 1 or req.end < req.start:
+            return TriggerResponse(success=False, message=f"잘못된 범위: {req.start}~{req.end}")
+
+        pages = (req.end - req.start + 1000) // 1000
+        logger.info(
+            f"[Playground] 🎯 Range Scan 트리거: {req.start:,}~{req.end:,} ({pages}p)"
+        )
+
+        async def _run_range_scan():
+            from app.clients.foodsafety_api import ApiClient
+            from app.repositories.state_repository import StateRepository
+            from app.services.rolling_scanner import RollingScanner
+
+            svc = "I2861"
+            api_client = ApiClient()
+            state_repo = StateRepository()
+            scanner = RollingScanner(api_client, svc, state_repo)
+
+            state = state_repo.load_state(svc)
+            fingerprints = state.get("page_fingerprints", {})
+            scan_times = state.get("page_scan_times", {})
+
+            max_pages = pages
+
+            # flush callback — scraper 파이프라인으로
+            async def _flush(rows):
+                from scraper import run_scraper_for_service_with_rows
+                await run_scraper_for_service_with_rows(svc, rows)
+
+            scanned, new_rows, mismatch, _ = await scanner._scan_range(
+                svc, req.start, req.start, req.end,
+                max_pages, fingerprints, scan_times, "RANGE"
+            )
+
+            if new_rows:
+                await _flush(new_rows)
+                logger.info(
+                    f"[Playground] ✅ Range Scan 완료: {scanned}p, {len(new_rows)}건 수집"
+                )
+            else:
+                logger.info(f"[Playground] ✅ Range Scan 완료: {scanned}p, 신규 0건")
+
+            # 상태 저장 (fingerprints + scan_times 업데이트)
+            state["page_fingerprints"] = fingerprints
+            state["page_scan_times"] = scan_times
+            state_repo.save_state(svc, state)
+
+        import asyncio
+        asyncio.create_task(_run_range_scan())
+
+        return TriggerResponse(
+            success=True,
+            message=f"🎯 Range Scan 등록: {req.start:,}~{req.end:,} ({pages}p)"
+        )
+    except Exception as e:
+        logger.error(f"[Playground] Range Scan 트리거 실패: {e}")
+        return TriggerResponse(success=False, message=str(e))
+
+
 # ─── 페이지 스캔 히스토리 ────────────────────────────────────────────────────
 
 @router.get("/page-scan-history/{service_id}", response_model=PageScanHistoryResponse)

@@ -60,6 +60,15 @@ async function triggerJob(jobType: string): Promise<{ success: boolean; message:
   return res.json();
 }
 
+async function triggerRangeScan(start: number, end: number): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${BASE}/trigger/range-scan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start, end }),
+  });
+  return res.json();
+}
+
 async function fetchTodayDetection(): Promise<TodayDetection> {
   const res = await fetch(`${BASE}/today-detection/I2861`);
   if (!res.ok) throw new Error('Failed');
@@ -114,6 +123,8 @@ export function PlaygroundPage() {
   const [pageScan, setPageScan] = useState<{ total_pages: number; scanned_pages: number; entries: PageScanEntry[] } | null>(null);
   const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [rangeStart, setRangeStart] = useState<string>('1');
+  const [rangeEnd, setRangeEnd] = useState<string>('10000');
 
   const refresh = useCallback(async () => {
     try {
@@ -147,6 +158,27 @@ export function PlaygroundPage() {
       setTimeout(() => setTriggerMsg(null), 5000);
     } catch {
       setTriggerMsg('트리거 실패');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRangeScan = async () => {
+    const s = parseInt(rangeStart, 10);
+    const e = parseInt(rangeEnd, 10);
+    if (isNaN(s) || isNaN(e) || s < 1 || e < s) {
+      setTriggerMsg('잘못된 범위입니다');
+      setTimeout(() => setTriggerMsg(null), 3000);
+      return;
+    }
+    setLoading(true);
+    setTriggerMsg(null);
+    try {
+      const result = await triggerRangeScan(s, e);
+      setTriggerMsg(result.message);
+      setTimeout(() => setTriggerMsg(null), 5000);
+    } catch {
+      setTriggerMsg('Range Scan 트리거 실패');
     } finally {
       setLoading(false);
     }
@@ -249,6 +281,39 @@ export function PlaygroundPage() {
               <MagnifyingGlass className="w-4 h-4 text-orange-400" />
               Scraper
             </button>
+          </div>
+
+          {/* Range Scan */}
+          <div className="mt-4 pt-4 border-t border-border-subtle">
+            <p className="text-xs font-medium text-text-secondary mb-2">🎯 범위 지정 스캔</p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={rangeStart}
+                onChange={(e) => setRangeStart(e.target.value)}
+                placeholder="시작"
+                className="w-28 px-3 py-2 rounded-lg border border-border-standard bg-background text-sm text-text-primary text-right font-mono focus:outline-none focus:ring-1 focus:ring-brand"
+              />
+              <span className="text-text-muted text-sm">~</span>
+              <input
+                type="number"
+                value={rangeEnd}
+                onChange={(e) => setRangeEnd(e.target.value)}
+                placeholder="종료"
+                className="w-28 px-3 py-2 rounded-lg border border-border-standard bg-background text-sm text-text-primary text-right font-mono focus:outline-none focus:ring-1 focus:ring-brand"
+              />
+              <button
+                onClick={handleRangeScan}
+                disabled={loading}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-orange-400/30 bg-orange-400/5 hover:bg-orange-400/10 transition-all text-sm font-medium text-orange-500 disabled:opacity-50"
+              >
+                <Play className="w-3.5 h-3.5" />
+                스캔
+              </button>
+            </div>
+            <p className="text-[10px] text-text-muted mt-1.5">
+              레코드 번호 범위 (1~952,999). 예: 940001~952999 = 마지막 13p
+            </p>
           </div>
         </Card>
       </div>
