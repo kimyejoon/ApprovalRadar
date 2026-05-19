@@ -133,9 +133,11 @@ async def run_scraper_for_service(service_id: str):
             if len(new_data_rows) > 10:
                 logger.info(f"   └ ... 외 {len(new_data_rows)-10}건")
             now = datetime.datetime.now().isoformat()
+            today_str = datetime.datetime.now().strftime("%Y%m%d")
 
             from database import get_db
-            actually_changed = 0  # 실제 DB 변경 건수 (SSE 발행 기준)
+            actually_changed = 0  # 실제 DB 변경 건수 (로그용)
+            today_changed = 0    # 오늘 변동분만 (SSE 발행 기준)
             with get_db() as conn:
                 for row in new_data_rows:
                     fields = _map_row_fields(service_id, row)
@@ -175,6 +177,8 @@ async def run_scraper_for_service(service_id: str):
                         # 1. 원본 API 응답(JSON) DB 저장
                         raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
                         actually_changed += 1
+                        if event_date == today_str:
+                            today_changed += 1
 
                     else:
                         # ── 중복 체크: 동일 (lcns_no, event_date) 이미 존재 → 스킵 ──
@@ -232,6 +236,8 @@ async def run_scraper_for_service(service_id: str):
                                 business_repo.update_business(lcns_no, updates, conn=conn)
                                 raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
                                 actually_changed += 1
+                                if event_date == today_str:
+                                    today_changed += 1
                             # else: 동일 event_date + 변경 없음 → 완전 스킵 (SSE 미발행)
                             continue
 
@@ -294,6 +300,8 @@ async def run_scraper_for_service(service_id: str):
                         business_repo.update_business(lcns_no, updates, conn=conn)
                         raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
                         actually_changed += 1
+                        if event_date == today_str:
+                            today_changed += 1
 
 
                 conn.commit()
@@ -306,12 +314,15 @@ async def run_scraper_for_service(service_id: str):
 
             # ── SSE 즉시 발행 — 실제 변경 건수만 ────────────────────────
             # 이미 수집된 레코드가 반복 반환되어도 중복 SSE 발행 방지
-            if actually_changed > 0:
+            if today_changed > 0:
                 from app.core.events import broadcaster
                 update_data = json.dumps(
-                    {"type": "UPDATE", "count": actually_changed}, ensure_ascii=False
+                    {"type": "UPDATE", "count": today_changed}, ensure_ascii=False
                 )
                 broadcaster.broadcast_sync(update_data)
+                logger.info(
+                    f"🔔 [{service_id}] 오늘 변동분 {today_changed}건 감지 → SSE 발행!"
+                )
 
             # ── I2500 백필 (daemon thread) — SSE 발행 후 비동기 실행 ────────────
             # 동일 LCNS_NO 중복 제거 (같은 업소의 여러 변동분은 1회만 조회)
@@ -435,6 +446,8 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
         # ── Step 3: bulk INSERT/UPDATE ──
         insert_count = 0
         update_count = 0
+        today_str = datetime.datetime.now().strftime("%Y%m%d")
+        today_changed = 0  # 오늘 변동분만 (SSE 발행 기준)
 
         for m in mapped_rows:
             fields = m["fields"]
@@ -470,6 +483,8 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
                 raw_repo.insert_raw_data(lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now, conn=conn)
                 insert_count += 1
                 actually_changed += 1
+                if event_date == today_str:
+                    today_changed += 1
                 # INSERT 후 existing_records에 추가 (같은 LCNS의 후속 row 처리용)
                 existing_records[lcns_no] = record
 
@@ -528,27 +543,35 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
                 raw_repo.insert_raw_data(lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now, conn=conn)
                 update_count += 1
                 actually_changed += 1
+                if event_date == today_str:
+                    today_changed += 1
 
         conn.commit()
 
     elapsed = time.time() - start_time
 
     # ── 결과 요약 + SSE 발행 ──
+    log_suffix = f"(오늘:{today_changed})" if today_changed > 0 else ""
     if actually_changed > 0:
         logger.info(
             f"✅ [{svc_name}] flush 완료: {len(mapped_rows)}건 → "
             f"INSERT {insert_count} / UPDATE {update_count} / 스킵 {skipped_dup} "
-            f"({elapsed:.1f}초) → SSE 발행! (count={actually_changed})"
+            f"({elapsed:.1f}초) {log_suffix}"
         )
-        from app.core.events import broadcaster
-        update_data = json.dumps(
-            {"type": "UPDATE", "count": actually_changed}, ensure_ascii=False
-        )
-        broadcaster.broadcast_sync(update_data)
     else:
         logger.info(
             f"ℹ️ [{svc_name}] flush 완료: {len(mapped_rows)}건 모두 이미 수집됨 "
-            f"({skipped_dup}건 스킵, {elapsed:.1f}초) → SSE 미발행"
+            f"({skipped_dup}건 스킵, {elapsed:.1f}초)"
+        )
+
+    if today_changed > 0:
+        from app.core.events import broadcaster
+        update_data = json.dumps(
+            {"type": "UPDATE", "count": today_changed}, ensure_ascii=False
+        )
+        broadcaster.broadcast_sync(update_data)
+        logger.info(
+            f"🔔 [{svc_name}] 오늘 변동분 {today_changed}건 감지 → SSE 발행!"
         )
 
 
