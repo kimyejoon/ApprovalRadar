@@ -700,47 +700,33 @@ class DiffCrawlerEngine:
         if is_first_cycle:
             _STARTUP_CHECK_DONE.add(svc)
             if state.get("pivots"):
-                logger.info(f"[{svc}] 🔍 기동 첫 주기: 저장 피벗 정합성 선제 검증 중...")
+                logger.info(f"[{svc}] 🔍 기동 첫 주기: 저장 피벗 전체 정합성 검증 중 (누락 없는 전체 수집)...")
                 startup_stale, shift_info = await pivot_manager.sample_check(
                     state["pivots"], self.api_client, svc,
-                    sample_ratio=1.0,  # ratio 먼저 적용되는 버그 방지: max_samples만 바인딩
-                    max_samples=MAX_SAMPLES_BY_SVC.get(svc, 20)
+                    sample_ratio=1.0,
+                    max_samples=None  # 전체 피벗 검사 — 누락 레코드 100% 수집
                 )
                 if startup_stale:
-                    shift_amount = shift_info.get("shift_amount")
-                    insert_range = shift_info.get("insert_range")
-                    # ✅ Shift 확정 시 기동 첫 주기에서도 즉시 수집
-                    if shift_amount and shift_amount > 0 and insert_range:
-                        ins_start, ins_end = insert_range
+                    # [전체 수집] all_missed_rows: 모든 피벗 순회에서 수집된 누락 레코드 합산
+                    all_missed = shift_info.get("all_missed_rows") or []
+                    if not all_missed:
+                        all_missed = shift_info.get("new_rows") or []
+
+                    if all_missed:
                         logger.info(
-                            f"[{svc}] 📥 기동 첫 주기 즉시 수집: "
-                            f"{ins_start:,}~{ins_end:,} 구간 ({shift_amount}건) — "
-                            f"다음 주기를 기다리지 않고 즉시 변동분 확보"
+                            f"[{svc}] 📥 기동 전체 누락 수집: {len(all_missed)}건 확보 "
+                            f"(전체 피벗 순회 완료)"
                         )
-                        immediate_rows = shift_info.get("new_rows") or []
-                        if not immediate_rows:
-                            cs = ins_start
-                            while cs <= ins_end:
-                                ce = min(cs + 1000 - 1, ins_end)
-                                fetched = await self._fetch_page(cs, ce)
-                                immediate_rows.extend(fetched)
-                                cs += 1000
-                        if immediate_rows:
-                            logger.info(
-                                f"[{svc}] ✅ 기동 즉시 수집 성공: {len(immediate_rows)}건 확보"
-                            )
-                            # 피벗 무효화 + 백그라운드 재건 시작 (플래그 설정)
-                            state["pivots"] = {}
-                            state["_bootstrapping"] = True
-                            self.state_repo.save_state(self.service_id, state)
-                            # [Bug-B Fix] 독립 ApiClient로 부트스트랩 실행
-                            threading.Thread(
-                                target=lambda: asyncio.run(self._run_bootstrap_standalone()),
-                                daemon=True,
-                                name=f"BootstrapThread-{svc}"
-                            ).start()
-                            logger.info(f"[{svc}] 🔄 피벗 재건 백그라운드 시작 (SSE/DB 저장과 병렬 실행)")
-                            return immediate_rows  # scraper가 정상 처리
+                        state["pivots"] = {}
+                        state["_bootstrapping"] = True
+                        self.state_repo.save_state(self.service_id, state)
+                        threading.Thread(
+                            target=lambda: asyncio.run(self._run_bootstrap_standalone()),
+                            daemon=True,
+                            name=f"BootstrapThread-{svc}"
+                        ).start()
+                        logger.info(f"[{svc}] 🔄 피벗 재건 백그라운드 시작 (SSE/DB 저장과 병렬 실행)")
+                        return all_missed  # scraper가 중복 필터 후 저장
                     logger.warning(
                         f"[{svc}] ⚠️ 기동 시 피벗 stale 감지 (저장 후 API 변동됨). "
                         f"피벗 초기화 → 다음 주기부터 Ping만으로 정상 감지."

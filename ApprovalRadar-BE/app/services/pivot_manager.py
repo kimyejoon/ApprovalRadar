@@ -9,6 +9,8 @@ diff_crawler.py에서 분리된 책임 단위입니다.
      (실증: 35000/35000 단건 vs 35000/35999 1000건은 완전히 다른 레코드 반환)
   3. fingerprint 기반 전체 대조 — 1,000건 모두의 복합키를 해시하여 한 번에 비교
   4. Shift 진단 — 불일치 시 새로 삽입된 레코드 목록과 위치를 즉시 특정
+  5. [개선] 전체 순회 — 첫 불일치에서 중단하지 않고 모든 피벗을 검사하여
+     복수의 독립적 삽입을 모두 수집 (all_missed_rows)
 """
 import asyncio
 import hashlib
@@ -29,33 +31,38 @@ def compute_page_fingerprint(rows: list) -> str:
     return hashlib.md5(json.dumps(keys, ensure_ascii=False).encode()).hexdigest()
 
 
-async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: float = 0.2, max_samples: int = None) -> tuple:
+async def sample_check(
+    pivots: dict,
+    api_client,
+    service_id: str,
+    sample_ratio: float = 0.2,
+    max_samples: int = None,
+) -> tuple:
     """
     저장된 피벗 페이지를 1,000건 단위로 전체 조회하여 fingerprint 비교.
 
-    알고리즘:
-      1. 무작위 샘플 피벗 선택 (sample_ratio%, 상한 max_samples개)
-      2. 각 피벗을 1,000건 일괄 조회 (저장 당시와 동일한 PAGE_SIZE)
-      3. 현재 (LCNS_NO, CHNG_DT) 복합키 fingerprint 계산
-      4. 저장된 fingerprint와 비교 → 완전 일치 시 정상
-      5. 불일치 시:
-         a. 저장된 첫 번째 복합키를 현재 records에서 탐색
-         b. i번째에서 발견 → shift_amount = i (i건이 앞에 새로 삽입됨)
-         c. 삽입된 records 상세 로그 출력
+    [핵심 개선] 첫 번째 불일치에서 즉시 return하지 않고 모든 피벗을 순회.
+    → 복수의 독립적 삽입이 여러 피벗 위치에서 발생했을 때 전부 수집.
+    → shift_info["all_missed_rows"]에 전체 수집 결과 반환.
 
     Args:
         sample_ratio: 전체 피벗 대비 샘플 비율 (0.0~1.0)
-        max_samples:  샘플 수 절대 상한 (None=무제한). 피벗이 많아도 API 호출을 제한할 때 사용.
-                      예: Bootstrap 직후 검증은 max_samples=5로 경량화
+        max_samples:  샘플 수 절대 상한 (None=무제한).
 
     Returns: (changed: bool, shift_info: dict)
+      shift_info keys:
+        - all_missed_rows: 전체 순회 수집된 모든 신규 레코드 (list)
+        - first_mismatch_idx: 첫 번째 불일치 피벗 위치 (int)
+        - shift_amount: 첫 번째 불일치 shift 수 (int|None)
+        - insert_range: 첫 번째 불일치 insert 구간 (tuple|None)
+        - new_rows: 첫 번째 불일치에서 수집된 레코드 (list)
+        - expected_lcns_no, bssh_nm: 첫 번째 불일치 참고 정보
     """
     if not pivots:
         return False, {}
 
     pivot_items = list(pivots.items())
     sample_size = max(1, int(len(pivot_items) * sample_ratio))
-    # max_samples 상한 적용
     if max_samples is not None:
         sample_size = min(sample_size, max_samples)
     sampled = sorted(
@@ -75,6 +82,11 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
         f"  검사 인덱스: [{idx_preview}]"
     )
 
+    # ── 전체 순회: 모든 불일치에서 누락 레코드 누적 수집 ─────────────────────
+    any_changed = False
+    all_missed_rows: list = []   # 전체 순회에서 발견된 모든 신규 레코드
+    first_shift_info: dict = {}  # 첫 번째 불일치의 shift_info (호환성 유지)
+
     for idx_str, pivot_data in sampled:
         idx = int(idx_str)
 
@@ -88,7 +100,6 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
         bssh_nm = pivot_data.get("BSSH_NM", "")
 
         try:
-            # ── 1,000건 일괄 조회 + 상세 페이지/API 로깅 ───────────────────
             page_end = idx + PAGE_SIZE - 1
             call_seq = getattr(api_client, "_call_count", 0) - api_calls_before + 1
             logger.info(
@@ -109,7 +120,7 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                 f"{len(items)}건 (API total_count={total_from_api})"
             )
 
-            # ── Fingerprint 전체 대조 ─────────────────────────────────────
+            # ── Fingerprint 전체 대조 ──────────────────────────────────────
             current_fingerprint = compute_page_fingerprint(items)
 
             if stored_fingerprint and current_fingerprint == stored_fingerprint:
@@ -120,11 +131,6 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                 continue
 
             # ── 불일치 감지 → 2-Phase 재확인 프로토콜 ─────────────────────
-            # API 노이즈(일시적 응답 건수 변동)와 진짜 변동을 구분하기 위해
-            # 3초 후 동일 구간을 재조회하여 fingerprint를 교차 검증한다.
-            # - 2차 일치(stored_fp) → API 노이즈 → 스킵 (false positive 제거)
-            # - 2차 불일치(1차와 동일) → 진짜 변동 → Shift 진단 진행
-            # - 2차 3중 불일치 → API 심각 불안정 → 이번 주기 스킵
             if stored_fingerprint:
                 logger.warning(
                     f"[{service_id}][피벗 무결성 검사] ⚠️ {idx:,}번 피벗 "
@@ -139,7 +145,6 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                 fp2 = compute_page_fingerprint(items2) if items2 else ""
 
                 if fp2 == stored_fingerprint:
-                    # 2차 확인 시 원래 fingerprint 복귀 → API 노이즈로 판단
                     logger.info(
                         f"[{service_id}][피벗 무결성 검사] ✅ {idx:,}번 피벗 "
                         f"재확인 결과 일치 — API 일시 노이즈로 판단, 스킵 (false positive 제거)"
@@ -147,17 +152,14 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                     continue
 
                 if fp2 == current_fingerprint:
-                    # 1차·2차 동일하게 불일치 → 진짜 변동
                     logger.warning(
                         f"[{service_id}][피벗 무결성 검사] ❌ {idx:,}번 피벗 "
                         f"fingerprint 2차 재확인 동일 불일치 — 진짜 변동으로 확정\n"
                         f"  저장 지문: {stored_fingerprint[:12]}...\n"
                         f"  확정 지문: {fp2[:12]}..."
                     )
-                    # items를 items2로 교체(최신 응답 기준으로 Shift 진단)
                     items = items2
                 else:
-                    # 3중 불일치(1차 ≠ 2차 ≠ stored) → API 심각 불안정
                     logger.warning(
                         f"[{service_id}][피벗 무결성 검사] ⚠️ {idx:,}번 피벗 "
                         f"3중 fingerprint 불일치 — API 응답 심각 불안정. 이번 주기 스킵."
@@ -178,7 +180,7 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                     f"  현재값: {actual_first_key}"
                 )
 
-            # ── Shift 진단: 저장된 첫 번째 복합키를 현재 records에서 선형 탐색 ──
+            # ── Shift 진단 ─────────────────────────────────────────────────
             stored_first_key = (stored_lcns_no, stored_chng_dt)
             logger.info(
                 f"[{service_id}] 🔍 Shift 진단: pages {idx:,}~{page_end:,}의 {len(items)}건 내에서 "
@@ -187,7 +189,6 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
 
             shift_amount = None
             new_rows = []
-
             for i, row in enumerate(items):
                 current_key = (row.get("LCNS_NO", ""), row.get("CHNG_DT", ""))
                 if current_key == stored_first_key:
@@ -195,6 +196,7 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                     new_rows = items[:i]
                     break
 
+            api_calls_used = getattr(api_client, "_call_count", 0) - api_calls_before
             shift_info = {
                 "first_mismatch_idx": idx,
                 "shift_amount": shift_amount,
@@ -203,8 +205,6 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                 "expected_lcns_no": stored_lcns_no,
                 "bssh_nm": bssh_nm,
             }
-
-            api_calls_used = getattr(api_client, "_call_count", 0) - api_calls_before
 
             if shift_amount is not None and shift_amount > 0:
                 new_rows_summary = "\n".join(
@@ -221,6 +221,7 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                     f"  → [{idx:,} ~ {idx+shift_amount-1:,}] 구간 즉시 수집 가능\n"
                     f"  📡 피벗 검사 누적 API 호출: {api_calls_used}회 소모"
                 )
+                all_missed_rows.extend(new_rows)
             elif shift_amount == 0:
                 logger.warning(
                     f"[{service_id}] 📊 Shift=0: pages {idx:,}~{page_end:,} — "
@@ -236,7 +237,11 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                     f"  📡 피벗 검사 누적 API 호출: {api_calls_used}회 소모"
                 )
 
-            return True, shift_info
+            # 첫 번째 불일치 정보 저장 (호환성)
+            if not any_changed:
+                first_shift_info = shift_info
+            any_changed = True
+            # [핵심] return하지 않고 다음 피벗으로 계속 진행 ───────────────
 
         except Exception as e:
             logger.warning(
@@ -245,6 +250,17 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
             continue
 
     api_calls_used = getattr(api_client, "_call_count", 0) - api_calls_before
+
+    if any_changed:
+        merged_shift_info = dict(first_shift_info)
+        merged_shift_info["all_missed_rows"] = all_missed_rows
+        logger.warning(
+            f"[{service_id}][피벗 무결성 검사] 🔍 전체 순회 완료: "
+            f"총 {len(sampled)}개 피벗 검사, {len(all_missed_rows)}건 누락 수집\n"
+            f"  📡 총 API 호출 횟수: {api_calls_used}회 소모"
+        )
+        return True, merged_shift_info
+
     logger.info(
         f"[{service_id}][피벗 무결성 검사] ✅ {len(sampled)}개 피벗 전체 정상 — "
         f"API 데이터 변동 없음 확인됨. (각 1,000건 fingerprint 대조)\n"
