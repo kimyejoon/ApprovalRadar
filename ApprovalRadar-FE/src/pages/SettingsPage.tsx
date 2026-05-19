@@ -494,10 +494,6 @@ function RollingScanSection() {
     queryFn: fetchRollingScanRate,
   });
 
-  const { data: currentInterval } = useQuery<number>({
-    queryKey: ['crawl-interval'],
-    queryFn: fetchCrawlInterval,
-  });
 
   const { data: keysData } = useQuery({
     queryKey: ['settings-api-keys'],
