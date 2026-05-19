@@ -216,7 +216,8 @@ class ApiClient:
             return self.api_keys[self.current_key_idx]
 
     async def rotate_key(self, failed_key: str):
-        """한도 초과 키를 소진 목록에 추가하고 다음 키로 교체합니다."""
+        """한도 초과 키를 소진 목록에 추가하고 다음 활성 키로 교체합니다.
+        소진된 키는 건너뛰어 retry 낭비를 방지합니다."""
         with self.key_lock:
             self.exhausted_keys.add(failed_key)
             ApiClient._mark_key_exhausted_in_db(failed_key)
@@ -229,9 +230,16 @@ class ApiClient:
             if self.api_keys[self.current_key_idx] != failed_key:
                 return
 
-            self.current_key_idx = (self.current_key_idx + 1) % len(self.api_keys)
-            new_key = self.api_keys[self.current_key_idx]
-            logger.info(f"[키 회전] API 한도 초과! 새로운 키로 교체: {new_key[:5]}***")
+            # 소진된 키를 건너뛰고 활성 키로 바로 점프
+            for _ in range(len(self.api_keys)):
+                self.current_key_idx = (self.current_key_idx + 1) % len(self.api_keys)
+                candidate = self.api_keys[self.current_key_idx]
+                if candidate not in self.exhausted_keys:
+                    logger.info(f"[키 회전] API 한도 초과! 활성 키로 교체: {candidate[:5]}***")
+                    break
+            else:
+                # 이론적으로 여기 도달 불가 (위 exhausted_keys 체크에서 걸림)
+                raise ApiKeysExhaustedError("All API keys are exhausted for today.")
         await self._renew_session()
 
     async def switch_key(self, current_key: str):
