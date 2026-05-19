@@ -42,6 +42,7 @@ interface PageScanEntry {
   page_number: number;
   page_start: number;
   fingerprint: string | null;
+  last_scanned: string | null;
 }
 
 // ─── API Helpers ────────────────────────────────────────────────────────────
@@ -365,20 +366,31 @@ export function PlaygroundPage() {
 
             {/* Heatmap-style page grid */}
             <div className="flex flex-wrap gap-[2px]">
-              {pageScan.entries.map((e) => (
-                <div
-                  key={e.page_number}
-                  className={`w-3 h-3 rounded-[2px] transition-colors cursor-pointer ${
-                    e.fingerprint ? 'bg-brand/60 hover:bg-brand' : 'bg-border-subtle hover:bg-border-standard'
-                  }`}
-                  title={`Page ${e.page_number} (${e.page_start.toLocaleString()}~) ${e.fingerprint ? `FP: ${e.fingerprint}` : '미스캔'}`}
-                />
-              ))}
+              {pageScan.entries.map((e) => {
+                const hasTime = !!e.last_scanned;
+                const hasFP = !!e.fingerprint;
+                const colorClass = hasFP && hasTime
+                  ? 'bg-brand hover:bg-brand/80'        // 이번 세션 스캔
+                  : hasFP
+                  ? 'bg-brand/30 hover:bg-brand/50'     // 이전 FP만
+                  : 'bg-border-subtle hover:bg-border-standard'; // 미스캔
+                return (
+                  <div
+                    key={e.page_number}
+                    className={`w-3 h-3 rounded-[2px] transition-colors cursor-pointer ${colorClass}`}
+                    title={`P${e.page_number} (${e.page_start.toLocaleString()}~)\n${hasFP ? `FP: ${e.fingerprint}` : '미스캔'}${hasTime ? `\n최종 스캔: ${e.last_scanned}` : ''}`}
+                  />
+                );
+              })}
             </div>
             <div className="flex items-center gap-4 mt-3 text-xs text-text-muted">
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-[2px] bg-brand/60" />
-                스캔 완료
+                <div className="w-3 h-3 rounded-[2px] bg-brand" />
+                이번 세션 스캔
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-[2px] bg-brand/30" />
+                이전 FP
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-[2px] bg-border-subtle" />

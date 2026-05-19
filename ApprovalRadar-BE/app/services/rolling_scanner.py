@@ -74,6 +74,7 @@ class RollingScanner:
         cursor_a = state.get("rolling_cursor_a", 1)
         cursor_b = state.get("rolling_cursor_b", mid_record)
         fingerprints: dict = state.get("page_fingerprints", {})
+        scan_times: dict = state.get("page_scan_times", {})
 
         # 각 커서에 절반씩 할당
         pages_a = pages_sequential // 2
@@ -101,7 +102,7 @@ class RollingScanner:
         # ── 커서 A 스캔 (전반부) ──
         scanned_a, new_a, mismatch_a, cursor_a = await self._scan_range(
             svc, cursor_a, range_a[0], range_a[1],
-            pages_a, fingerprints, "A"
+            pages_a, fingerprints, scan_times, "A"
         )
         mismatched_pages += mismatch_a
         total_scanned += scanned_a
@@ -117,7 +118,7 @@ class RollingScanner:
         # ── 커서 B 스캔 (후반부) ──
         scanned_b, new_b, mismatch_b, cursor_b = await self._scan_range(
             svc, cursor_b, range_b[0], range_b[1],
-            pages_b, fingerprints, "B"
+            pages_b, fingerprints, scan_times, "B"
         )
         mismatched_pages += mismatch_b
         total_scanned += scanned_b
@@ -132,7 +133,7 @@ class RollingScanner:
 
         # ── Track 2: Random Probe ──
         scanned_r, new_r = await self._scan_random_probe(
-            svc, pages_random, total_count, cursor_a, cursor_b, range_a, range_b
+            svc, pages_random, total_count, cursor_a, cursor_b, range_a, range_b, scan_times
         )
         total_scanned += scanned_r
         if new_r and flush_callback:
@@ -147,6 +148,7 @@ class RollingScanner:
         state["rolling_cursor_a"] = cursor_a
         state["rolling_cursor_b"] = cursor_b
         state["page_fingerprints"] = fingerprints
+        state["page_scan_times"] = scan_times
         # 구버전 호환: 단일 커서 키 제거
         state.pop("rolling_cursor", None)
         self.state_repo.save_state(svc, state)
@@ -176,7 +178,7 @@ class RollingScanner:
     async def _scan_range(
         self, svc: str, cursor: int,
         range_start: int, range_end: int,
-        max_pages: int, fingerprints: dict,
+        max_pages: int, fingerprints: dict, scan_times: dict,
         label: str
     ) -> tuple:
         """
@@ -307,6 +309,9 @@ class RollingScanner:
                 current_fp = compute_page_fingerprint(items)
                 stored_fp = fingerprints.get(str(page_start), "")
 
+                # 스캔 시각 기록
+                scan_times[str(page_start)] = datetime.now().strftime("%H:%M:%S")
+
                 if not stored_fp:
                     # 첫 스캔: fingerprint 신규 저장
                     new_fp_count += 1
@@ -391,7 +396,8 @@ class RollingScanner:
     async def _scan_random_probe(
         self, svc: str, max_pages: int, total_count: int,
         cursor_a: int, cursor_b: int,
-        range_a: tuple, range_b: tuple
+        range_a: tuple, range_b: tuple,
+        scan_times: dict | None = None
     ) -> tuple:
         """
         Track 2: 전체 범위에서 랜덤 페이지를 샘플링하여 DB 미존재 레코드를 수집합니다.
@@ -470,6 +476,10 @@ class RollingScanner:
                     continue
 
                 scanned += 1
+
+                # 스캔 시각 기록
+                if scan_times is not None:
+                    scan_times[str(page_start)] = datetime.now().strftime("%H:%M:%S")
 
                 # DB batch miss 체크
                 lcns_list = []

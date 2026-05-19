@@ -171,24 +171,26 @@ async def trigger_job(job_type: str):
 
 @router.get("/page-scan-history/{service_id}", response_model=PageScanHistoryResponse)
 async def get_page_scan_history(service_id: str = "I2861"):
-    """page_fingerprints 상태를 페이지별 테이블로 변환하여 반환합니다."""
+    """page_fingerprints + page_scan_times를 페이지별 테이블로 변환하여 반환합니다."""
     from app.repositories.state_repository import StateRepository
     state_repo = StateRepository()
     state = state_repo.load_state(service_id)
 
     total_count = state.get("last_total_count", 0)
     fingerprints = state.get("page_fingerprints", {})
+    scan_times = state.get("page_scan_times", {})
     total_pages = (total_count + 999) // 1000 if total_count > 0 else 0
 
     entries = []
     for p in range(total_pages):
         page_start = p * 1000 + 1
         fp = fingerprints.get(str(page_start))
+        ts = scan_times.get(str(page_start))
         entries.append(PageScanEntry(
             page_number=p + 1,
             page_start=page_start,
             fingerprint=fp[:12] if fp else None,
-            last_scanned=None,  # fingerprint 존재 = 스캔됨
+            last_scanned=ts,
         ))
 
     scanned = sum(1 for e in entries if e.fingerprint is not None)
