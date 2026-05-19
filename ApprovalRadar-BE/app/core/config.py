@@ -32,6 +32,11 @@ class Settings:
     PIVOT_INTERVAL = 5000  # 희소 색인(Sparse Index) 피벗 간격
     STATE_FILE_PATH = "result/meta_state.json"  # 메타데이터 상태 저장 파일
     
+    # Rolling Scan 설정: 매 주기 스캔할 API 페이지 수 (기본 100)
+    # 전체 1회전 시간 = ceil(전체 페이지 수 / ROLLING_SCAN_PAGES_PER_CYCLE) × 크롤링 주기
+    # 예: 1,198 페이지 / 100 = 12주기 × 30분 = 6시간
+    ROLLING_SCAN_PAGES_PER_CYCLE: int = 100
+    
     # API Keys
     API_KEYS = []
     

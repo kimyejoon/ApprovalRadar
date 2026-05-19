@@ -7,6 +7,7 @@ from app.repositories.state_repository import StateRepository
 from app.core.logger import logger
 from app.core.events import shutdown_event
 from app.services import pivot_manager
+from app.services.rolling_scanner import RollingScanner
 
 PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
 
@@ -17,9 +18,8 @@ PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
 # → 향후 신뢰 가능한 서비스가 확인될 때만 이 set에 추가할 것.
 RELIABLE_TOTAL_COUNT_SERVICES: set[str] = set()
 
-# 서비스별 피벗 검사 샘플 수 (DELETE 감지 커버리지 조정)
-# I2859: 피벗 47개 → 20샘플 = 42.6% 커버/주기
-# I2861: 피벗 190개 → 30샘플 = 15.8% 커버/주기 (5키 기준 일 1,008회 추가 소모, 한도 내)
+# [Legacy] 서비스별 피벗 검사 샘플 수 — Rolling Scan 도입으로 더 이상 사용되지 않음
+# 기동 시 startup_check에서만 참조 (호환성 유지)
 MAX_SAMPLES_BY_SVC: dict[str, int] = {
     "I2859": 20,
     "I2861": 30,
@@ -741,99 +741,24 @@ class DiffCrawlerEngine:
         if new_tail <= old_tail:
             elapsed = time.time() - start_time
 
-            pivots = state.get("pivots", {})
+            # ── Rolling Full Scan: 매 주기 N페이지 순차 스캔 ─────────────────────
+            # 기존 피벗 sample_check 교체 → 전체 페이지를 순환하며 fingerprint 비교
+            # 사각지대 0: 모든 레코드가 settings.ROLLING_SCAN_PAGES_PER_CYCLE 주기 내 검사됨
+            scanner = RollingScanner(self.api_client, svc, self.state_repo)
+            rolling_new_rows = await scanner.scan_cycle()
 
-            # pivots 있으면 Delete 은폐 감지 실행
-            if pivots:
-                # 서비스별 샘플 수 참조 (I2859=20, I2861=30)
-                # I2861 30샘플 × ~3.5초 ≈ 105초 (30분 주기 었 충분)
-                changed, shift_info = await pivot_manager.sample_check(
-                    pivots, self.api_client, svc,
-                    sample_ratio=1.0,  # ratio 먼저 적용되는 버그 방지: max_samples만 바인딩
-                    max_samples=MAX_SAMPLES_BY_SVC.get(svc, 20)
+            if rolling_new_rows:
+                logger.info(
+                    f"[{svc}] 📥 Rolling Scan 신규 {len(rolling_new_rows)}건 발견 → "
+                    f"scraper 파이프라인으로 반환 (DB 저장 + SSE 발행)"
                 )
-                if changed:
-                    logger.warning(
-                        f"[{svc}] ⚠️ [Delete 은폐 감지] Tail 변동 없으나 피벗 불일치! "
-                        f"피벗 초기화 후 다음 주기에 정상 Delta 탐색으로 신규 변동분 수집 예정."
-                    )
+                return rolling_new_rows
 
-                    # ✅ Shift 진단으로 신규 데이터 즉시 수집
-                    shift_amount = shift_info.get("shift_amount")
-                    insert_range = shift_info.get("insert_range")
-                    if shift_amount and shift_amount > 0 and insert_range:
-                        ins_start, ins_end = insert_range
-                        logger.info(
-                            f"[{svc}] 📥 Shift값({shift_amount})을 토대로 즉시 신규변동분 수집: "
-                            f"{ins_start:,} ~ {ins_end:,}번 구간 ({shift_amount}건)"
-                        )
-                        try:
-                            immediate_rows = shift_info.get("new_rows") or []
-                            if not immediate_rows:
-                                cs = ins_start
-                                while cs <= ins_end:
-                                    ce = min(cs + 1000 - 1, ins_end)
-                                    fetched = await self._fetch_page(cs, ce)
-                                    immediate_rows.extend(fetched)
-                                    cs += 1000
-                            if immediate_rows:
-                                logger.info(
-                                    f"[{svc}] ✅ 즉시 수집 성공: {len(immediate_rows)}건 확보 — "
-                                    f"기존 scraper 파이프라인으로 반환 (DB 저장 + SSE 발행)"
-                                )
-                                # 피벗 무효화 + 백그라운드 재건
-                                state["pivots"] = {}
-                                state["_bootstrapping"] = True
-                                self.state_repo.save_state(self.service_id, state)
-                                # [Bug-B Fix] 독립 ApiClient로 부트스트랩 실행
-                                threading.Thread(
-                                    target=lambda: asyncio.run(self._run_bootstrap_standalone()),
-                                    daemon=True,
-                                    name=f"BootstrapThread-{svc}"
-                                ).start()
-                                logger.info(f"[{svc}] 🔄 피벗 재건 백그라운드 시작")
-                                return immediate_rows
-                            else:
-                                logger.warning(f"[{svc}] 즉시 수집: {ins_start:,}~{ins_end:,} 응답 없음")
-                        except Exception as e:
-                            logger.warning(f"[{svc}] 즉시 수집 실패 (다음 주기 재시도): {e}")
-
-                    state["pivots"] = {}
-                    self.state_repo.save_state(self.service_id, state)
-                    return []
-
+            elapsed = time.time() - start_time
             logger.info(
                 f"[{svc}] ✔️ 이번 주기 신규 변동없음. (tail: {old_tail:,}건) "
-                f"[소요: {time.time() - start_time:.1f}초]"
+                f"[소요: {elapsed:.1f}초]"
             )
-            # ✅ 피벗 없음 → 다음 주기 즉시 재부트스트랩 (1주기 후)
-            # - 피벗이 비어있으면 Delete 은폐 감지 불가 → 최대한 빠르게 복원
-            # - MAX_EMPTY=1: Tail 변동 없음 확인 직후 즉시 재부트스트랩 실행
-            if not pivots:
-                self._empty_pivot_cycles += 1
-                MAX_EMPTY = 1
-                logger.info(
-                    f"[{svc}] 📋 피벗 없음 (Ping Only 모드) → "
-                    f"{'즉시 재부트스트랩 시작!' if self._empty_pivot_cycles >= MAX_EMPTY else '다음 주기 재부트스트랩 예정'}"
-                )
-                # 카운터 영속 저장
-                state["empty_pivot_cycles"] = self._empty_pivot_cycles
-                self.state_repo.save_state(self.service_id, state)
-                if self._empty_pivot_cycles >= MAX_EMPTY:
-                    logger.warning(f"[{svc}] 🔄 피벗 재건 백그라운드 시작 → Delete 은폐 감지 복원 중...")
-                    state["_bootstrapping"] = True
-                    self.state_repo.save_state(self.service_id, state)
-                    # [Bug-B Fix] 독립 ApiClient로 부트스트랩 실행
-                    threading.Thread(
-                        target=lambda: asyncio.run(self._run_bootstrap_standalone()),
-                        daemon=True,
-                        name=f"BootstrapThread-{self.service_id}"
-                    ).start()
-            else:
-                if self._empty_pivot_cycles != 0:
-                    self._empty_pivot_cycles = 0
-                    state["empty_pivot_cycles"] = 0
-                    self.state_repo.save_state(self.service_id, state)
             return []
 
 

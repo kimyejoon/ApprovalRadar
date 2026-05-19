@@ -305,3 +305,40 @@ async def update_crawl_interval(body: CrawlIntervalUpdateRequest):
         logger.error(f"[settings] 크롤링 주기 변경 오류: {e}")
         raise HTTPException(status_code=500, detail="크롤링 주기 변경 실패")
     return CrawlIntervalResponse(interval_minutes=body.interval_minutes)
+
+
+# ─── Rolling Scan 스캔 속도 설정 ─────────────────────────────────────────────
+
+class RollingScanRateResponse(BaseModel):
+    pages_per_cycle: int
+
+class RollingScanRateUpdateRequest(BaseModel):
+    pages_per_cycle: int
+
+@router.get(
+    "/rolling-scan-rate",
+    response_model=RollingScanRateResponse,
+    summary="Rolling Scan 주기당 스캔 페이지 수 조회",
+)
+async def get_rolling_scan_rate():
+    from app.core.config import settings as _s
+    return RollingScanRateResponse(pages_per_cycle=_s.ROLLING_SCAN_PAGES_PER_CYCLE)
+
+
+@router.put(
+    "/rolling-scan-rate",
+    response_model=RollingScanRateResponse,
+    summary="Rolling Scan 주기당 스캔 페이지 수 변경",
+    description="주기당 스캔할 페이지 수를 변경합니다. 10~200 범위에서 설정 가능. 서버 재시작 없이 즉시 반영됩니다.",
+)
+async def update_rolling_scan_rate(body: RollingScanRateUpdateRequest):
+    if not (10 <= body.pages_per_cycle <= 200):
+        raise HTTPException(status_code=422, detail="스캔 페이지 수는 10~200 범위여야 합니다.")
+    try:
+        from app.core.config import settings as _s
+        _s.ROLLING_SCAN_PAGES_PER_CYCLE = body.pages_per_cycle
+        logger.info(f"[settings] Rolling Scan 스캔 속도 변경: {body.pages_per_cycle}페이지/주기")
+    except Exception as e:
+        logger.error(f"[settings] Rolling Scan 스캔 속도 변경 오류: {e}")
+        raise HTTPException(status_code=500, detail="Rolling Scan 설정 변경 실패")
+    return RollingScanRateResponse(pages_per_cycle=body.pages_per_cycle)
