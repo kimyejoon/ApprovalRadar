@@ -194,8 +194,11 @@ class RollingScanner:
         new_fp_count = 0  # 신규 fingerprint 저장 수
         match_count = 0   # fingerprint 일치 수
         today_found = 0   # 오늘 CHNG_DT 신규 발견 수
+        yesterday_found = 0  # 어제 CHNG_DT 신규 발견 수
         db_miss_count = 0  # DB 미존재 레코드 수
         today_str = datetime.now().strftime("%Y%m%d")
+        from datetime import timedelta
+        yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
 
         # ── 인사이트 통계 수집용 ──
         all_chng_dts = []   # 전체 CHNG_DT 수집 (분포 분석)
@@ -288,13 +291,18 @@ class RollingScanner:
                         db_miss_count += len(missing_items)
                         new_rows.extend(missing_items)
 
-                        # 오늘 변동분 카운팅
                         today_in_missing = sum(
                             1 for item in missing_items
                             if item.get("CHNG_DT", "") == today_str
                         )
+                        yesterday_in_missing = sum(
+                            1 for item in missing_items
+                            if item.get("CHNG_DT", "") == yesterday_str
+                        )
                         if today_in_missing:
                             today_found += today_in_missing
+                        if yesterday_in_missing:
+                            yesterday_found += yesterday_in_missing
                             logger.info(
                                 f"[{svc}] 🆕 커서 {label} page {page_start:,}: "
                                 f"오늘({today_str}) 변동분 {today_in_missing}건 즉시 감지!"
@@ -372,7 +380,7 @@ class RollingScanner:
                     logger.info(
                         f"[{svc}] 📊 커서 {label} 진행: {scanned}/{max_pages}p "
                         f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched} "
-                        f"DB미존재:{db_miss_count} 오늘:{today_found}){insight}"
+                        f"DB미존재:{db_miss_count} 오늘:{today_found} 어제:{yesterday_found}){insight}"
                     )
 
         finally:
@@ -386,10 +394,14 @@ class RollingScanner:
             logger.info(
                 f"[{svc}] 🆕 커서 {label}: 오늘({today_str}) 변동분 {today_found}건 즉시 감지!"
             )
+        if yesterday_found > 0:
+            logger.info(
+                f"[{svc}] 📋 커서 {label}: 어제({yesterday_str}) 변동분 {yesterday_found}건 감지"
+            )
         logger.info(
             f"[{svc}] ✅ 커서 {label} 완료: {scanned}p 스캔 "
             f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched} "
-            f"DB미존재:{db_miss_count} 오늘:{today_found}) → {len(new_rows)}건 수집"
+            f"DB미존재:{db_miss_count} 오늘:{today_found} 어제:{yesterday_found}) → {len(new_rows)}건 수집"
         )
 
         return scanned, new_rows, mismatched, cursor
@@ -408,6 +420,8 @@ class RollingScanner:
             (scanned_count, new_rows)
         """
         today_str = datetime.now().strftime("%Y%m%d")
+        from datetime import timedelta as _td
+        yesterday_str = (datetime.now() - _td(days=1)).strftime("%Y%m%d")
         total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE
 
         # Sequential 커서 근방 제외 (±30p 범위)
@@ -445,6 +459,7 @@ class RollingScanner:
         scanned = 0
         new_rows = []
         today_found = 0
+        yesterday_found = 0
         db_miss_count = 0
 
         # DB batch 조회용 커넥션
@@ -505,20 +520,23 @@ class RollingScanner:
                         db_miss_count += len(page_new)
                         new_rows.extend(page_new)
 
-                # 오늘 CHNG_DT 체크
+                # 오늘/어제 CHNG_DT 체크
                 page_today = sum(1 for item in items if item.get("CHNG_DT", "").startswith(today_str))
+                page_yesterday = sum(1 for item in items if item.get("CHNG_DT", "").startswith(yesterday_str))
                 if page_today > 0:
                     today_found += page_today
                     logger.info(
                         f"[{svc}] 🎯 오늘 데이터 발견! page {page_start:,}: "
                         f"{page_today}건 (CHNG_DT={today_str})"
                     )
+                if page_yesterday > 0:
+                    yesterday_found += page_yesterday
 
                 # 10p마다 진행 로그
                 if scanned % 10 == 0:
                     logger.info(
                         f"[{svc}] 📊 Random Probe 진행: {scanned}/{sample_size}p "
-                        f"(DB미존재:{db_miss_count} 오늘:{today_found})"
+                        f"(DB미존재:{db_miss_count} 오늘:{today_found} 어제:{yesterday_found})"
                     )
 
                 await asyncio.sleep(0.3)
@@ -531,7 +549,7 @@ class RollingScanner:
 
         logger.info(
             f"[{svc}] ✅ Random Probe 완료: {scanned}p → "
-            f"{len(new_rows)}건 수집 (DB미존재:{db_miss_count} 오늘:{today_found})"
+            f"{len(new_rows)}건 수집 (DB미존재:{db_miss_count} 오늘:{today_found} 어제:{yesterday_found})"
         )
 
         return scanned, new_rows

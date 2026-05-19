@@ -21,6 +21,8 @@ interface SchedulerStatus {
 interface TodayDetection {
   today_date: string;
   today_count: number;
+  yesterday_date: string;
+  yesterday_count: number;
   total_records: number;
   scan_coverage_pct: number;
   recent_detections: {
@@ -332,10 +334,14 @@ export function PlaygroundPage() {
           <SectionTitle icon={<Play className="w-5 h-5 text-red-400" />} title="오늘 감지 현황" />
           {today ? (
             <div>
-              <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-4 gap-3 mb-4">
                 <div className="text-center p-3 rounded-lg bg-background">
                   <div className="text-2xl font-bold text-brand">{today.today_count}</div>
                   <div className="text-xs text-text-muted mt-1">오늘 변동건</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-background">
+                  <div className="text-2xl font-bold text-yellow-400">{today.yesterday_count}</div>
+                  <div className="text-xs text-text-muted mt-1">어제 변동건</div>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-background">
                   <div className="text-2xl font-bold text-text-primary">{today.total_records.toLocaleString()}</div>
@@ -350,7 +356,7 @@ export function PlaygroundPage() {
               {/* Recent Detections */}
               {today.recent_detections.length > 0 && (
                 <div className="mt-4">
-                  <h3 className="text-xs font-medium text-text-muted mb-2">최근 감지 (오늘)</h3>
+                  <h3 className="text-xs font-medium text-text-muted mb-2">최근 감지 (오늘+어제)</h3>
                   <div className="space-y-1 max-h-48 overflow-y-auto">
                     {today.recent_detections.map((d, i) => (
                       <div key={i} className="flex items-center justify-between px-3 py-1.5 rounded bg-background text-xs">

@@ -55,6 +55,8 @@ class PageScanHistoryResponse(BaseModel):
 class TodayDetectionResponse(BaseModel):
     today_date: str
     today_count: int
+    yesterday_date: str = ""
+    yesterday_count: int = 0
     total_records: int
     scan_coverage_pct: float
     recent_detections: List[dict]
@@ -288,9 +290,15 @@ async def get_page_scan_history(service_id: str = "I2861"):
 
 @router.get("/today-detection/{service_id}", response_model=TodayDetectionResponse)
 async def get_today_detection(service_id: str = "I2861"):
-    """오늘 CHNG_DT로 감지된 레코드 현황을 반환합니다."""
-    today_str = datetime.now().strftime("%Y%m%d")
-    today_display = datetime.now().strftime("%Y-%m-%d")
+    """오늘 + 어제 CHNG_DT로 감지된 레코드 현황을 반환합니다."""
+    from datetime import timedelta
+
+    now = datetime.now()
+    today_str = now.strftime("%Y%m%d")
+    today_display = now.strftime("%Y-%m-%d")
+    yesterday = now - timedelta(days=1)
+    yesterday_str = yesterday.strftime("%Y%m%d")
+    yesterday_display = yesterday.strftime("%Y-%m-%d")
 
     with get_db() as conn:
         # 오늘 변동분
@@ -299,18 +307,24 @@ async def get_today_detection(service_id: str = "I2861"):
             (today_str,)
         ).fetchone()[0]
 
+        # 어제 변동분
+        yesterday_count = conn.execute(
+            "SELECT COUNT(*) FROM businesses WHERE last_event_date = ?",
+            (yesterday_str,)
+        ).fetchone()[0]
+
         # 전체 레코드
         total = conn.execute("SELECT COUNT(*) FROM businesses").fetchone()[0]
 
-        # 최근 감지된 오늘 데이터 (최신 10건)
+        # 최근 감지된 오늘+어제 데이터 (최신 10건)
         recent = conn.execute(
             """SELECT business_name, license_no, industry_type, last_event_date, 
                       updated_at, infer_update_type
                FROM businesses 
-               WHERE last_event_date = ? 
-               ORDER BY updated_at DESC 
+               WHERE last_event_date IN (?, ?) 
+               ORDER BY last_event_date DESC, updated_at DESC 
                LIMIT 10""",
-            (today_str,)
+            (today_str, yesterday_str)
         ).fetchall()
 
         recent_list = [
@@ -338,6 +352,8 @@ async def get_today_detection(service_id: str = "I2861"):
     return TodayDetectionResponse(
         today_date=today_display,
         today_count=today_count,
+        yesterday_date=yesterday_display,
+        yesterday_count=yesterday_count,
         total_records=total,
         scan_coverage_pct=round(coverage, 1),
         recent_detections=recent_list,
