@@ -25,8 +25,8 @@ class Settings:
     GAP_SECONDS = 3.0   # 하위 호환성 유지
     GAP_MIN = 0.5       # Jitter 최솟값(초) - WAF 차단 시 키 전환으로 우회
     GAP_MAX = 1.5       # Jitter 최댓값(초) - 축소하여 스캔 속도 향상
-    # 탐색 최소주기 - .env의 SCRAPER_INTERVAL_MINUTES 로 오버라이드 가능 (기본값 30분)
-    SCRAPER_INTERVAL_MINUTES: int = 30
+    # 탐색 최소주기 - .env의 SCRAPER_INTERVAL_MINUTES 로 오버라이드 가능 (기본값 15분)
+    SCRAPER_INTERVAL_MINUTES: int = 15
     
     # 모니터링 최적화 설정
     PIVOT_INTERVAL = 5000  # 희소 색인(Sparse Index) 피벗 간격
@@ -34,7 +34,8 @@ class Settings:
     
     # Rolling Scan 설정: 매 주기 스캔할 API 페이지 총 수 (전 서비스 합계)
     # 서비스별 비례 배분됨 → compute_optimal_defaults() 참조
-    ROLLING_SCAN_PAGES_PER_CYCLE: int = 100
+    # 12키 기반: 15분 주기 × 150p = ~1.5시간에 1회전
+    ROLLING_SCAN_PAGES_PER_CYCLE: int = 150
     
     # API Keys
     API_KEYS = []

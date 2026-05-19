@@ -181,7 +181,7 @@ async def poll_changes_for_date(target_date: str) -> dict:
             )
 
             from scraper import run_scraper_for_service_with_rows
-            await run_scraper_for_service_with_rows("I2861", mapped_rows)
+            await run_scraper_for_service_with_rows("I2861", mapped_rows, collected_by="chng_dt_poller")
             result["new"] = len(new_items)
 
             elapsed = round(time.time() - start_time, 1)

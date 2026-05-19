@@ -176,6 +176,8 @@ def init_db():
         cursor.execute("ALTER TABLE businesses ADD COLUMN change_before TEXT")
     if "change_after" not in biz_columns:
         cursor.execute("ALTER TABLE businesses ADD COLUMN change_after TEXT")
+    if "collected_by" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN collected_by TEXT")
 
     # 인허가 변동건 메모 테이블 (license_date + business_name 당 1건)
     cursor.execute('''

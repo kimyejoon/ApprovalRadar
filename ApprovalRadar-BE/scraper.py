@@ -182,6 +182,7 @@ async def run_scraper_for_service(service_id: str):
                             "change_reason": fields.get("change_reason"),
                             "change_before": fields.get("change_before"),
                             "change_after": fields.get("change_after"),
+                            "collected_by": "rolling_scan",
                         }
                         business_repo.insert_business(record, conn=conn)
                         # 1. 원본 API 응답(JSON) DB 저장
@@ -383,7 +384,7 @@ async def run_all_scrapers():
         await run_scraper_for_service(svc)
 
 
-async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list):
+async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list, collected_by: str = "rolling_scan"):
     """
     외부에서 수집된 rows를 DB에 저장 + SSE 발행.
     [최적화] batch SELECT로 기존 레코드 조회 후 bulk INSERT/UPDATE.
@@ -499,6 +500,7 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
                 "change_reason": fields.get("change_reason"),
                 "change_before": fields.get("change_before"),
                 "change_after": fields.get("change_after"),
+                "collected_by": collected_by,
             }
             business_repo.insert_business(record, conn=conn)
             raw_repo.insert_raw_data(lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now, conn=conn)

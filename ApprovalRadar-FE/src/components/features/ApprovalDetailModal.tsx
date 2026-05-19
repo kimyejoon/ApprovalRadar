@@ -374,6 +374,11 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
                               {item.prev_business_status && ` (이전: ${item.prev_business_status})`}
                             </span>
                           )}
+                          {item.collected_by && (
+                            <span className="text-[10px] text-text-muted/50 mt-1 font-mono">
+                              via {({'rolling_scan': 'Rolling Scan', 'chng_dt_poller': 'CHNG_DT Poller', 'tail_ping': 'Tail Ping', 'range_scan': 'Range Scan'} as Record<string, string>)[item.collected_by] || item.collected_by}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-text-muted">

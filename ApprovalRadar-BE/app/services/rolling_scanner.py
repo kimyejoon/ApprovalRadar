@@ -19,9 +19,10 @@ Rolling Full Scan 서비스 모듈 (2-Track 아키텍처).
 """
 import asyncio
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.core.config import settings
 from app.core.logger import logger
+from app.core.events import shutdown_event
 from app.services.pivot_manager import compute_page_fingerprint
 
 PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
@@ -35,12 +36,16 @@ class RollingScanner:
 
     async def scan_cycle(self, pages_per_cycle: int = None, flush_callback=None, boosted: bool = False) -> list:
         """
-        2-Track Rolling Scan: Sequential(A+B) + Random Probe.
+        Oldest-First Rolling Scan: 가장 오래된 페이지 우선 + Random Probe.
+
+        전략:
+        - 1시간 이상 경과한 페이지를 오래된 순으로 선택 (미스캔 = 최우선)
+        - 30% Random Probe (부스트 시 50%)
 
         Args:
             pages_per_cycle: 주기당 총 스캔 페이지 수
-            flush_callback: async callable(rows) — 각 트랙 완료 시 즉시 호출.
-            boosted: True면 Random Probe 비중 증가 (Tail Ping 트리거 시)
+            flush_callback: async callable(rows) — 완료 시 즉시 호출.
+            boosted: True면 Random Probe 비중 증가
 
         Returns:
             list: 새로 발견된 레코드 리스트 (flush_callback 미사용 시)
@@ -54,126 +59,198 @@ class RollingScanner:
         if total_count == 0:
             return []
 
-        # 전체 페이지 수 및 중간점 계산
         total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE
         if total_pages == 0:
             return []
 
-        mid_record = ((total_count // 2) // PAGE_SIZE) * PAGE_SIZE + 1  # mid 정렬
-
-        # ── 2-Track 페이지 분배 ──
-        # 일반: Sequential 70% + Random 30%
-        # 부스트(Tail Ping 트리거): Sequential 50% + Random 50%
-        if boosted:
-            pages_random = pages_per_cycle // 2
-        else:
-            pages_random = max(10, pages_per_cycle * 3 // 10)  # 최소 10p
-        pages_sequential = pages_per_cycle - pages_random
-
-        # 듀얼 커서 로드
-        cursor_a = state.get("rolling_cursor_a", 1)
-        cursor_b = state.get("rolling_cursor_b", mid_record)
         fingerprints: dict = state.get("page_fingerprints", {})
         scan_times: dict = state.get("page_scan_times", {})
 
-        # 각 커서에 절반씩 할당
-        pages_a = pages_sequential // 2
-        pages_b = pages_sequential - pages_a
+        # ── 페이지 분배: Oldest-First + Random ──
+        if boosted:
+            pages_random = pages_per_cycle // 2
+        else:
+            pages_random = max(10, pages_per_cycle * 3 // 10)
+        pages_oldest = pages_per_cycle - pages_random
 
-        # 영역 범위
-        range_a = (1, mid_record - 1)           # 전반부
-        range_b = (mid_record, total_count)     # 후반부
+        # ── Track 1: Oldest-First 페이지 선택 ──
+        MIN_AGE_SEC = 3600  # 1시간 이상 경과한 페이지만
+        oldest_pages = self._select_oldest_pages(scan_times, total_pages, pages_oldest, MIN_AGE_SEC)
 
-        pages_a_total = (range_a[1]) // PAGE_SIZE if range_a[1] > 0 else 0
-        pages_b_total = ((range_b[1] - range_b[0] + 1) + PAGE_SIZE - 1) // PAGE_SIZE if range_b[1] >= range_b[0] else 0
+        if oldest_pages:
+            max_age = self._get_page_age(scan_times, oldest_pages[0])
+            min_age = self._get_page_age(scan_times, oldest_pages[-1])
+            unscanned = sum(1 for ps in oldest_pages if str(ps) not in scan_times)
+        else:
+            max_age = min_age = 0.0
+            unscanned = 0
 
-        mode = "🚀 BOOST" if boosted else "🔄 일반"
+        mode = "🚀 BOOST" if boosted else "🔄 Oldest-First"
         logger.info(
-            f"[{svc}] {mode} Rolling Scan 시작 (2-Track): "
-            f"Sequential A={cursor_a:,}~{range_a[1]:,} ({pages_a}p) + B={cursor_b:,}~{range_b[1]:,} ({pages_b}p) | "
-            f"Random Probe {pages_random}p | "
-            f"전체={total_pages}p ({total_count:,}건)"
+            f"[{svc}] {mode} Rolling Scan: "
+            f"Oldest {len(oldest_pages)}p (미스캔 {unscanned}p, "
+            f"최고연식 {max_age:.1f}h, 최저 {min_age:.1f}h) + "
+            f"Random {pages_random}p | 전체={total_pages}p ({total_count:,}건)"
         )
 
         new_rows_total = []
-        mismatched_pages = 0
         total_scanned = 0
+        mismatched_pages = 0
 
-        # ── 커서 A 스캔 (전반부) ──
-        scanned_a, new_a, mismatch_a, cursor_a = await self._scan_range(
-            svc, cursor_a, range_a[0], range_a[1],
-            pages_a, fingerprints, scan_times, "A"
-        )
-        mismatched_pages += mismatch_a
-        total_scanned += scanned_a
-        # 커서 A 완료 즉시 flush → DB INSERT + SSE 발행
-        if new_a and flush_callback:
-            await flush_callback(new_a)
-            logger.info(
-                f"[{svc}] ⚡ 커서 A 즉시 flush: {len(new_a)}건 → scraper 파이프라인"
+        # ── Oldest-First 스캔 ──
+        for page_start in oldest_pages:
+            if shutdown_event.is_set():
+                break
+            scanned, new_rows, mismatch = await self._scan_single_page(
+                svc, page_start, total_count, fingerprints, scan_times
             )
-        elif new_a:
-            new_rows_total.extend(new_a)
-
-        # ── 커서 B 스캔 (후반부) ──
-        scanned_b, new_b, mismatch_b, cursor_b = await self._scan_range(
-            svc, cursor_b, range_b[0], range_b[1],
-            pages_b, fingerprints, scan_times, "B"
-        )
-        mismatched_pages += mismatch_b
-        total_scanned += scanned_b
-        # 커서 B 완료 즉시 flush
-        if new_b and flush_callback:
-            await flush_callback(new_b)
-            logger.info(
-                f"[{svc}] ⚡ 커서 B 즉시 flush: {len(new_b)}건 → scraper 파이프라인"
-            )
-        elif new_b:
-            new_rows_total.extend(new_b)
+            total_scanned += scanned
+            mismatched_pages += mismatch
+            if new_rows and flush_callback:
+                await flush_callback(new_rows)
+            elif new_rows:
+                new_rows_total.extend(new_rows)
 
         # ── Track 2: Random Probe ──
         scanned_r, new_r = await self._scan_random_probe(
-            svc, pages_random, total_count, cursor_a, cursor_b, range_a, range_b, scan_times
+            svc, pages_random, total_count, 1, total_count, (1, total_count), (1, total_count), scan_times
         )
         total_scanned += scanned_r
         if new_r and flush_callback:
             await flush_callback(new_r)
             logger.info(
-                f"[{svc}] ⚡ Random Probe 즉시 flush: {len(new_r)}건 → scraper 파이프라인"
+                f"[{svc}] ⚡ Random Probe flush: {len(new_r)}건 → scraper 파이프라인"
             )
         elif new_r:
             new_rows_total.extend(new_r)
 
-        # 상태 영속화
-        state["rolling_cursor_a"] = cursor_a
-        state["rolling_cursor_b"] = cursor_b
+        # 상태 영속화 (커서 불필요 — Oldest-First는 상태 없음)
         state["page_fingerprints"] = fingerprints
         state["page_scan_times"] = scan_times
-        # 구버전 호환: 단일 커서 키 제거
         state.pop("rolling_cursor", None)
+        state.pop("rolling_cursor_a", None)
+        state.pop("rolling_cursor_b", None)
         self.state_repo.save_state(svc, state)
 
-        # 남은 페이지 계산
-        remaining_a = max(0, ((range_a[1] - cursor_a + 1) + PAGE_SIZE - 1) // PAGE_SIZE) if cursor_a <= range_a[1] else pages_a_total
-        remaining_b = max(0, ((range_b[1] - cursor_b + 1) + PAGE_SIZE - 1) // PAGE_SIZE) if cursor_b <= range_b[1] else pages_b_total
-        max_remaining = max(remaining_a, remaining_b)
-        half_pages = max(pages_a, pages_b)
-        cycles_to_complete = (max_remaining + half_pages - 1) // half_pages if half_pages > 0 else 0
+        # 커버리지 계산
+        scanned_page_count = sum(1 for k in scan_times if scan_times[k])
+        coverage_pct = round(scanned_page_count / total_pages * 100, 1) if total_pages > 0 else 0
 
-        flushed_total = (len(new_a) if new_a and flush_callback else 0) + \
-                        (len(new_b) if new_b and flush_callback else 0) + \
-                        (len(new_r) if new_r and flush_callback else 0)
+        flushed_total = (len(new_r) if new_r and flush_callback else 0)
 
         logger.info(
             f"[{svc}] ✅ Rolling Scan 완료: "
-            f"{total_scanned}p (Seq A:{scanned_a}+B:{scanned_b} | Rand:{scanned_r}), "
+            f"{total_scanned}p (Oldest:{len(oldest_pages)} + Rand:{scanned_r}), "
             f"{mismatched_pages}건 불일치, "
             f"{flushed_total + len(new_rows_total)}건 수집 | "
-            f"다음 A={cursor_a:,}, B={cursor_b:,} | "
-            f"약 {cycles_to_complete}주기 후 1회전 완료"
+            f"커버리지: {scanned_page_count}/{total_pages}p ({coverage_pct}%)"
         )
 
         return new_rows_total
+
+    def _select_oldest_pages(self, scan_times: dict, total_pages: int, count: int, min_age_sec: int = 3600) -> list:
+        """
+        1시간 이상 경과한 페이지를 오래된 순으로 count개 선택.
+        미스캔 페이지(scan_times에 없는)가 최우선.
+        """
+        now = datetime.now()
+        candidates = []
+        for page_idx in range(total_pages):
+            page_start = page_idx * PAGE_SIZE + 1
+            key = str(page_start)
+            last_scan = scan_times.get(key)
+            if last_scan is None:
+                age = float('inf')  # 미스캔 = 최우선
+            else:
+                try:
+                    age = (now - datetime.fromisoformat(last_scan)).total_seconds()
+                except (ValueError, TypeError):
+                    age = float('inf')
+            if age >= min_age_sec:
+                candidates.append((page_start, age))
+
+        # 오래된 순 정렬 → 상위 count개
+        candidates.sort(key=lambda x: -x[1])
+        return [c[0] for c in candidates[:count]]
+
+    def _get_page_age(self, scan_times: dict, page_start: int) -> float:
+        """페이지의 연식(시간)을 반환."""
+        key = str(page_start)
+        last_scan = scan_times.get(key)
+        if last_scan is None:
+            return 999.9
+        try:
+            delta = (datetime.now() - datetime.fromisoformat(last_scan)).total_seconds()
+            return delta / 3600
+        except (ValueError, TypeError):
+            return 999.9
+
+    async def _scan_single_page(
+        self, svc: str, page_start: int, total_count: int,
+        fingerprints: dict, scan_times: dict
+    ) -> tuple:
+        """
+        단일 페이지 스캔 + fingerprint 비교.
+        Returns: (scanned_count, new_rows, mismatch_count)
+        """
+        from app.core.events import shutdown_event
+        if shutdown_event.is_set():
+            return (0, [], 0)
+
+        page_end = min(page_start + PAGE_SIZE - 1, total_count)
+        fp_key = str(page_start)
+
+        try:
+            data = await self.api_client.fetch_data(
+                self.service_id, page_start, page_end
+            )
+        except Exception as e:
+            logger.debug(f"[{svc}] 페이지 {page_start} API 실패: {e}")
+            return (0, [], 0)
+
+        if not data or self.service_id not in data:
+            return (1, [], 0)
+
+        rows = data[self.service_id].get("row", [])
+        if not rows:
+            return (1, [], 0)
+
+        # Fingerprint 비교
+        new_fp = compute_page_fingerprint(rows)
+        old_fp = fingerprints.get(fp_key)
+        fingerprints[fp_key] = new_fp
+        scan_times[fp_key] = datetime.now().isoformat()
+
+        mismatch = 0
+        new_rows = []
+
+        if old_fp and old_fp != new_fp:
+            mismatch = 1
+            # 불일치 → DB에 없는 레코드 찾기
+            from database import get_db
+            today_str = datetime.now().strftime("%Y%m%d")
+            yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+
+            lcns_list = [r.get("LCNS_NO", "") for r in rows if r.get("LCNS_NO")]
+            existing_set = set()
+            if lcns_list:
+                with get_db() as conn:
+                    ph = ",".join(["?"] * len(lcns_list))
+                    db_rows = conn.execute(
+                        f"SELECT license_no, last_event_date FROM businesses WHERE license_no IN ({ph})",
+                        lcns_list
+                    ).fetchall()
+                    for r in db_rows:
+                        existing_set.add((r["license_no"], r["last_event_date"]))
+
+            for row in rows:
+                lcns = row.get("LCNS_NO", "")
+                chng_dt = row.get("CHNG_DT", "")
+                if lcns and chng_dt in (today_str, yesterday_str):
+                    if (lcns, chng_dt) not in existing_set:
+                        new_rows.append(row)
+
+        return (1, new_rows, mismatch)
 
     async def _scan_range(
         self, svc: str, cursor: int,

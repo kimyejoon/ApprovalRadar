@@ -155,7 +155,7 @@ async def trigger_range_scan(req: RangeScanRequest):
             # flush callback — scraper 파이프라인으로
             async def _flush(rows):
                 from scraper import run_scraper_for_service_with_rows
-                await run_scraper_for_service_with_rows(svc, rows)
+                await run_scraper_for_service_with_rows(svc, rows, collected_by="range_scan")
 
             scanned, new_rows, mismatch, _ = await scanner._scan_range(
                 svc, req.start, req.start, req.end,

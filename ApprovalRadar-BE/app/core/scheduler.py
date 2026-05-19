@@ -157,7 +157,7 @@ def _evening_chng_dt_job():
                             f"→ scraper 파이프라인으로 처리 (DB 저장 + SSE 발행)"
                         )
                         from scraper import run_scraper_for_service_with_rows
-                        await run_scraper_for_service_with_rows(svc_id, new_rows)
+                        await run_scraper_for_service_with_rows(svc_id, new_rows, collected_by="chng_dt_poller")
                         found_total += len(new_rows)
                     else:
                         logger.info(
@@ -261,7 +261,7 @@ def _boosted_rolling_scan_job():
                     scanner = RollingScanner(api_client, svc_id, state_repo)
 
                     async def flush_cb(rows):
-                        await run_scraper_for_service_with_rows(svc_id, rows)
+                        await run_scraper_for_service_with_rows(svc_id, rows, collected_by="tail_ping")
 
                     await scanner.scan_cycle(
                         flush_callback=flush_cb,

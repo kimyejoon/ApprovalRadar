@@ -21,6 +21,7 @@ export interface ApprovalData {
   infer_update_detail?: string;
   is_read?: number;
   read_at?: string | null;
+  collected_by?: string | null;
 }
 
 export interface ApprovalMappedItem {
