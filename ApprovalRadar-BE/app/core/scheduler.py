@@ -241,22 +241,67 @@ def shutdown_scheduler():
     scheduler.shutdown(wait=False)
 
 
+def _boosted_rolling_scan_job():
+    """Tail Ping 변동 감지 → 부스트 Rolling Scan (Random Probe 50%) 즉시 실행."""
+    from app.core.config import settings
+    from app.clients.foodsafety_api import ApiClient
+    from app.services.rolling_scanner import RollingScanner
+    from app.services.diff_crawler import StateRepository
+    from scraper import run_scraper_for_service_with_rows
+
+    async def _run():
+        service_ids = getattr(settings, "SERVICES", ["I2861"])
+        state_repo = StateRepository()
+
+        async with ApiClient() as api_client:
+            for svc_id in service_ids:
+                try:
+                    scanner = RollingScanner(api_client, svc_id, state_repo)
+
+                    async def flush_cb(rows):
+                        await run_scraper_for_service_with_rows(svc_id, rows)
+
+                    await scanner.scan_cycle(
+                        flush_callback=flush_cb,
+                        boosted=True,  # Random Probe 50%
+                    )
+                except Exception as e:
+                    logger.error(f"[Boost Scan] {svc_id} 실패: {e}")
+
+    asyncio.run(_run())
+
+
 def trigger_immediate_scrape():
-    """키 회복/추가 시 크롤링을 즉시 1회 실행합니다.
-    APScheduler 'date' 잡으로 등록하여 별도 스레드에서 비동기로 안전하게 실행합니다.
-    이미 실행 중인 잡과 충돌하지 않습니다 (고유 id를 timestamp로 구분)."""
+    """Tail Ping 변동 감지 시 즉시 실행:
+    1) 기존 Scraper (tail 수집)
+    2) 부스트 Rolling Scan (Random Probe 50% — 오늘 변동분 빠른 감지)
+    APScheduler 'date' 잡으로 등록하여 별도 스레드에서 비동기로 안전 실행."""
     import time
-    job_id = f"immediate_scrape_{int(time.time())}"
+    ts = int(time.time())
+
+    # 1) 기존 scraper (tail 영역 수집)
     try:
         scheduler.add_job(
             _scraper_job,
             'date',
             run_date=datetime.now(),
-            id=job_id,
+            id=f"immediate_scrape_{ts}",
         )
-        logger.info(f"[즉시 재가동] 크롤러 즉시 실행 잡 등록됨: {job_id}")
+        logger.info(f"[즉시 재가동] Scraper 즉시 실행 등록")
     except Exception as e:
-        logger.error(f"[즉시 재가동] 잡 등록 실패: {e}")
+        logger.error(f"[즉시 재가동] Scraper 등록 실패: {e}")
+
+    # 2) 부스트 Rolling Scan (Random Probe 비중 증가)
+    try:
+        scheduler.add_job(
+            _boosted_rolling_scan_job,
+            'date',
+            run_date=datetime.now(),
+            id=f"boost_rolling_{ts}",
+        )
+        logger.info(f"[즉시 재가동] 🚀 부스트 Rolling Scan 등록 (Random 50%)")
+    except Exception as e:
+        logger.error(f"[즉시 재가동] 부스트 Rolling 등록 실패: {e}")
 
 
 def reschedule_scraper_job(new_interval_minutes: int) -> None:

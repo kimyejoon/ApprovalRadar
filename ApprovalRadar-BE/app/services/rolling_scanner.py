@@ -1,21 +1,21 @@
 """
-Rolling Full Scan 서비스 모듈 (듀얼 커서 버전).
+Rolling Full Scan 서비스 모듈 (2-Track 아키텍처).
 
-매 주기 N페이지(기본 100)를 2개 커서(A/B)로 나눠 순차 스캔.
-- cursor_a: 전체 데이터의 전반부 (0 ~ mid)
-- cursor_b: 전체 데이터의 후반부 (mid ~ end)
-각 커서가 자기 영역을 순환하므로, 1커서 대비 회전 시간 2배 단축.
+=== Track 1: Sequential Scan (듀얼 커서 A/B) ===
+전체 데이터를 순차적으로 스캔하여 과거 누락 데이터를 보완합니다.
+- cursor_a: 전반부 (0 ~ mid) 순차 스캔
+- cursor_b: 후반부 (mid ~ end) 순차 스캔
+
+=== Track 2: Random Probe ===
+전체 범위에서 랜덤 페이지를 샘플링하여 오늘 변동분을 빠르게 감지합니다.
+- 매 주기 30% 페이지를 랜덤 위치에서 스캔
+- Sequential이 아직 미도달한 구간의 오늘 데이터를 확률적으로 감지
+- Tail Ping 부스트 시 Random 비중 50%로 증가
 
 상태 (crawler_state.extra_state에 영속):
   - rolling_cursor_a: 전반부 스캔 위치
   - rolling_cursor_b: 후반부 스캔 위치
   - page_fingerprints: {page_start_idx: fingerprint_hash}
-
-핵심 로직:
-  1. cursor_a에서 N/2페이지, cursor_b에서 N/2페이지 스캔
-  2. 저장된 fingerprint와 비교 → 불일치 시 신규 레코드 추출
-  3. 각 커서 전진 (영역 끝 도달 시 영역 시작으로 리셋)
-  4. 수집된 신규 레코드 반환
 """
 import asyncio
 import random
@@ -33,15 +33,14 @@ class RollingScanner:
         self.service_id = service_id
         self.state_repo = state_repo
 
-    async def scan_cycle(self, pages_per_cycle: int = None, flush_callback=None) -> list:
+    async def scan_cycle(self, pages_per_cycle: int = None, flush_callback=None, boosted: bool = False) -> list:
         """
-        듀얼 커서로 전반부/후반부를 동시에 스캔하여 변경된 레코드를 반환합니다.
+        2-Track Rolling Scan: Sequential(A+B) + Random Probe.
 
         Args:
-            pages_per_cycle: 주기당 스캔 페이지 수
-            flush_callback: async callable(rows) — 커서별 스캔 완료 시 즉시 호출.
-                           DB INSERT + SSE 발행을 위해 사용.
-                           호출되면 해당 rows는 반환 리스트에서 제외됨.
+            pages_per_cycle: 주기당 총 스캔 페이지 수
+            flush_callback: async callable(rows) — 각 트랙 완료 시 즉시 호출.
+            boosted: True면 Random Probe 비중 증가 (Tail Ping 트리거 시)
 
         Returns:
             list: 새로 발견된 레코드 리스트 (flush_callback 미사용 시)
@@ -62,14 +61,23 @@ class RollingScanner:
 
         mid_record = ((total_count // 2) // PAGE_SIZE) * PAGE_SIZE + 1  # mid 정렬
 
+        # ── 2-Track 페이지 분배 ──
+        # 일반: Sequential 70% + Random 30%
+        # 부스트(Tail Ping 트리거): Sequential 50% + Random 50%
+        if boosted:
+            pages_random = pages_per_cycle // 2
+        else:
+            pages_random = max(10, pages_per_cycle * 3 // 10)  # 최소 10p
+        pages_sequential = pages_per_cycle - pages_random
+
         # 듀얼 커서 로드
         cursor_a = state.get("rolling_cursor_a", 1)
         cursor_b = state.get("rolling_cursor_b", mid_record)
         fingerprints: dict = state.get("page_fingerprints", {})
 
         # 각 커서에 절반씩 할당
-        pages_a = pages_per_cycle // 2
-        pages_b = pages_per_cycle - pages_a  # 홀수일 경우 B가 1개 더
+        pages_a = pages_sequential // 2
+        pages_b = pages_sequential - pages_a
 
         # 영역 범위
         range_a = (1, mid_record - 1)           # 전반부
@@ -78,11 +86,12 @@ class RollingScanner:
         pages_a_total = (range_a[1]) // PAGE_SIZE if range_a[1] > 0 else 0
         pages_b_total = ((range_b[1] - range_b[0] + 1) + PAGE_SIZE - 1) // PAGE_SIZE if range_b[1] >= range_b[0] else 0
 
+        mode = "🚀 BOOST" if boosted else "🔄 일반"
         logger.info(
-            f"[{svc}] 🔄 Rolling Scan 시작 (듀얼 커서): "
-            f"A={cursor_a:,}~{range_a[1]:,} ({pages_a}p), "
-            f"B={cursor_b:,}~{range_b[1]:,} ({pages_b}p) | "
-            f"전체={total_pages}페이지 ({total_count:,}건)"
+            f"[{svc}] {mode} Rolling Scan 시작 (2-Track): "
+            f"Sequential A={cursor_a:,}~{range_a[1]:,} ({pages_a}p) + B={cursor_b:,}~{range_b[1]:,} ({pages_b}p) | "
+            f"Random Probe {pages_random}p | "
+            f"전체={total_pages}p ({total_count:,}건)"
         )
 
         new_rows_total = []
@@ -121,6 +130,19 @@ class RollingScanner:
         elif new_b:
             new_rows_total.extend(new_b)
 
+        # ── Track 2: Random Probe ──
+        scanned_r, new_r = await self._scan_random_probe(
+            svc, pages_random, total_count, cursor_a, cursor_b, range_a, range_b
+        )
+        total_scanned += scanned_r
+        if new_r and flush_callback:
+            await flush_callback(new_r)
+            logger.info(
+                f"[{svc}] ⚡ Random Probe 즉시 flush: {len(new_r)}건 → scraper 파이프라인"
+            )
+        elif new_r:
+            new_rows_total.extend(new_r)
+
         # 상태 영속화
         state["rolling_cursor_a"] = cursor_a
         state["rolling_cursor_b"] = cursor_b
@@ -137,13 +159,14 @@ class RollingScanner:
         cycles_to_complete = (max_remaining + half_pages - 1) // half_pages if half_pages > 0 else 0
 
         flushed_total = (len(new_a) if new_a and flush_callback else 0) + \
-                        (len(new_b) if new_b and flush_callback else 0)
+                        (len(new_b) if new_b and flush_callback else 0) + \
+                        (len(new_r) if new_r and flush_callback else 0)
 
         logger.info(
             f"[{svc}] ✅ Rolling Scan 완료: "
-            f"{total_scanned}페이지 스캔 (A:{scanned_a}+B:{scanned_b}), "
+            f"{total_scanned}p (Seq A:{scanned_a}+B:{scanned_b} | Rand:{scanned_r}), "
             f"{mismatched_pages}건 불일치, "
-            f"{flushed_total + len(new_rows_total)}건 신규 수집 | "
+            f"{flushed_total + len(new_rows_total)}건 수집 | "
             f"다음 A={cursor_a:,}, B={cursor_b:,} | "
             f"약 {cycles_to_complete}주기 후 1회전 완료"
         )
@@ -364,6 +387,143 @@ class RollingScanner:
         )
 
         return scanned, new_rows, mismatched, cursor
+
+    async def _scan_random_probe(
+        self, svc: str, max_pages: int, total_count: int,
+        cursor_a: int, cursor_b: int,
+        range_a: tuple, range_b: tuple
+    ) -> tuple:
+        """
+        Track 2: 전체 범위에서 랜덤 페이지를 샘플링하여 DB 미존재 레코드를 수집합니다.
+        Sequential 커서가 현재 스캔 중인 근방은 제외하여 중복을 방지합니다.
+
+        Returns:
+            (scanned_count, new_rows)
+        """
+        today_str = datetime.now().strftime("%Y%m%d")
+        total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE
+
+        # Sequential 커서 근방 제외 (±30p 범위)
+        exclude_margin = 30 * PAGE_SIZE
+        exclude_a = set(range(
+            max(1, cursor_a - exclude_margin),
+            min(total_count, cursor_a + exclude_margin) + 1,
+            PAGE_SIZE
+        ))
+        exclude_b = set(range(
+            max(1, cursor_b - exclude_margin),
+            min(total_count, cursor_b + exclude_margin) + 1,
+            PAGE_SIZE
+        ))
+        excluded = exclude_a | exclude_b
+
+        # 전체 가능 페이지 시작 위치 생성
+        all_page_starts = [
+            p * PAGE_SIZE + 1 for p in range(total_pages)
+            if (p * PAGE_SIZE + 1) not in excluded
+        ]
+
+        if not all_page_starts:
+            return 0, []
+
+        # 랜덤 샘플링
+        sample_size = min(max_pages, len(all_page_starts))
+        sampled_starts = sorted(random.sample(all_page_starts, sample_size))
+
+        logger.info(
+            f"[{svc}] 🎲 Random Probe 시작: {sample_size}p "
+            f"(전체 {len(all_page_starts)}p 중 랜덤 샘플링, 오늘={today_str})"
+        )
+
+        scanned = 0
+        new_rows = []
+        today_found = 0
+        db_miss_count = 0
+
+        # DB batch 조회용 커넥션
+        import sqlite3
+        from database import DB_FILE
+        db_conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+        db_conn.row_factory = sqlite3.Row
+
+        try:
+            for page_start in sampled_starts:
+                page_end = min(page_start + PAGE_SIZE - 1, total_count)
+
+                try:
+                    res = await self.api_client.fetch_data(
+                        svc, page_start, page_end, timeout=15
+                    )
+                except Exception:
+                    continue
+
+                if not res or svc not in res:
+                    continue
+
+                block = res[svc]
+                code = block.get("RESULT", {}).get("CODE", "")
+                if code != "INFO-000":
+                    continue
+
+                items = block.get("row", [])
+                if not items:
+                    continue
+
+                scanned += 1
+
+                # DB batch miss 체크
+                lcns_list = []
+                for item in items:
+                    ln = item.get("LCNS_NO", "")
+                    if ln:
+                        lcns_list.append(ln)
+
+                if lcns_list:
+                    unique_lcns = list(set(lcns_list))
+                    placeholders = ",".join(["?"] * len(unique_lcns))
+                    existing = set()
+                    cursor = db_conn.execute(
+                        f"SELECT license_no FROM businesses WHERE license_no IN ({placeholders})",
+                        unique_lcns
+                    )
+                    for row in cursor.fetchall():
+                        existing.add(row["license_no"])
+
+                    page_new = [item for item in items if item.get("LCNS_NO", "") and item.get("LCNS_NO") not in existing]
+                    if page_new:
+                        db_miss_count += len(page_new)
+                        new_rows.extend(page_new)
+
+                # 오늘 CHNG_DT 체크
+                page_today = sum(1 for item in items if item.get("CHNG_DT", "").startswith(today_str))
+                if page_today > 0:
+                    today_found += page_today
+                    logger.info(
+                        f"[{svc}] 🎯 오늘 데이터 발견! page {page_start:,}: "
+                        f"{page_today}건 (CHNG_DT={today_str})"
+                    )
+
+                # 10p마다 진행 로그
+                if scanned % 10 == 0:
+                    logger.info(
+                        f"[{svc}] 📊 Random Probe 진행: {scanned}/{sample_size}p "
+                        f"(DB미존재:{db_miss_count} 오늘:{today_found})"
+                    )
+
+                await asyncio.sleep(0.3)
+
+        finally:
+            try:
+                db_conn.close()
+            except Exception:
+                pass
+
+        logger.info(
+            f"[{svc}] ✅ Random Probe 완료: {scanned}p → "
+            f"{len(new_rows)}건 수집 (DB미존재:{db_miss_count} 오늘:{today_found})"
+        )
+
+        return scanned, new_rows
 
     def _extract_new_rows(
         self, current_items: list, fingerprints: dict, page_start: int
