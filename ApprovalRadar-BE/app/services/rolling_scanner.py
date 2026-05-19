@@ -19,6 +19,7 @@ Rolling Full Scan 서비스 모듈 (듀얼 커서 버전).
 """
 import asyncio
 import random
+from datetime import datetime
 from app.core.config import settings
 from app.core.logger import logger
 from app.services.pivot_manager import compute_page_fingerprint
@@ -143,10 +144,12 @@ class RollingScanner:
         mismatched = 0
         new_fp_count = 0  # 신규 fingerprint 저장 수
         match_count = 0   # fingerprint 일치 수
+        today_found = 0   # 오늘 CHNG_DT 신규 발견 수
+        today_str = datetime.now().strftime("%Y%m%d")
 
         logger.info(
             f"[{svc}] 📡 커서 {label} 스캔 시작: "
-            f"범위 {cursor:,}~{range_end:,}, 최대 {max_pages}페이지"
+            f"범위 {cursor:,}~{range_end:,}, 최대 {max_pages}페이지 (오늘={today_str})"
         )
 
         while scanned < max_pages:
@@ -198,7 +201,18 @@ class RollingScanner:
                 scanned += 1
                 continue
 
-            # fingerprint 비교
+            # ── 오늘 CHNG_DT 신규분 즉시 감지 ──────────────────────────
+            # fingerprint 상태와 무관하게, 오늘 변동분은 무조건 수집
+            # scraper 파이프라인이 DB 중복 필터 처리
+            today_items = [
+                item for item in items
+                if item.get("CHNG_DT", "") == today_str
+            ]
+            if today_items:
+                new_rows.extend(today_items)
+                today_found += len(today_items)
+
+            # ── fingerprint 비교 ──────────────────────────────────
             current_fp = compute_page_fingerprint(items)
             stored_fp = fingerprints.get(str(page_start), "")
 
@@ -209,11 +223,17 @@ class RollingScanner:
                 # 일치: 변동 없음
                 match_count += 1
             else:
-                # 불일치: 변동 감지!
+                # 불일치: 변동 감지! (오늘 외 레코드도 포함)
                 mismatched += 1
                 extracted = self._extract_new_rows(items, fingerprints, page_start)
                 if extracted:
-                    new_rows.extend(extracted)
+                    # 오늘 CHNG_DT 레코드는 이미 위에서 추가됨 → 오늘 외 레코드만 추가
+                    non_today = [
+                        r for r in extracted
+                        if r.get("CHNG_DT", "") != today_str
+                    ]
+                    if non_today:
+                        new_rows.extend(non_today)
                     logger.info(
                         f"[{svc}] 📥 커서 {label} page {page_start:,}: "
                         f"fingerprint 불일치 → {len(extracted)}건 신규 발견"
@@ -233,15 +253,19 @@ class RollingScanner:
             if scanned % 10 == 0:
                 logger.info(
                     f"[{svc}] 📊 커서 {label} 진행: {scanned}/{max_pages}p "
-                    f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched}) "
-                    f"현재 page={page_start:,}"
+                    f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched} "
+                    f"오늘:{today_found}) 현재 page={page_start:,}"
                 )
 
         # 커서별 완료 요약
+        if today_found > 0:
+            logger.info(
+                f"[{svc}] 🆕 커서 {label}: 오늘({today_str}) 변동분 {today_found}건 즉시 감지!"
+            )
         logger.info(
             f"[{svc}] ✅ 커서 {label} 완료: {scanned}p 스캔 "
-            f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched}) "
-            f"→ {len(new_rows)}건 수집"
+            f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched} "
+            f"오늘:{today_found}) → {len(new_rows)}건 수집"
         )
 
         return scanned, new_rows, mismatched, cursor
