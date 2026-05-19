@@ -72,11 +72,12 @@ async def tail_ping_all_services():
                 tail_detected = False
                 sentinel_detected = False
 
-                # ── 0. 역방향 검증: known_tail 자체가 유효한지 확인 ──────
-                # API 재정렬로 tail이 축소되면 known_tail+1 체크만으로는 감지 불가
-                # → known_tail 위치에 데이터가 있는지 먼저 확인 (API 1회)
+                # ── 0. 역방향 검증: known_tail 근방에 데이터 존재하는지 확인 ──
+                # ⚠️ API는 Gappy 인덱스: 단일 위치에 데이터 없을 수 있음 (Gap)
+                # → 단일 위치 대신 known_tail 포함 범위(PAGE_SIZE)로 조회하여 Gap 오탐 방지
+                range_start = max(1, known_tail - PAGE_SIZE + 1)
                 tail_valid_res = await api_client.fetch_data(
-                    svc_id, known_tail, known_tail, timeout=10
+                    svc_id, range_start, known_tail, timeout=10
                 )
                 await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
 
@@ -88,12 +89,12 @@ async def tail_ping_all_services():
                         tail_is_valid = True
 
                 if not tail_is_valid:
-                    # known_tail 위치에 데이터 없음 → tail 축소!
+                    # known_tail 근방 전체에 데이터 없음 → 진짜 축소/재정렬!
                     svc_name = {"I2859": "식품업소", "I2861": "음식점업소"}.get(svc_id, svc_id)
                     logger.warning(
                         f"🚨 [Tail Ping] {svc_name}({svc_id}) "
-                        f"known_tail={known_tail:,} 위치에 데이터 없음! "
-                        f"API 재정렬로 tail 축소 감지 → Scraper 트리거 (재부트스트랩)"
+                        f"known_tail={known_tail:,} 근방 [{range_start:,}~{known_tail:,}] "
+                        f"범위에 데이터 없음! 실제 축소/재정렬 감지 → Scraper 트리거"
                     )
                     tail_detected = True
                 else:

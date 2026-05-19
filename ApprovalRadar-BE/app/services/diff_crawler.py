@@ -250,17 +250,18 @@ class DiffCrawlerEngine:
         #    known_tail 위치에 더 이상 데이터가 없을 수 있음 (tail 축소).
         #    역방향 검증 없이 known_tail+1만 확인하면 영구적으로 감지 불가.
         if known_tail > 0:
-            # Step 1-A: 역방향 검증 — known_tail 자체가 아직 유효한지 확인 (API 1회)
-            tail_check = await self._fetch_page(known_tail, known_tail)
+            # Step 1-A: 역방향 검증 — known_tail 근방에 데이터가 존재하는지 확인 (API 1회)
+            # ⚠️ API는 Gappy 인덱스 구조: 단일 위치(known_tail)에 데이터 없을 수 있음 (Gap)
+            # → 단일 위치 대신 known_tail 포함 범위(PAGE_SIZE)를 조회하여 Gap 오탐 방지
+            range_start = max(1, known_tail - PAGE_SIZE + 1)
+            tail_check = await self._fetch_page(range_start, known_tail)
             if not tail_check:
-                # known_tail에 데이터 없음 → API 재정렬로 tail 축소!
-                # → 이진탐색(Step 2~4)으로 실제 tail 재발견
+                # known_tail 근방 전체에 데이터 없음 → 진짜 tail 축소/재정렬!
                 logger.warning(
-                    f"[{svc}] ⚠️ known_tail={known_tail:,} 위치에 데이터 없음! "
-                    f"API 재정렬로 tail 축소 감지. 이진탐색으로 실제 tail 재탐색..."
+                    f"[{svc}] ⚠️ known_tail={known_tail:,} 근방 [{range_start:,}~{known_tail:,}] "
+                    f"범위에 데이터 없음! API 재정렬/축소 감지. 이진탐색으로 실제 tail 재탐색..."
                 )
-                self._reshuffled = True  # 호출자에게 재정렬 사실 전달
-                # known_tail을 0으로 취급하여 처음부터 탐색
+                self._reshuffled = True
                 known_tail = 0
             else:
                 # Step 1-B: known_tail 유효 → 그 뒤에 신규 데이터 있는지 확인

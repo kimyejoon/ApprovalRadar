@@ -52,18 +52,20 @@ def test_tail():
                 if db_tail == 0:
                     print(f"  ⚠️  부트스트랩 미완료 → 처음부터 탐색합니다.")
 
-                # 역방향 검증: DB tail 위치에 데이터 있는지
+                # 역방향 검증: DB tail 근방에 데이터 있는지 (범위 체크 — Gap 오탐 방지)
                 if db_tail > 0:
-                    print(f"  🔍 역방향 검증: 인덱스 {db_tail:,} 위치 데이터 확인...", end=" ")
+                    range_start = max(1, db_tail - 999)
+                    print(f"  🔍 역방향 검증: [{range_start:,}~{db_tail:,}] 범위 데이터 확인...", end=" ")
                     try:
-                        res = await client.fetch_data(service_id, db_tail, db_tail, timeout=10)
+                        res = await client.fetch_data(service_id, range_start, db_tail, timeout=10)
                         block = res.get(service_id, {}) if res else {}
                         code = block.get("RESULT", {}).get("CODE", "")
                         if code == "INFO-000" and block.get("row"):
-                            print("✅ 유효")
+                            row_count = len(block["row"])
+                            print(f"✅ 유효 ({row_count}건)")
                         else:
                             print(f"❌ 데이터 없음 (CODE={code})")
-                            print(f"  ⚠️  API 재정렬로 tail 축소! DB tail이 실제보다 큼.")
+                            print(f"  ⚠️  실제 tail 축소/재정렬 감지!")
                     except Exception as e:
                         print(f"⚠️ 오류: {e}")
                     await asyncio.sleep(2)
