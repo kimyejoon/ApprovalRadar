@@ -1,19 +1,19 @@
 """
-독립 Tail Ping 잡 — Rolling Scan과 분리된 경량 변동 감지.
+독립 Tail Ping 잡 — Ping-Only 경량 변동 감지.
 
-매 N분(기본 5분) 간격으로 각 서비스의 Tail을 API 1회로 체크합니다.
-변동 감지 시 즉시 scan_for_updates()를 트리거하여 Shift 분석 + 데이터 수집.
+매 N분(기본 5분) 간격으로 각 서비스의 known_tail+1 위치에
+데이터가 존재하는지 API 1회로 직접 확인합니다.
 
-API 비용: 서비스당 1회/주기 (I2861 only → 일일 ~288회, 5,000 중 5.8%)
+★ total_count 의존 없음 — 직접 데이터 존재 여부를 확인하는 방식.
+  _fetch_page(known_tail+1, known_tail+PAGE_SIZE) → 데이터 있으면 변동!
 
-설계 원칙:
-  - Rolling Scan과 완전 독립 (별도 스케줄러 잡)
-  - 자체 ApiClient 인스턴스 사용 (세션 공유 X)
-  - 변동 감지 시 trigger_immediate_scrape()로 스케줄러에 위임
-  - DiffCrawlerEngine.find_true_tail()을 직접 재사용하여 검증된 로직 활용
-    (오응답 방어, total_count 50% 급감 감지, 전략B fallback 등 포함)
+변동 감지 시 즉시 scan_for_updates()를 트리거하여
+find_true_tail(이진탐색) + Shift 분석 + 데이터 수집을 scraper에 위임.
+
+API 비용: 서비스당 1회/주기 (I2861 only → 일일 ~288회)
 """
 import asyncio
+import random
 
 from app.core.config import settings
 from app.core.logger import logger
@@ -21,18 +21,14 @@ from app.core.events import shutdown_event
 from app.clients.foodsafety_api import ApiClient, ApiKeysExhaustedError
 from app.repositories.state_repository import StateRepository
 
-
-# Tail Ping 주기 (분) — 스케줄러에서 참조
+PAGE_SIZE = 1000  # diff_crawler.py와 동일
 TAIL_PING_INTERVAL_MINUTES = 5
 
 
 async def tail_ping_all_services():
     """
-    모든 활성 서비스의 Tail을 체크하고,
-    변동 감지 시 즉시 Scraper 잡을 트리거합니다.
-
-    검증된 DiffCrawlerEngine.find_true_tail()을 직접 재사용하여
-    오응답 방어 (total_count 50% 급감 감지) 등 기존 안전장치를 그대로 활용합니다.
+    모든 활성 서비스의 known_tail+1 위치에 데이터가 있는지 직접 확인.
+    데이터 존재 시 → 즉시 Scraper 트리거 (find_true_tail + Shift는 scraper가 처리).
     """
     if ApiClient.is_exhausted():
         logger.debug("[Tail Ping] API 키 소진 상태 → 스킵")
@@ -62,42 +58,48 @@ async def tail_ping_all_services():
                     logger.debug(f"[Tail Ping] {svc_id} 부트스트랩 진행 중 → 스킵")
                     continue
 
-                # ── 검증된 find_true_tail() 재사용 ────────────────────
-                # DiffCrawlerEngine의 오응답 방어 로직 그대로 활용:
-                #  - total_count < known_tail * 0.5 → 전략B fallback
-                #  - INFO-200 → 빈 응답 처리
-                #  - Gap 허용 스캔
-                from app.services.diff_crawler import DiffCrawlerEngine
-                crawler = DiffCrawlerEngine(
-                    api_client=api_client,
-                    service_id=svc_id
+                # ── Ping-Only: known_tail+1 위치에 데이터 존재 여부 직접 확인 ──
+                # total_count 의존 없음 — 실제 데이터 존재 여부만 확인
+                ping_start = known_tail + 1
+                ping_end = known_tail + PAGE_SIZE
+                res = await api_client.fetch_data(
+                    svc_id, ping_start, ping_end, timeout=10
                 )
-                new_tail = await crawler.find_true_tail(known_tail=known_tail)
+                # WAF 방지 jitter
+                await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
 
-                if new_tail == known_tail:
-                    logger.info(
-                        f"[Tail Ping] {svc_id} 변동 없음: {known_tail:,}건"
+                if not res or svc_id not in res:
+                    logger.info(f"[Tail Ping] {svc_id} 변동 없음 (known_tail={known_tail:,})")
+                    continue
+
+                block = res[svc_id]
+                code = block.get("RESULT", {}).get("CODE", "")
+
+                if code == "INFO-200":
+                    # INFO-200 = 해당 범위에 데이터 없음 → 변동 없음
+                    logger.info(f"[Tail Ping] {svc_id} 변동 없음 (known_tail={known_tail:,})")
+                    continue
+
+                if code != "INFO-000":
+                    # 예상치 못한 응답 코드 → 스킵
+                    logger.debug(
+                        f"[Tail Ping] {svc_id} 예상외 응답: {code} → 스킵"
                     )
                     continue
 
-                if new_tail > known_tail:
-                    diff = new_tail - known_tail
+                # INFO-000 = 데이터 존재! → known_tail 너머에 신규 데이터 있음
+                rows = block.get("row", [])
+                if rows:
                     svc_name = {"I2859": "식품업소", "I2861": "음식점업소"}.get(svc_id, svc_id)
                     logger.info(
                         f"🚨 [Tail Ping] {svc_name}({svc_id}) "
-                        f"Tail 변동 감지! +{diff:,}건 "
-                        f"({known_tail:,} → {new_tail:,}) "
+                        f"Tail 변동 감지! known_tail={known_tail:,} 이후 "
+                        f"{len(rows)}건 데이터 존재 "
                         f"→ 즉시 Scraper 트리거"
                     )
                     detected_any = True
                 else:
-                    # Tail 감소: find_true_tail 자체에서 이미 방어 처리됨
-                    # 여기 도달 = 실제로 데이터가 줄어든 경우 (야간 정리 등)
-                    logger.warning(
-                        f"[Tail Ping] {svc_id} Tail 감소: "
-                        f"{known_tail:,} → {new_tail:,}. "
-                        f"다음 정기 크롤링에서 처리됩니다."
-                    )
+                    logger.info(f"[Tail Ping] {svc_id} 변동 없음 (known_tail={known_tail:,})")
 
             except ApiKeysExhaustedError:
                 logger.info("[Tail Ping] API 키 소진 → 중단")
@@ -115,5 +117,5 @@ async def tail_ping_all_services():
 
 
 def run_tail_ping():
-    """스케줄러 동기 래퍼: 별도 스레드에서 새 이벤트 루프를 생성하여 비동기 Tail Ping 실행."""
+    """스케줄러 동기 래퍼."""
     asyncio.run(tail_ping_all_services())
