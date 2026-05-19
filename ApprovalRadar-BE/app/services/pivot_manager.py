@@ -119,14 +119,50 @@ async def sample_check(pivots: dict, api_client, service_id: str, sample_ratio: 
                 )
                 continue
 
-            # ── 불일치 감지 ───────────────────────────────────────────────
+            # ── 불일치 감지 → 2-Phase 재확인 프로토콜 ─────────────────────
+            # API 노이즈(일시적 응답 건수 변동)와 진짜 변동을 구분하기 위해
+            # 3초 후 동일 구간을 재조회하여 fingerprint를 교차 검증한다.
+            # - 2차 일치(stored_fp) → API 노이즈 → 스킵 (false positive 제거)
+            # - 2차 불일치(1차와 동일) → 진짜 변동 → Shift 진단 진행
+            # - 2차 3중 불일치 → API 심각 불안정 → 이번 주기 스킵
             if stored_fingerprint:
                 logger.warning(
-                    f"[{service_id}][피벗 무결성 검사] ❌ {idx:,}번 피벗 "
-                    f"fingerprint 불일치! (pages {idx:,}~{page_end:,}, 1,000건 전체 변동 감지)\n"
+                    f"[{service_id}][피벗 무결성 검사] ⚠️ {idx:,}번 피벗 "
+                    f"fingerprint 1차 불일치 — 3초 후 재확인 중...\n"
                     f"  저장 지문: {stored_fingerprint[:12]}...\n"
-                    f"  현재 지문: {current_fingerprint[:12]}..."
+                    f"  1차 지문: {current_fingerprint[:12]}..."
                 )
+                await asyncio.sleep(3.0)
+                res2 = await api_client.fetch_data(service_id, idx, page_end)
+                await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+                items2 = res2.get(service_id, {}).get("row", []) if res2 else []
+                fp2 = compute_page_fingerprint(items2) if items2 else ""
+
+                if fp2 == stored_fingerprint:
+                    # 2차 확인 시 원래 fingerprint 복귀 → API 노이즈로 판단
+                    logger.info(
+                        f"[{service_id}][피벗 무결성 검사] ✅ {idx:,}번 피벗 "
+                        f"재확인 결과 일치 — API 일시 노이즈로 판단, 스킵 (false positive 제거)"
+                    )
+                    continue
+
+                if fp2 == current_fingerprint:
+                    # 1차·2차 동일하게 불일치 → 진짜 변동
+                    logger.warning(
+                        f"[{service_id}][피벗 무결성 검사] ❌ {idx:,}번 피벗 "
+                        f"fingerprint 2차 재확인 동일 불일치 — 진짜 변동으로 확정\n"
+                        f"  저장 지문: {stored_fingerprint[:12]}...\n"
+                        f"  확정 지문: {fp2[:12]}..."
+                    )
+                    # items를 items2로 교체(최신 응답 기준으로 Shift 진단)
+                    items = items2
+                else:
+                    # 3중 불일치(1차 ≠ 2차 ≠ stored) → API 심각 불안정
+                    logger.warning(
+                        f"[{service_id}][피벗 무결성 검사] ⚠️ {idx:,}번 피벗 "
+                        f"3중 fingerprint 불일치 — API 응답 심각 불안정. 이번 주기 스킵."
+                    )
+                    continue
             else:
                 actual_first_key = (items[0].get("LCNS_NO", ""), items[0].get("CHNG_DT", ""))
                 stored_first_key = (stored_lcns_no, stored_chng_dt)

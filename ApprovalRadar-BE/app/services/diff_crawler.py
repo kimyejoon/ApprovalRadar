@@ -17,6 +17,14 @@ PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
 # → 향후 신뢰 가능한 서비스가 확인될 때만 이 set에 추가할 것.
 RELIABLE_TOTAL_COUNT_SERVICES: set[str] = set()
 
+# 서비스별 피벗 검사 샘플 수 (DELETE 감지 커버리지 조정)
+# I2859: 피벗 47개 → 20샘플 = 42.6% 커버/주기
+# I2861: 피벗 190개 → 30샘플 = 15.8% 커버/주기 (5키 기준 일 1,008회 추가 소모, 한도 내)
+MAX_SAMPLES_BY_SVC: dict[str, int] = {
+    "I2859": 20,
+    "I2861": 30,
+}
+
 # [Phase 3] Circuit Breaker 임계값
 # diff_count가 이 값을 초과하면 API 한도 초과를 방지하기 위해 해당 주기를 즉시 중단하고
 # 관리자에게 ALERT SSE를 발송한다. (Key 5개 × 1,000회 = 5,000회 한도 고려)
@@ -614,9 +622,9 @@ class DiffCrawlerEngine:
             _STARTUP_CHECK_DONE.add(svc)
             if state.get("pivots"):
                 logger.info(f"[{svc}] 🔍 기동 첫 주기: 저장 피벗 정합성 선제 검증 중...")
-                # max_samples=20: 1주기 99%(I2859), 2주기 누적 89%(I2861) 감지 보장
                 startup_stale, shift_info = await pivot_manager.sample_check(
-                    state["pivots"], self.api_client, svc, max_samples=20
+                    state["pivots"], self.api_client, svc,
+                    max_samples=MAX_SAMPLES_BY_SVC.get(svc, 20)
                 )
                 if startup_stale:
                     shift_amount = shift_info.get("shift_amount")
@@ -671,11 +679,11 @@ class DiffCrawlerEngine:
 
             # pivots 있으면 Delete 은폐 감지 실행
             if pivots:
-                # ✅ Delete 은폐 감지: Tail이 같아도 Insert+Delete가 동시 발생했을 수 있음
-                # max_samples=20: 1주기 99%(I2859), 2주기 누적 89%(I2861) 감지 보장
-                # I2861 기준 20샘플 × 3.5s ≈ 70s (30분 주기 내 충분)
+                # 서비스별 샘플 수 참조 (I2859=20, I2861=30)
+                # I2861 30샘플 × ~3.5초 ≈ 105초 (30분 주기 었 충분)
                 changed, shift_info = await pivot_manager.sample_check(
-                    pivots, self.api_client, svc, max_samples=20
+                    pivots, self.api_client, svc,
+                    max_samples=MAX_SAMPLES_BY_SVC.get(svc, 20)
                 )
                 if changed:
                     logger.warning(
