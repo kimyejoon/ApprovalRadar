@@ -394,31 +394,11 @@ class DiffCrawlerEngine:
         self._empty_pivot_cycles = 0  # in-memory 동기화
         self._cb_consecutive_count = 0
 
-        # ── Bootstrap 완료 후 오늘 날짜 보완 ──────────────────────────────────
-        # 시나리오: 오후 10시 최초 설치 or 전략C(19:00)가 아직 미실행인 경우
-        # Bootstrap은 Tail 기준선만 설정하므로, 오늘 API에 이미 있는 레코드가
-        # 우리 DB에 없을 수 있음 → CHNG_DT=오늘로 직접 조회하여 미수집분 보완.
-        # 단, 19시 이전에는 API가 오늘 날짜를 차단하므로 19시 이후에만 실행.
-        from datetime import datetime
-        now = datetime.now()
-        if now.hour >= 19:
-            today_str = now.strftime("%Y%m%d")
-            logger.info(
-                f"[{self.service_id}] 📅 Bootstrap 완료 후 오늘({today_str}) 데이터 보완 시작 "
-                f"(19시 이후 최초 실행 대응)..."
-            )
-            try:
-                today_rows = await self._fetch_today_補完(today_str)
-                if today_rows:
-                    logger.info(
-                        f"[{self.service_id}] 📥 오늘 날짜 보완: {len(today_rows)}건 발견 → "
-                        f"DB 미수집분 필터 후 저장"
-                    )
-                    return today_rows   # scraper layer에서 중복 필터 후 저장
-                else:
-                    logger.info(f"[{self.service_id}] ✅ 오늘 날짜 보완: 추가 수집 대상 없음.")
-            except Exception as e:
-                logger.warning(f"[{self.service_id}] 오늘 날짜 보완 실패 (무시): {e}")
+        # ── [비활성화] Bootstrap 완료 후 오늘 날짜 보완 ─────────────────────
+        # CHNG_DT 파라미터가 실제 데이터를 필터링하지 않음 (2026-05-19 실증)
+        # CHNG_DT=오늘 조회 → total_count만 변경, 실제 row는 필터링 없이 반환
+        # → false positive 삽입 위험 → 비활성화
+        # 주력 감지: Tail Ping + Multi-Point Sentinel (5분 간격)
 
         return state
 
