@@ -99,6 +99,8 @@ class RollingScanner:
         new_rows_total = []
         total_scanned = 0
         mismatched_pages = 0
+        flushed_count = 0
+        scan_start = datetime.now()
 
         for page_start in oldest_pages:
             if shutdown_event.is_set():
@@ -110,8 +112,21 @@ class RollingScanner:
             mismatched_pages += mismatch
             if new_rows and flush_callback:
                 await flush_callback(new_rows)
+                flushed_count += len(new_rows)
             elif new_rows:
                 new_rows_total.extend(new_rows)
+
+            # 매 25p마다 진행률 로그
+            if total_scanned > 0 and total_scanned % 25 == 0:
+                elapsed = (datetime.now() - scan_start).total_seconds()
+                pace = elapsed / total_scanned  # 초/페이지
+                remaining = (len(oldest_pages) - total_scanned) * pace
+                logger.info(
+                    f"[{svc}] 📊 스캔 진행: {total_scanned}/{len(oldest_pages)}p "
+                    f"({total_scanned/len(oldest_pages)*100:.0f}%) | "
+                    f"불일치:{mismatched_pages} 수집:{flushed_count + len(new_rows_total)} | "
+                    f"경과:{elapsed:.0f}초 잔여:{remaining:.0f}초"
+                )
 
         # 상태 영속화
         state["page_fingerprints"] = fingerprints
@@ -120,11 +135,19 @@ class RollingScanner:
 
         scanned_page_count = sum(1 for k in scan_times if scan_times[k])
         coverage_pct = round(scanned_page_count / total_pages * 100, 1) if total_pages > 0 else 0
+        elapsed_total = (datetime.now() - scan_start).total_seconds()
+
+        # 다음 예상 최고연식 계산
+        next_max_age = self._get_page_age(scan_times, oldest_pages[-1]) if oldest_pages else 0
+        all_ages = sorted([self._get_page_age(scan_times, p*PAGE_SIZE+1) for p in range(total_pages)], reverse=True)
+        worst_age = all_ages[0] if all_ages else 0
 
         logger.info(
-            f"[{svc}] ✅ Oldest-First 완료: {total_scanned}p, "
-            f"{mismatched_pages}건 불일치, {len(new_rows_total)}건 수집 | "
-            f"커버리지: {scanned_page_count}/{total_pages}p ({coverage_pct}%)"
+            f"[{svc}] ✅ Oldest-First 완료: {total_scanned}p "
+            f"({elapsed_total:.0f}초 소요) | "
+            f"불일치:{mismatched_pages} 수집:{flushed_count + len(new_rows_total)}건 | "
+            f"커버리지: {scanned_page_count}/{total_pages}p ({coverage_pct}%) | "
+            f"현재 최대연식: {worst_age:.1f}h"
         )
         return new_rows_total
 
