@@ -201,17 +201,21 @@ def compute_optimal_defaults(
 def get_rolling_pages_for_service(service_id: str) -> int:
     """
     서비스별 데이터량 비례로 롤링 스캔 페이지 수를 반환합니다.
-
-    I2861 (953,000건) : I2859 (238,000건) ≈ 4:1 비율
-    총 100페이지일 때 → I2861: 80p, I2859: 20p
+    settings.SERVICES에 포함된 서비스만 대상으로 비례 배분합니다.
+    서비스가 1개이면 전체 예산을 할당합니다.
     """
-    # 서비스별 전체 페이지 수 (동적 로드 시도, 실패 시 하드코딩 fallback)
-    page_counts = _get_service_page_counts()
-    total = sum(page_counts.values())
-    if total == 0:
-        return settings.ROLLING_SCAN_PAGES_PER_CYCLE  # fallback
+    # 서비스가 1개면 전체 할당
+    if len(settings.SERVICES) <= 1:
+        return settings.ROLLING_SCAN_PAGES_PER_CYCLE
 
-    share = page_counts.get(service_id, 0) / total
+    page_counts = _get_service_page_counts()
+    # SERVICES에 포함된 것만 필터
+    active_counts = {k: v for k, v in page_counts.items() if k in settings.SERVICES}
+    total = sum(active_counts.values())
+    if total == 0:
+        return settings.ROLLING_SCAN_PAGES_PER_CYCLE
+
+    share = active_counts.get(service_id, 0) / total
     allocated = max(10, int(settings.ROLLING_SCAN_PAGES_PER_CYCLE * share))
     return allocated
 
@@ -222,7 +226,7 @@ def _get_service_page_counts() -> dict:
         import sqlite3
         from database import DB_FILE
         if not os.path.exists(DB_FILE):
-            return {"I2861": 953, "I2859": 238}  # fallback
+            return {"I2861": 953}  # fallback (I2861 only)
         conn = sqlite3.connect(DB_FILE)
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
@@ -232,10 +236,10 @@ def _get_service_page_counts() -> dict:
         result = {}
         for row in rows:
             total = row["last_total_count"] or 0
-            result[row["service_id"]] = (total + 999) // 1000  # 페이지 수
-        return result if result else {"I2861": 953, "I2859": 238}
+            result[row["service_id"]] = (total + 999) // 1000
+        return result if result else {"I2861": 953}
     except Exception:
-        return {"I2861": 953, "I2859": 238}
+        return {"I2861": 953}
 
 
 settings = Settings()
