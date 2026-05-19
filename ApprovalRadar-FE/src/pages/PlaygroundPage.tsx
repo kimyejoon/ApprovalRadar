@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ArrowClockwise, Play, RocketLaunch, Broadcast, MagnifyingGlass, Lightning } from '@phosphor-icons/react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { API_BASE_URL } from '@/lib/api';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
