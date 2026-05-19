@@ -259,12 +259,14 @@ class BusinessRepository:
         industry_type: str = "",
         representative_name: str = "",
         phone_number: str = "",
+        license_date: str = "",
         conn=None,
     ):
         """
         I2500 API 백필 결과 반영.
         - 이미 값이 있는 필드는 덮어쓰지 않음 (COALESCE)
         - 빈 문자열은 NULL로 처리하여 기존값 보호
+        - license_date: None/미색인/빈값만 채움
         """
         query = """
             UPDATE businesses
@@ -279,10 +281,15 @@ class BusinessRepository:
                     CASE WHEN phone_number = '' OR phone_number IS NULL
                          THEN NULLIF(?, '') ELSE phone_number END,
                     phone_number
+                ),
+                license_date       = COALESCE(
+                    CASE WHEN license_date IS NULL OR license_date = '' OR license_date = '미색인'
+                         THEN NULLIF(?, '') ELSE license_date END,
+                    license_date
                 )
             WHERE license_no = ?
         """
-        params = (industry_type, representative_name, phone_number, license_no)
+        params = (industry_type, representative_name, phone_number, license_date, license_no)
         if conn:
             conn.execute(query, params)
         else:
