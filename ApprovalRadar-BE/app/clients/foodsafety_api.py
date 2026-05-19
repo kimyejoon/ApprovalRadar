@@ -339,7 +339,8 @@ class ApiClient:
                                 await self.rotate_key(api_key)
                                 logger.warning(f"키 회전 후 {settings.GAP_SECONDS}초 대기...")
                                 await asyncio.sleep(settings.GAP_SECONDS)
-                                attempt += 1
+                                # attempt 증가 없이 continue — 키 소진은 retry가 아님
+                                # (모든 키 소진 시 rotate_key가 ApiKeysExhaustedError 발생)
                                 continue
                             return result
                         # None → 재시도 (서버 오류)
