@@ -64,60 +64,69 @@ async def poll_today_changes(target_date: str = None):
 
     try:
         async with ApiClient() as api_client:
-            # ── Step 1: 전체 건수 확인 (1건 조회) ──
-            res = await api_client.fetch_data(
-                SERVICE_ID, 1, 1, CHNG_DT=today_str, timeout=10
-            )
-
-            if not res or SERVICE_ID not in res:
-                logger.debug(f"[CHNG_DT Poller] I2500 응답 없음")
-                return result
-
-            block = res[SERVICE_ID]
-            code = block.get("RESULT", {}).get("CODE", "")
-
-            if code == "INFO-200":
-                logger.info(f"[CHNG_DT Poller] CHNG_DT={today_str} 변동분 없음")
-                return result
-
-            if code != "INFO-000":
-                logger.warning(f"[CHNG_DT Poller] 응답 코드: {code}")
-                return result
-
-            total = int(block.get("total_count", "0"))
-            result["total"] = total
-            logger.info(
-                f"[CHNG_DT Poller] I2500 CHNG_DT={today_str} → "
-                f"전체 {total:,}건 감지, 수집 시작..."
-            )
-
-            # ── Step 2: 전체 페이지 순회하여 수집 ──
+            # ── Step 1: 전체 페이지 순회 (빈 페이지까지 반복) ──
+            # ⚠️ I2500의 total_count는 endIdx와 동일값을 반환하므로 신뢰 불가
+            # → INFO-200(데이터 없음) 또는 반환 건수 < PAGE_SIZE 까지 반복
             all_items = []
-            start = 1
-            while start <= total:
-                end = min(start + PAGE_SIZE - 1, total)
+            page = 1
+            MAX_PAGES = 20  # 안전장치 (20,000건 상한)
+
+            while page <= MAX_PAGES:
+                start = (page - 1) * PAGE_SIZE + 1
+                end = page * PAGE_SIZE
+
                 page_res = await api_client.fetch_data(
                     SERVICE_ID, start, end, CHNG_DT=today_str, timeout=15
                 )
 
-                if page_res and SERVICE_ID in page_res:
-                    rows = page_res[SERVICE_ID].get("row", [])
-                    all_items.extend(rows)
-                    logger.info(
-                        f"[CHNG_DT Poller] 페이지 {start}~{end}: {len(rows)}건"
-                    )
-                else:
-                    logger.warning(f"[CHNG_DT Poller] 페이지 {start}~{end} 실패")
+                if not page_res or SERVICE_ID not in page_res:
+                    logger.warning(f"[CHNG_DT Poller] 페이지 {start}~{end} 응답 없음")
+                    break
 
-                start += PAGE_SIZE
+                block = page_res[SERVICE_ID]
+                code = block.get("RESULT", {}).get("CODE", "")
+
+                if code == "INFO-200":
+                    # 데이터 없음 = 끝
+                    if page == 1:
+                        logger.info(f"[CHNG_DT Poller] CHNG_DT={today_str} 변동분 없음")
+                    else:
+                        logger.info(f"[CHNG_DT Poller] 페이지 {page} INFO-200 → 수집 완료")
+                    break
+
+                if code != "INFO-000":
+                    logger.warning(f"[CHNG_DT Poller] 페이지 {page} 응답 코드: {code}")
+                    break
+
+                rows = block.get("row", [])
+                if not rows:
+                    break
+
+                all_items.extend(rows)
+                logger.info(
+                    f"[CHNG_DT Poller] 페이지 {page}({start}~{end}): {len(rows)}건"
+                )
+
+                if len(rows) < PAGE_SIZE:
+                    # 마지막 페이지 (1000건 미만 반환)
+                    break
+
+                page += 1
 
                 if shutdown_event.is_set():
                     break
 
+            result["total"] = len(all_items)
+
             if not all_items:
                 return result
 
-            # ── Step 3: DB 중복 체크 (LCNS, CHNG_DT 쌍) ──
+            logger.info(
+                f"[CHNG_DT Poller] I2500 CHNG_DT={today_str} 전체 {len(all_items):,}건 수집 완료 "
+                f"({page}페이지)"
+            )
+
+            # ── Step 2: DB 중복 체크 (LCNS, CHNG_DT 쌍) ──
             lcns_list = [item.get("LCNS_NO", "") for item in all_items if item.get("LCNS_NO")]
             existing_pairs = set()
 
@@ -133,7 +142,7 @@ async def poll_today_changes(target_date: str = None):
                     for row in rows:
                         existing_pairs.add((row["license_no"], row["last_event_date"]))
 
-            # ── Step 4: 신규 건만 필터 ──
+            # ── Step 3: 신규 건만 필터 ──
             new_items = []
             for item in all_items:
                 lcns = item.get("LCNS_NO", "")
@@ -149,12 +158,12 @@ async def poll_today_changes(target_date: str = None):
 
             if not new_items:
                 logger.info(
-                    f"[CHNG_DT Poller] {len(all_items)}건 모두 이미 수집됨 "
+                    f"[CHNG_DT Poller] {len(all_items):,}건 모두 이미 수집됨 "
                     f"→ Rolling Scan이 정상 작동 중 ✅"
                 )
                 return result
 
-            # ── Step 5: I2500 → I2861 형식으로 변환하여 scraper 파이프라인 처리 ──
+            # ── Step 4: I2500 → I2861 형식으로 변환하여 scraper 파이프라인 처리 ──
             mapped_rows = []
             for item in new_items:
                 # I2861 형식으로 변환 (scraper가 기대하는 필드)
@@ -174,7 +183,7 @@ async def poll_today_changes(target_date: str = None):
                 mapped_rows.append(i2861_row)
 
             logger.info(
-                f"[CHNG_DT Poller] 🆕 DB 미수집 {len(new_items)}/{len(all_items)}건 "
+                f"[CHNG_DT Poller] 🆕 DB 미수집 {len(new_items):,}/{len(all_items):,}건 "
                 f"→ scraper 파이프라인 처리"
             )
 
@@ -185,7 +194,7 @@ async def poll_today_changes(target_date: str = None):
 
             logger.info(
                 f"🔔 [CHNG_DT Poller] 완료: CHNG_DT={today_str} "
-                f"전체 {total}건 중 신규 {len(new_items)}건 INSERT → SSE 발행"
+                f"전체 {len(all_items):,}건 중 신규 {len(new_items):,}건 INSERT → SSE 발행"
             )
 
     except ApiKeysExhaustedError:
