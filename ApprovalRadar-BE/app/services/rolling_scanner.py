@@ -73,6 +73,11 @@ class RollingScanner:
         fingerprints: dict = state.get("page_fingerprints", {})
         scan_times: dict = state.get("page_scan_times", {})
 
+        # 레거시 HH:MM:SS → ISO 자동 마이그레이션
+        migrated = self._migrate_scan_times(scan_times)
+        if migrated > 0:
+            logger.info(f"[{svc}] 🔧 scan_times 마이그레이션: {migrated}건 HH:MM:SS → ISO 변환")
+
         # 순수 Oldest-First: min_age 제약 없이 가장 오래된 N개 선택
         oldest_pages = self._select_oldest_pages(scan_times, total_pages, pages_per_cycle, min_age_sec=0)
 
@@ -205,9 +210,40 @@ class RollingScanner:
         )
         return new_rows_total
 
+    @staticmethod
+    def _parse_scan_time(value: str) -> datetime | None:
+        """scan_times 값을 datetime으로 파싱. ISO/HH:MM:SS 모두 지원."""
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(value)
+        except (ValueError, TypeError):
+            pass
+        # 레거시 HH:MM:SS → 오늘 날짜 + 시간으로 해석
+        try:
+            t = datetime.strptime(value, "%H:%M:%S").time()
+            return datetime.combine(datetime.now().date(), t)
+        except (ValueError, TypeError):
+            return None
+
+    def _migrate_scan_times(self, scan_times: dict) -> int:
+        """HH:MM:SS 레거시 값을 ISO datetime으로 일괄 변환."""
+        migrated = 0
+        today = datetime.now().date()
+        for k, v in list(scan_times.items()):
+            if v and 'T' not in str(v):
+                try:
+                    t = datetime.strptime(v, "%H:%M:%S").time()
+                    scan_times[k] = datetime.combine(today, t).isoformat()
+                    migrated += 1
+                except (ValueError, TypeError):
+                    del scan_times[k]
+                    migrated += 1
+        return migrated
+
     def _select_oldest_pages(self, scan_times: dict, total_pages: int, count: int, min_age_sec: int = 3600) -> list:
         """
-        1시간 이상 경과한 페이지를 오래된 순으로 count개 선택.
+        경과 시간 기준으로 가장 오래된 페이지 count개 선택.
         미스캔 페이지(scan_times에 없는)가 최우선.
         """
         now = datetime.now()
@@ -217,16 +253,13 @@ class RollingScanner:
             key = str(page_start)
             last_scan = scan_times.get(key)
             if last_scan is None:
-                age = float('inf')  # 미스캔 = 최우선
+                age = float('inf')
             else:
-                try:
-                    age = (now - datetime.fromisoformat(last_scan)).total_seconds()
-                except (ValueError, TypeError):
-                    age = float('inf')
+                parsed = self._parse_scan_time(last_scan)
+                age = (now - parsed).total_seconds() if parsed else float('inf')
             if age >= min_age_sec:
                 candidates.append((page_start, age))
 
-        # 오래된 순 정렬 → 상위 count개
         candidates.sort(key=lambda x: -x[1])
         return [c[0] for c in candidates[:count]]
 
@@ -236,11 +269,10 @@ class RollingScanner:
         last_scan = scan_times.get(key)
         if last_scan is None:
             return 999.9
-        try:
-            delta = (datetime.now() - datetime.fromisoformat(last_scan)).total_seconds()
-            return delta / 3600
-        except (ValueError, TypeError):
+        parsed = self._parse_scan_time(last_scan)
+        if parsed is None:
             return 999.9
+        return (datetime.now() - parsed).total_seconds() / 3600
 
     async def _scan_single_page(
         self, svc: str, page_start: int, total_count: int,
