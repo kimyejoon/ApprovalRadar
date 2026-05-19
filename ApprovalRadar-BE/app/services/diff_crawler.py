@@ -696,8 +696,19 @@ class DiffCrawlerEngine:
             # 기존 피벗 sample_check 교체 → 전체 페이지를 순환하며 fingerprint 비교
             # 사각지대 0: 모든 레코드가 settings.ROLLING_SCAN_PAGES_PER_CYCLE 주기 내 검사됨
             scanner = RollingScanner(self.api_client, svc, self.state_repo)
-            rolling_new_rows = await scanner.scan_cycle()
 
+            # flush_callback: 커서별 완료 시 즉시 scraper 호출 (DB INSERT + SSE)
+            # → 커서 A 완료 → 즉시 SSE → 커서 B 시작 (기존: 6분 지연 → 3분으로 단축)
+            async def _flush_rolling_rows(rows: list):
+                from scraper import run_scraper_for_service_with_rows
+                await run_scraper_for_service_with_rows(svc, rows)
+
+            rolling_new_rows = await scanner.scan_cycle(
+                flush_callback=_flush_rolling_rows
+            )
+
+            # flush_callback 사용 시 rows는 이미 처리됨 → 빈 리스트
+            # flush_callback 미사용 시 (fallback) → 기존 방식으로 반환
             if rolling_new_rows:
                 logger.info(
                     f"[{svc}] 📥 Rolling Scan 신규 {len(rolling_new_rows)}건 발견 → "

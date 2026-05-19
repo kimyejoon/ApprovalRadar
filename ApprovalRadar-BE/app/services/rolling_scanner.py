@@ -33,12 +33,18 @@ class RollingScanner:
         self.service_id = service_id
         self.state_repo = state_repo
 
-    async def scan_cycle(self, pages_per_cycle: int = None) -> list:
+    async def scan_cycle(self, pages_per_cycle: int = None, flush_callback=None) -> list:
         """
         듀얼 커서로 전반부/후반부를 동시에 스캔하여 변경된 레코드를 반환합니다.
 
+        Args:
+            pages_per_cycle: 주기당 스캔 페이지 수
+            flush_callback: async callable(rows) — 커서별 스캔 완료 시 즉시 호출.
+                           DB INSERT + SSE 발행을 위해 사용.
+                           호출되면 해당 rows는 반환 리스트에서 제외됨.
+
         Returns:
-            list: 새로 발견된 레코드 리스트
+            list: 새로 발견된 레코드 리스트 (flush_callback 미사용 시)
         """
         svc = self.service_id
         if pages_per_cycle is None:
@@ -88,18 +94,32 @@ class RollingScanner:
             svc, cursor_a, range_a[0], range_a[1],
             pages_a, fingerprints, "A"
         )
-        new_rows_total.extend(new_a)
         mismatched_pages += mismatch_a
         total_scanned += scanned_a
+        # 커서 A 완료 즉시 flush → DB INSERT + SSE 발행
+        if new_a and flush_callback:
+            await flush_callback(new_a)
+            logger.info(
+                f"[{svc}] ⚡ 커서 A 즉시 flush: {len(new_a)}건 → scraper 파이프라인"
+            )
+        elif new_a:
+            new_rows_total.extend(new_a)
 
         # ── 커서 B 스캔 (후반부) ──
         scanned_b, new_b, mismatch_b, cursor_b = await self._scan_range(
             svc, cursor_b, range_b[0], range_b[1],
             pages_b, fingerprints, "B"
         )
-        new_rows_total.extend(new_b)
         mismatched_pages += mismatch_b
         total_scanned += scanned_b
+        # 커서 B 완료 즉시 flush
+        if new_b and flush_callback:
+            await flush_callback(new_b)
+            logger.info(
+                f"[{svc}] ⚡ 커서 B 즉시 flush: {len(new_b)}건 → scraper 파이프라인"
+            )
+        elif new_b:
+            new_rows_total.extend(new_b)
 
         # 상태 영속화
         state["rolling_cursor_a"] = cursor_a
@@ -116,11 +136,14 @@ class RollingScanner:
         half_pages = max(pages_a, pages_b)
         cycles_to_complete = (max_remaining + half_pages - 1) // half_pages if half_pages > 0 else 0
 
+        flushed_total = (len(new_a) if new_a and flush_callback else 0) + \
+                        (len(new_b) if new_b and flush_callback else 0)
+
         logger.info(
             f"[{svc}] ✅ Rolling Scan 완료: "
             f"{total_scanned}페이지 스캔 (A:{scanned_a}+B:{scanned_b}), "
             f"{mismatched_pages}건 불일치, "
-            f"{len(new_rows_total)}건 신규 수집 | "
+            f"{flushed_total + len(new_rows_total)}건 신규 수집 | "
             f"다음 A={cursor_a:,}, B={cursor_b:,} | "
             f"약 {cycles_to_complete}주기 후 1회전 완료"
         )
