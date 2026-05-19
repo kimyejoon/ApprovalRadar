@@ -200,12 +200,20 @@ def export_approvals_excel(
 
 @router.get("/detail", response_model=DetailListResponse)
 def get_approval_detail(
-    license_date: str = Query(..., description="최초인허가일 (YYYYMMDD)"),
-    business_name: str = Query(..., description="상호명"),
+    license_no: str = Query(None, description="인허가번호"),
+    license_date: str = Query(None, description="최초인허가일 (YYYYMMDD) - 레거시"),
+    business_name: str = Query(None, description="상호명 - 레거시"),
     repo: BusinessRepository = Depends(get_business_repo)
 ):
     try:
-        records = repo.get_businesses_by_date_and_name(license_date, business_name)
+        records = []
+        if license_no:
+            # 인허가번호 기반 조회 (정확한 매칭)
+            records = repo.get_businesses_by_license_no(license_no)
+        elif license_date and business_name:
+            # 레거시 fallback: license_date + business_name
+            records = repo.get_businesses_by_date_and_name(license_date, business_name)
+
         if not records:
             raise HTTPException(status_code=404, detail="해당 인허가 정보를 찾을 수 없습니다.")
                 

@@ -178,6 +178,17 @@ class BusinessRepository:
                 rows = cursor.fetchall()
                 return [dict(row) for row in rows]
 
+    def get_businesses_by_license_no(self, license_no: str, conn=None) -> List[Dict[str, Any]]:
+        """인허가번호 기반 이력 조회 — 상호변경/미색인과 무관하게 정확 매칭."""
+        query = "SELECT * FROM businesses WHERE license_no = ? ORDER BY last_event_date DESC, created_at DESC"
+        if conn:
+            cursor = conn.execute(query, (license_no,))
+            return [dict(row) for row in cursor.fetchall()]
+        else:
+            with get_db() as c:
+                cursor = c.execute(query, (license_no,))
+                return [dict(row) for row in cursor.fetchall()]
+
     def insert_business(self, record: dict, conn=None):
         query = '''
             INSERT INTO businesses 

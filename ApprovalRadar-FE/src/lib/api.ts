@@ -95,8 +95,9 @@ export async function fetchApprovals(params: FetchApprovalsParams): Promise<Appr
 }
 
 export interface ApprovalDetailParams {
-  license_date: string;
-  business_name: string;
+  license_no?: string;
+  license_date?: string;
+  business_name?: string;
 }
 
 export interface ApprovalDetailResponse {
@@ -106,8 +107,9 @@ export interface ApprovalDetailResponse {
 
 export async function fetchApprovalDetail(params: ApprovalDetailParams): Promise<ApprovalDetailResponse> {
   const url = new URL(`${API_BASE_URL}/api/v1/approvals/detail`);
-  url.searchParams.append('license_date', params.license_date);
-  url.searchParams.append('business_name', params.business_name);
+  if (params.license_no) url.searchParams.append('license_no', params.license_no);
+  if (params.license_date) url.searchParams.append('license_date', params.license_date);
+  if (params.business_name) url.searchParams.append('business_name', params.business_name);
 
   const response = await fetch(url.toString(), {
     headers: {

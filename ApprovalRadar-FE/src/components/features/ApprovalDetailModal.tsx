@@ -222,18 +222,16 @@ function MemoSection({ licenseDate, businessName }: MemoSectionProps) {
 // ─── 메인 모달 컴포넌트 ───────────────────────────────────────────────────────
 
 export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalDetailModalProps) {
+  const licenseNo = selectedItem?.raw.license_no;
   const { data: detailResponse, isLoading, isError } = useQuery({
-    queryKey: ['approvalDetail', selectedItem?.raw.license_date, selectedItem?.name],
+    queryKey: ['approvalDetail', licenseNo],
     queryFn: () => {
-      if (!selectedItem?.raw.license_date || !selectedItem?.name) {
-        return Promise.reject(new Error('Missing required parameters'));
+      if (!licenseNo) {
+        return Promise.reject(new Error('Missing license_no'));
       }
-      return fetchApprovalDetail({
-        license_date: selectedItem.raw.license_date,
-        business_name: selectedItem.name,
-      });
+      return fetchApprovalDetail({ license_no: licenseNo });
     },
-    enabled: isOpen && !!selectedItem?.raw.license_date && !!selectedItem?.name,
+    enabled: isOpen && !!licenseNo,
   });
 
   const historyData = detailResponse?.data || [];
