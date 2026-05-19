@@ -18,8 +18,6 @@ import {
   ChatCircle,
   Timer,
   Gauge,
-  Lightning,
-  Warning,
 } from '@phosphor-icons/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -448,11 +446,10 @@ function CrawlIntervalSection() {
             <button
               key={m}
               onClick={() => setLocalVal(m)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                displayVal === m
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${displayVal === m
                   ? 'bg-brand/15 border-brand/50 text-brand'
                   : 'bg-surface border-border-standard text-text-muted hover:text-text-primary hover:border-brand/30'
-              }`}
+                }`}
             >
               {m}분
             </button>
@@ -513,17 +510,11 @@ function RollingScanSection() {
   }
 
   const displayVal: number = localVal ?? currentRate ?? 100;
-  const intervalMinutes = currentInterval ?? 30;
+
   const activeKeys = keysData?.keys.filter((k) => k.is_active && !k.is_exhausted).length ?? 2;
 
   // 예상 지표 계산
-  const cyclesPerDay = Math.floor((24 * 60) / intervalMinutes);
-  const dailyApiUsage = displayVal * cyclesPerDay;
   const dailyApiLimit = activeKeys * API_DAILY_LIMIT_PER_KEY;
-  const dailyApiRemaining = dailyApiLimit - dailyApiUsage;
-  const cyclesToComplete = Math.ceil(ESTIMATED_TOTAL_PAGES / displayVal);
-  const rotationHours = (cyclesToComplete * intervalMinutes) / 60;
-  const isOverBudget = dailyApiUsage > dailyApiLimit;
 
   const mutation = useMutation({
     mutationFn: (p: number) => updateRollingScanRate(p),
@@ -584,57 +575,14 @@ function RollingScanSection() {
             <button
               key={p}
               onClick={() => setLocalVal(p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                displayVal === p
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${displayVal === p
                   ? 'bg-brand/15 border-brand/50 text-brand'
                   : 'bg-surface border-border-standard text-text-muted hover:text-text-primary hover:border-brand/30'
-              }`}
+                }`}
             >
               {p}페이지
             </button>
           ))}
-        </div>
-
-        {/* 예상 정보 카드 */}
-        <div className="rounded-xl border border-border-standard bg-surface/30 p-4 space-y-3">
-          <h4 className="text-xs font-medium text-text-muted flex items-center gap-1.5">
-            <Lightning className="w-3.5 h-3.5" />
-            예상 성능
-          </h4>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-lg font-semibold text-text-primary tabular-nums">
-                {rotationHours.toFixed(1)}시간
-              </p>
-              <p className="text-[10px] text-text-muted">전체 1회전</p>
-            </div>
-            <div>
-              <p className={`text-lg font-semibold tabular-nums ${isOverBudget ? 'text-red-400' : 'text-text-primary'}`}>
-                {dailyApiUsage.toLocaleString()}회
-              </p>
-              <p className="text-[10px] text-text-muted">일일 API 소모</p>
-            </div>
-            <div>
-              <p className={`text-lg font-semibold tabular-nums ${dailyApiRemaining < 0 ? 'text-red-400' : dailyApiRemaining < 500 ? 'text-yellow-400' : 'text-brand'}`}>
-                {dailyApiRemaining.toLocaleString()}회
-              </p>
-              <p className="text-[10px] text-text-muted">잔여 API 여유</p>
-            </div>
-          </div>
-
-          {/* 예산 초과 경고 */}
-          {isOverBudget && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium">
-              <Warning className="w-3.5 h-3.5" weight="fill" />
-              일일 API 한도({dailyApiLimit.toLocaleString()}회)를 초과합니다. 스캔 수를 줄이거나 API 키를 추가하세요.
-            </div>
-          )}
-          {!isOverBudget && dailyApiRemaining < 500 && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-xs font-medium">
-              <Warning className="w-3.5 h-3.5" weight="fill" />
-              API 여유가 {dailyApiRemaining}회로 적습니다. Backfill 등 추가 작업에 제한이 있을 수 있습니다.
-            </div>
-          )}
         </div>
 
         {/* 저장 버튼 */}
