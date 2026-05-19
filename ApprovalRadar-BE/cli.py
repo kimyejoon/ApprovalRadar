@@ -21,20 +21,74 @@ def check_keys():
 
 def test_tail():
     import time
-    print("현재 데이터의 꼬리(Tail) 지점을 조회합니다 (서비스별 최적 전략)...")
-    print("(I2500은 Backfill 전용 단건 조회 API이므로 tail 스캔 대상 아님)")
+    print("현재 데이터의 꼬리(Tail) 지점을 조회합니다...")
+    print("(DB 저장값과 API 실시간값을 비교합니다)\n")
+
     async def _run():
+        from app.repositories.state_repository import StateRepository
+        state_repo = StateRepository()
+
         async with ApiClient() as client:
             services = ["I2859", "I2861"]
+            svc_names = {"I2859": "식품업소", "I2861": "음식점업소"}
+
             for i, service_id in enumerate(services):
                 if i > 0:
-                    print(f"  (다음 서비스 전 3초 대기 - WAF 방지)")
+                    print(f"\n  (다음 서비스 전 3초 대기 - WAF 방지)")
                     await asyncio.sleep(3)
+
+                svc_name = svc_names.get(service_id, service_id)
+                print(f"\n{'─' * 50}")
+                print(f"📡 [{service_id}] {svc_name}")
+                print(f"{'─' * 50}")
+
+                # DB 저장된 tail
+                state = state_repo.load_state(service_id)
+                db_tail = state.get("last_total_count", 0)
+                pivot_count = len(state.get("pivots", {}))
+                print(f"  📋 DB 저장 tail: {db_tail:,}건 (피벗 {pivot_count}개)")
+
+                if db_tail == 0:
+                    print(f"  ⚠️  부트스트랩 미완료 → 처음부터 탐색합니다.")
+
+                # 역방향 검증: DB tail 위치에 데이터 있는지
+                if db_tail > 0:
+                    print(f"  🔍 역방향 검증: 인덱스 {db_tail:,} 위치 데이터 확인...", end=" ")
+                    try:
+                        res = await client.fetch_data(service_id, db_tail, db_tail, timeout=10)
+                        block = res.get(service_id, {}) if res else {}
+                        code = block.get("RESULT", {}).get("CODE", "")
+                        if code == "INFO-000" and block.get("row"):
+                            print("✅ 유효")
+                        else:
+                            print(f"❌ 데이터 없음 (CODE={code})")
+                            print(f"  ⚠️  API 재정렬로 tail 축소! DB tail이 실제보다 큼.")
+                    except Exception as e:
+                        print(f"⚠️ 오류: {e}")
+                    await asyncio.sleep(2)
+
+                # 실시간 tail 탐색
+                print(f"  🔍 실시간 tail 이진탐색 시작...")
+                start_time = time.time()
                 crawler = DiffCrawlerEngine(api_client=client, service_id=service_id)
-                tail = await crawler.find_true_tail()
-                print(f"  [{service_id}] 현재 전체 데이터 건수: {tail:,}건")
+                actual_tail = await crawler.find_true_tail(known_tail=0)
+                elapsed = time.time() - start_time
+
+                print(f"  📊 실시간 tail: {actual_tail:,}건 ({elapsed:.1f}초)")
+
+                # 비교
+                if db_tail > 0:
+                    diff = actual_tail - db_tail
+                    if diff > 0:
+                        print(f"  📈 차이: +{diff:,}건 (신규 데이터 추가)")
+                    elif diff < 0:
+                        print(f"  📉 차이: {diff:,}건 (API 재정렬로 축소)")
+                    else:
+                        print(f"  ✅ 일치: DB tail == 실시간 tail")
+
     asyncio.run(_run())
-    print("\n✅ 조회 완료")
+    print(f"\n{'─' * 50}")
+    print("✅ 조회 완료")
 
 def run_sync():
     print("수동으로 차분 동기화(Delta Sync)를 1회 실행합니다...")

@@ -243,18 +243,34 @@ class DiffCrawlerEngine:
         # ── 전략 B: 지수점프 + 이진탐색 + Gap허용 스캔 ───────────────────────
         logger.info(f"[{svc}][Bootstrapper] Tail 탐색 시작 (known_tail={known_tail:,})")
 
-        # Step 1: Ping - known_tail 직후 확인 (빠른 경로). 전략A 성공 서비스는 여기 미도달.
+        # Step 1: Ping - known_tail 직후 확인 + 역방향 유효성 검증
+        # ⚠️ API는 수시로 데이터를 재정렬(가나다 순 재인덱싱)하므로
+        #    known_tail 위치에 더 이상 데이터가 없을 수 있음 (tail 축소).
+        #    역방향 검증 없이 known_tail+1만 확인하면 영구적으로 감지 불가.
         if known_tail > 0:
-            ping = await self._fetch_page(known_tail + 1, known_tail + PAGE_SIZE)
-            if not ping:
-                logger.info(
-                    f"[{svc}] ✔️ Tail 조사 완료: 현재 전체 {known_tail:,}건 — "
-                    f"{known_tail+1:,}번 이후 데이터 없음 → 이번 주기 신규 발생 없음."
+            # Step 1-A: 역방향 검증 — known_tail 자체가 아직 유효한지 확인 (API 1회)
+            tail_check = await self._fetch_page(known_tail, known_tail)
+            if not tail_check:
+                # known_tail에 데이터 없음 → API 재정렬로 tail 축소!
+                # → 이진탐색(Step 2~4)으로 실제 tail 재발견
+                logger.warning(
+                    f"[{svc}] ⚠️ known_tail={known_tail:,} 위치에 데이터 없음! "
+                    f"API 재정렬로 tail 축소 감지. 이진탐색으로 실제 tail 재탐색..."
                 )
-                return known_tail
-            logger.info(
-                f"[{svc}] 📌 Ping: {known_tail+1:,}번 이후에 {len(ping)}건 데이터 감지 → 정확한 신규 건수 탐색 시작..."
-            )
+                # known_tail을 0으로 취급하여 처음부터 탐색
+                known_tail = 0
+            else:
+                # Step 1-B: known_tail 유효 → 그 뒤에 신규 데이터 있는지 확인
+                ping = await self._fetch_page(known_tail + 1, known_tail + PAGE_SIZE)
+                if not ping:
+                    logger.info(
+                        f"[{svc}] ✔️ Tail 조사 완료: 현재 전체 {known_tail:,}건 — "
+                        f"{known_tail+1:,}번 이후 데이터 없음 → 이번 주기 신규 발생 없음."
+                    )
+                    return known_tail
+                logger.info(
+                    f"[{svc}] 📌 Ping: {known_tail+1:,}번 이후에 {len(ping)}건 데이터 감지 → 정확한 신규 건수 탐색 시작..."
+                )
 
 
         # Step 0 (NEW): 소규모 데이터 Pre-check

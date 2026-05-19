@@ -72,34 +72,59 @@ async def tail_ping_all_services():
                 tail_detected = False
                 sentinel_detected = False
 
-                # ── 1. Tail Ping: known_tail+1 데이터 존재 확인 ────────────
-                ping_start = known_tail + 1
-                ping_end = known_tail + PAGE_SIZE
-                res = await api_client.fetch_data(
-                    svc_id, ping_start, ping_end, timeout=10
+                # ── 0. 역방향 검증: known_tail 자체가 유효한지 확인 ──────
+                # API 재정렬로 tail이 축소되면 known_tail+1 체크만으로는 감지 불가
+                # → known_tail 위치에 데이터가 있는지 먼저 확인 (API 1회)
+                tail_valid_res = await api_client.fetch_data(
+                    svc_id, known_tail, known_tail, timeout=10
                 )
                 await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
 
-                if res and svc_id in res:
-                    block = res[svc_id]
-                    code = block.get("RESULT", {}).get("CODE", "")
-                    if code == "INFO-000" and block.get("row"):
-                        rows = block["row"]
-                        svc_name = {"I2859": "식품업소", "I2861": "음식점업소"}.get(svc_id, svc_id)
-                        logger.info(
-                            f"🚨 [Tail Ping] {svc_name}({svc_id}) "
-                            f"Tail 변동 감지! known_tail={known_tail:,} 이후 "
-                            f"{len(rows)}건 존재 → Scraper 트리거"
-                        )
-                        tail_detected = True
-                    elif code == "INFO-200":
-                        logger.info(
-                            f"[Tail Ping] {svc_id} Tail 변동 없음 "
-                            f"(known_tail={known_tail:,})"
-                        )
-                    # 기타 코드 → 무시
+                tail_is_valid = False
+                if tail_valid_res and svc_id in tail_valid_res:
+                    vblock = tail_valid_res[svc_id]
+                    vcode = vblock.get("RESULT", {}).get("CODE", "")
+                    if vcode == "INFO-000" and vblock.get("row"):
+                        tail_is_valid = True
+
+                if not tail_is_valid:
+                    # known_tail 위치에 데이터 없음 → tail 축소!
+                    svc_name = {"I2859": "식품업소", "I2861": "음식점업소"}.get(svc_id, svc_id)
+                    logger.warning(
+                        f"🚨 [Tail Ping] {svc_name}({svc_id}) "
+                        f"known_tail={known_tail:,} 위치에 데이터 없음! "
+                        f"API 재정렬로 tail 축소 감지 → Scraper 트리거 (재부트스트랩)"
+                    )
+                    tail_detected = True
                 else:
-                    logger.debug(f"[Tail Ping] {svc_id} Tail Ping 응답 없음")
+                    # ── 1. Tail Ping: known_tail+1 데이터 존재 확인 ────────
+                    ping_start = known_tail + 1
+                    ping_end = known_tail + PAGE_SIZE
+                    res = await api_client.fetch_data(
+                        svc_id, ping_start, ping_end, timeout=10
+                    )
+                    await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+
+                    if res and svc_id in res:
+                        block = res[svc_id]
+                        code = block.get("RESULT", {}).get("CODE", "")
+                        if code == "INFO-000" and block.get("row"):
+                            rows = block["row"]
+                            svc_name = {"I2859": "식품업소", "I2861": "음식점업소"}.get(svc_id, svc_id)
+                            logger.info(
+                                f"🚨 [Tail Ping] {svc_name}({svc_id}) "
+                                f"Tail 변동 감지! known_tail={known_tail:,} 이후 "
+                                f"{len(rows)}건 존재 → Scraper 트리거"
+                            )
+                            tail_detected = True
+                        elif code == "INFO-200":
+                            logger.info(
+                                f"[Tail Ping] {svc_id} Tail 변동 없음 "
+                                f"(known_tail={known_tail:,})"
+                            )
+                        # 기타 코드 → 무시
+                    else:
+                        logger.debug(f"[Tail Ping] {svc_id} Tail Ping 응답 없음")
 
                 # ── 2. Multi-Point Sentinel: 랜덤 피벗 fingerprint 비교 ──
                 if not tail_detected:
