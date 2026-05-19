@@ -17,6 +17,9 @@ import {
   SlackLogo,
   ChatCircle,
   Timer,
+  Gauge,
+  Lightning,
+  Warning,
 } from '@phosphor-icons/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -43,6 +46,24 @@ async function updateCrawlInterval(minutes: number): Promise<number> {
   if (!res.ok) throw new Error('크롤 주기 변경 실패');
   const data = await res.json();
   return data.interval_minutes;
+}
+
+// ─── Rolling Scan API ────────────────────────────────────────────────────
+async function fetchRollingScanRate(): Promise<number> {
+  const res = await fetch(`${API_BASE}/api/v1/admin/settings/rolling-scan-rate`);
+  if (!res.ok) throw new Error('스캔 속도 조회 실패');
+  const data = await res.json();
+  return data.pages_per_cycle;
+}
+async function updateRollingScanRate(pages: number): Promise<number> {
+  const res = await fetch(`${API_BASE}/api/v1/admin/settings/rolling-scan-rate`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pages_per_cycle: pages }),
+  });
+  if (!res.ok) throw new Error('스캔 속도 변경 실패');
+  const data = await res.json();
+  return data.pages_per_cycle;
 }
 
 // ─── 상태 배지 컴포넌트 ────────────────────────────────────────────────────
@@ -457,6 +478,184 @@ function CrawlIntervalSection() {
   );
 }
 
+// ─── Rolling Scan 스캔 속도 설정 ─────────────────────────────────────────────
+
+const SCAN_PRESETS = [30, 50, 80, 100, 150] as const;
+
+// API 키 당 일일 한도
+const API_DAILY_LIMIT_PER_KEY = 1000;
+// 전체 페이지 수 추정 (I2859 ~238 + I2861 ~960)
+const ESTIMATED_TOTAL_PAGES = 1198;
+
+function RollingScanSection() {
+  const queryClient = useQueryClient();
+  const [localVal, setLocalVal] = useState<number | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const { data: currentRate, isLoading } = useQuery<number>({
+    queryKey: ['rolling-scan-rate'],
+    queryFn: fetchRollingScanRate,
+  });
+
+  const { data: currentInterval } = useQuery<number>({
+    queryKey: ['crawl-interval'],
+    queryFn: fetchCrawlInterval,
+  });
+
+  const { data: keysData } = useQuery({
+    queryKey: ['settings-api-keys'],
+    queryFn: fetchApiKeys,
+  });
+
+  const initDone = localVal !== null;
+  if (!initDone && currentRate !== undefined) {
+    setLocalVal(currentRate);
+  }
+
+  const displayVal: number = localVal ?? currentRate ?? 100;
+  const intervalMinutes = currentInterval ?? 30;
+  const activeKeys = keysData?.keys.filter((k) => k.is_active && !k.is_exhausted).length ?? 2;
+
+  // 예상 지표 계산
+  const cyclesPerDay = Math.floor((24 * 60) / intervalMinutes);
+  const dailyApiUsage = displayVal * cyclesPerDay;
+  const dailyApiLimit = activeKeys * API_DAILY_LIMIT_PER_KEY;
+  const dailyApiRemaining = dailyApiLimit - dailyApiUsage;
+  const cyclesToComplete = Math.ceil(ESTIMATED_TOTAL_PAGES / displayVal);
+  const rotationHours = (cyclesToComplete * intervalMinutes) / 60;
+  const isOverBudget = dailyApiUsage > dailyApiLimit;
+
+  const mutation = useMutation({
+    mutationFn: (p: number) => updateRollingScanRate(p),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rolling-scan-rate'] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    },
+  });
+
+  return (
+    <Card className="border-border-standard bg-surface">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          <Gauge className="w-4 h-4 text-brand" weight="fill" />
+          Rolling Scan 설정
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <p className="text-xs text-text-muted leading-relaxed">
+          매 크롤링 주기마다 스캔할 API 페이지 수를 설정합니다. 높을수록 변동 감지가 빨라지지만 API 호출량이 증가합니다.
+        </p>
+
+        {/* 현재 값 + 저장 표시 */}
+        <div className="flex items-baseline gap-2">
+          <span className="text-4xl font-bold text-text-primary tabular-nums">
+            {isLoading ? '—' : displayVal}
+          </span>
+          <span className="text-sm text-text-muted">페이지/주기</span>
+          {saved && (
+            <span className="ml-2 text-xs text-brand flex items-center gap-1">
+              <CheckCircle className="w-3.5 h-3.5" weight="fill" /> 저장됨
+            </span>
+          )}
+        </div>
+
+        {/* 슬라이더 */}
+        <div className="space-y-2">
+          <input
+            id="rolling-scan-slider"
+            type="range"
+            min={10}
+            max={200}
+            step={10}
+            value={displayVal}
+            onChange={(e) => setLocalVal(Number(e.target.value))}
+            className="w-full accent-brand cursor-pointer"
+          />
+          <div className="flex justify-between text-[10px] text-text-muted">
+            <span>10 (안전)</span>
+            <span>200 (최대)</span>
+          </div>
+        </div>
+
+        {/* 프리셋 */}
+        <div className="flex flex-wrap gap-2">
+          {SCAN_PRESETS.map((p) => (
+            <button
+              key={p}
+              onClick={() => setLocalVal(p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                displayVal === p
+                  ? 'bg-brand/15 border-brand/50 text-brand'
+                  : 'bg-surface border-border-standard text-text-muted hover:text-text-primary hover:border-brand/30'
+              }`}
+            >
+              {p}페이지
+            </button>
+          ))}
+        </div>
+
+        {/* 예상 정보 카드 */}
+        <div className="rounded-xl border border-border-standard bg-surface/30 p-4 space-y-3">
+          <h4 className="text-xs font-medium text-text-muted flex items-center gap-1.5">
+            <Lightning className="w-3.5 h-3.5" />
+            예상 성능
+          </h4>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-lg font-semibold text-text-primary tabular-nums">
+                {rotationHours.toFixed(1)}시간
+              </p>
+              <p className="text-[10px] text-text-muted">전체 1회전</p>
+            </div>
+            <div>
+              <p className={`text-lg font-semibold tabular-nums ${isOverBudget ? 'text-red-400' : 'text-text-primary'}`}>
+                {dailyApiUsage.toLocaleString()}회
+              </p>
+              <p className="text-[10px] text-text-muted">일일 API 소모</p>
+            </div>
+            <div>
+              <p className={`text-lg font-semibold tabular-nums ${dailyApiRemaining < 0 ? 'text-red-400' : dailyApiRemaining < 500 ? 'text-yellow-400' : 'text-brand'}`}>
+                {dailyApiRemaining.toLocaleString()}회
+              </p>
+              <p className="text-[10px] text-text-muted">잔여 API 여유</p>
+            </div>
+          </div>
+
+          {/* 예산 초과 경고 */}
+          {isOverBudget && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium">
+              <Warning className="w-3.5 h-3.5" weight="fill" />
+              일일 API 한도({dailyApiLimit.toLocaleString()}회)를 초과합니다. 스캔 수를 줄이거나 API 키를 추가하세요.
+            </div>
+          )}
+          {!isOverBudget && dailyApiRemaining < 500 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-xs font-medium">
+              <Warning className="w-3.5 h-3.5" weight="fill" />
+              API 여유가 {dailyApiRemaining}회로 적습니다. Backfill 등 추가 작업에 제한이 있을 수 있습니다.
+            </div>
+          )}
+        </div>
+
+        {/* 저장 버튼 */}
+        <button
+          id="save-rolling-scan-btn"
+          onClick={() => mutation.mutate(displayVal)}
+          disabled={mutation.isPending || displayVal === currentRate}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ArrowsClockwise className={`w-4 h-4 ${mutation.isPending ? 'animate-spin' : ''}`} />
+          {mutation.isPending ? '적용 중...' : '스캔 속도 적용'}
+        </button>
+
+        <p className="text-[11px] text-text-muted">
+          * 전체 페이지 수 약 {ESTIMATED_TOTAL_PAGES.toLocaleString()}개 기준. 활성 키 {activeKeys}개 × {API_DAILY_LIMIT_PER_KEY.toLocaleString()}회 = 일일 한도 {dailyApiLimit.toLocaleString()}회.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── 메인 설정 페이지 ──────────────────────────────────────────────────────
 
 export function SettingsPage() {
@@ -605,6 +804,9 @@ export function SettingsPage() {
 
       {/* 크롤링 주기 설정 카드 */}
       <CrawlIntervalSection />
+
+      {/* Rolling Scan 스캔 속도 설정 카드 */}
+      <RollingScanSection />
     </div>
   );
 }
