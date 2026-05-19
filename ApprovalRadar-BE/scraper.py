@@ -135,6 +135,7 @@ async def run_scraper_for_service(service_id: str):
             now = datetime.datetime.now().isoformat()
 
             from database import get_db
+            actually_changed = 0  # 실제 DB 변경 건수 (SSE 발행 기준)
             with get_db() as conn:
                 for row in new_data_rows:
                     fields = _map_row_fields(service_id, row)
@@ -142,9 +143,6 @@ async def run_scraper_for_service(service_id: str):
                         continue
 
                     lcns_no = fields["lcns_no"]
-
-                    # 1. 원본 API 응답(JSON) DB 저장
-                    raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
 
                     # 2. 날짜/시간 필드 파싱
                     event_date, event_time, license_date, license_time = _parse_datetime_fields(
@@ -174,13 +172,72 @@ async def run_scraper_for_service(service_id: str):
                             "license_time": license_time,
                         }
                         business_repo.insert_business(record, conn=conn)
+                        # 1. 원본 API 응답(JSON) DB 저장
+                        raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
+                        actually_changed += 1
 
                     else:
-                        # ── 변경 감지 ──────────────────────────────────────────
-                        prev_infer_type = db_record.get("infer_update_type", "")
+                        # ── 중복 체크: 동일 (lcns_no, event_date) 이미 존재 → 스킵 ──
                         prev_event_date = db_record.get("last_event_date", "")
-                        is_mirror_upgrade = prev_infer_type == "mirror"  # CLI 초기 스캔 레코드
-                        is_event_date_changed = prev_event_date and event_date and prev_event_date != event_date
+                        if prev_event_date == event_date:
+                            # 이미 수집된 레코드 → 변경 감지만 수행
+                            prev_infer_type = db_record.get("infer_update_type", "")
+                            is_mirror_upgrade = prev_infer_type == "mirror"
+
+                            change: ChangeResult = detector.detect(
+                                db_record=db_record,
+                                new_rep_name=fields["representative_name"],
+                                new_business_status=fields["business_status"],
+                                new_business_name=fields["business_name"],
+                                now=now,
+                            )
+
+                            should_update = (
+                                change.is_updated
+                                or (fields["industry_type"] and not db_record.get("industry_type"))
+                                or is_mirror_upgrade
+                            )
+
+                            if should_update:
+                                updates = {
+                                    "business_name": fields["business_name"],
+                                    "address": fields["address"],
+                                    "representative_name": fields["representative_name"],
+                                    "business_status": (
+                                        fields["business_status"]
+                                        if fields["business_status"] is not None
+                                        else db_record.get("business_status")
+                                    ),
+                                    "phone_number": fields["phone_number"],
+                                    "industry_type": (
+                                        fields["industry_type"] or db_record.get("industry_type")
+                                    ),
+                                    "representative_history": json.dumps(
+                                        change.rep_history, ensure_ascii=False
+                                    ),
+                                    "licensing_history": json.dumps(
+                                        change.lic_history, ensure_ascii=False
+                                    ),
+                                    "update_type": change.update_type,
+                                    "prev_business_status": change.prev_business_status,
+                                    "prev_representative_name": change.prev_representative_name,
+                                    "prev_business_name": change.prev_business_name,
+                                    "infer_update_type": change.infer_update_type,
+                                    "infer_update_detail": change.infer_update_detail,
+                                    "last_event_date": event_date,
+                                    "last_event_time": event_time,
+                                    "license_time": license_time,
+                                    "updated_at": now,
+                                }
+                                business_repo.update_business(lcns_no, updates, conn=conn)
+                                raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
+                                actually_changed += 1
+                            # else: 동일 event_date + 변경 없음 → 완전 스킵 (SSE 미발행)
+                            continue
+
+                        # ── 변경 감지: event_date가 다름 → 새로운 변동 이벤트 ──
+                        is_mirror_upgrade = db_record.get("infer_update_type", "") == "mirror"
+                        is_event_date_changed = True
 
                         change: ChangeResult = detector.detect(
                             db_record=db_record,
@@ -190,62 +247,53 @@ async def run_scraper_for_service(service_id: str):
                             now=now,
                         )
 
-                        # ── mirror 레코드가 diff로 재발견되거나 이벤트일자 변경 시 업데이트 ──
-                        # (1) mirror 레코드: CLI 초기 스캔값이 diff로 재발견 → '변동확인'으로 승급
-                        # (2) last_event_date 변경: 동일 업소의 새로운 인허가 변동 이벤트 발생
-                        should_update = (
-                            change.is_updated
-                            or (fields["industry_type"] and not db_record.get("industry_type"))
-                            or is_mirror_upgrade
-                            or is_event_date_changed
-                        )
+                        # infer_update_type 결정
+                        if change.infer_update_type:
+                            resolved_infer_type = change.infer_update_type
+                            resolved_infer_detail = change.infer_update_detail
+                        elif is_event_date_changed:
+                            resolved_infer_type = "인허가변동"
+                            resolved_infer_detail = f"변동일자: {prev_event_date} → {event_date}"
+                        elif is_mirror_upgrade:
+                            resolved_infer_type = "변동확인"
+                            resolved_infer_detail = None
+                        else:
+                            resolved_infer_type = change.infer_update_type
+                            resolved_infer_detail = change.infer_update_detail
 
-                        if should_update:
-                            # infer_update_type 결정
-                            if change.infer_update_type:
-                                resolved_infer_type = change.infer_update_type
-                                resolved_infer_detail = change.infer_update_detail
-                            elif is_event_date_changed:
-                                resolved_infer_type = "인허가변동"
-                                resolved_infer_detail = f"변동일자: {prev_event_date} → {event_date}"
-                            elif is_mirror_upgrade:
-                                resolved_infer_type = "변동확인"
-                                resolved_infer_detail = None
-                            else:
-                                resolved_infer_type = change.infer_update_type
-                                resolved_infer_detail = change.infer_update_detail
-
-                            updates = {
-                                "business_name": fields["business_name"],
-                                "address": fields["address"],
-                                "representative_name": fields["representative_name"],
-                                "business_status": (
-                                    fields["business_status"]
-                                    if fields["business_status"] is not None
-                                    else db_record.get("business_status")
-                                ),
-                                "phone_number": fields["phone_number"],
-                                "industry_type": (
-                                    fields["industry_type"] or db_record.get("industry_type")
-                                ),
-                                "representative_history": json.dumps(
-                                    change.rep_history, ensure_ascii=False
-                                ),
-                                "licensing_history": json.dumps(
-                                    change.lic_history, ensure_ascii=False
-                                ),
-                                "update_type": change.update_type,
-                                "prev_business_status": change.prev_business_status,
-                                "prev_representative_name": change.prev_representative_name,
-                                "prev_business_name": change.prev_business_name,
-                                "infer_update_type": resolved_infer_type,
-                                "infer_update_detail": resolved_infer_detail,
-                                "last_event_date": event_date,
-                                "last_event_time": event_time,
-                                "license_time": license_time,
-                                "updated_at": now,
-                            }
-                            business_repo.update_business(lcns_no, updates, conn=conn)
+                        updates = {
+                            "business_name": fields["business_name"],
+                            "address": fields["address"],
+                            "representative_name": fields["representative_name"],
+                            "business_status": (
+                                fields["business_status"]
+                                if fields["business_status"] is not None
+                                else db_record.get("business_status")
+                            ),
+                            "phone_number": fields["phone_number"],
+                            "industry_type": (
+                                fields["industry_type"] or db_record.get("industry_type")
+                            ),
+                            "representative_history": json.dumps(
+                                change.rep_history, ensure_ascii=False
+                            ),
+                            "licensing_history": json.dumps(
+                                change.lic_history, ensure_ascii=False
+                            ),
+                            "update_type": change.update_type,
+                            "prev_business_status": change.prev_business_status,
+                            "prev_representative_name": change.prev_representative_name,
+                            "prev_business_name": change.prev_business_name,
+                            "infer_update_type": resolved_infer_type,
+                            "infer_update_detail": resolved_infer_detail,
+                            "last_event_date": event_date,
+                            "last_event_time": event_time,
+                            "license_time": license_time,
+                            "updated_at": now,
+                        }
+                        business_repo.update_business(lcns_no, updates, conn=conn)
+                        raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
+                        actually_changed += 1
 
 
                 conn.commit()
@@ -253,16 +301,17 @@ async def run_scraper_for_service(service_id: str):
             total_elapsed = time.time() - start_time
             logger.info(
                 f"✅ [{service_id} 총 소요시간: {total_elapsed:.2f}초] "
-                f"모든 변경분({len(new_data_rows)}건)의 DB 업데이트 및 커밋 완료."
+                f"전체 {len(new_data_rows)}건 중 실제 변경 {actually_changed}건 DB 커밋 완료."
             )
 
-            # ── SSE 즉시 발행 (백필 전) — count 포함 ────────────────────────
-            # 프론트에서 count만큼 팝업을 생성하기 위해 변동 건수를 페이로드에 포함
-            from app.core.events import broadcaster
-            update_data = json.dumps(
-                {"type": "UPDATE", "count": len(new_data_rows)}, ensure_ascii=False
-            )
-            broadcaster.broadcast_sync(update_data)
+            # ── SSE 즉시 발행 — 실제 변경 건수만 ────────────────────────
+            # 이미 수집된 레코드가 반복 반환되어도 중복 SSE 발행 방지
+            if actually_changed > 0:
+                from app.core.events import broadcaster
+                update_data = json.dumps(
+                    {"type": "UPDATE", "count": actually_changed}, ensure_ascii=False
+                )
+                broadcaster.broadcast_sync(update_data)
 
             # ── I2500 백필 (daemon thread) — SSE 발행 후 비동기 실행 ────────────
             # 동일 LCNS_NO 중복 제거 (같은 업소의 여러 변동분은 1회만 조회)
