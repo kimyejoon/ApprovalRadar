@@ -181,8 +181,8 @@ class BusinessRepository:
     def insert_business(self, record: dict, conn=None):
         query = '''
             INSERT INTO businesses 
-            (license_no, business_name, address, representative_name, business_status, license_date, phone_number, industry_type, last_event_date, is_new, update_type, prev_business_status, prev_representative_name, prev_business_name, infer_update_type, infer_update_detail, last_event_time, license_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
+            (license_no, business_name, address, representative_name, business_status, license_date, phone_number, industry_type, last_event_date, is_new, update_type, prev_business_status, prev_representative_name, prev_business_name, infer_update_type, infer_update_detail, last_event_time, license_time, change_reason, change_before, change_after)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
         params = (
             record["license_no"], record["business_name"], record["address"], 
@@ -190,7 +190,8 @@ class BusinessRepository:
             record["license_date"], record["phone_number"], record.get("industry_type"), record["last_event_date"],
             record.get("update_type"), record.get("prev_business_status"), 
             record.get("prev_representative_name"), record.get("prev_business_name"), record.get("infer_update_type"), record.get("infer_update_detail"),
-            record.get("last_event_time"), record.get("license_time")
+            record.get("last_event_time"), record.get("license_time"),
+            record.get("change_reason"), record.get("change_before"), record.get("change_after")
         )
         
         if conn:

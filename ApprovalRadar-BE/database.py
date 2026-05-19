@@ -169,6 +169,13 @@ def init_db():
         cursor.execute("ALTER TABLE businesses ADD COLUMN representative_history TEXT DEFAULT '[]'")
     if "licensing_history" not in biz_columns:
         cursor.execute("ALTER TABLE businesses ADD COLUMN licensing_history TEXT DEFAULT '[]'")
+    # ── API 원본 변경 사유/전/후 저장 (CHNG_PRVNS, CHNG_BF_CN, CHNG_AF_CN) ──
+    if "change_reason" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN change_reason TEXT")
+    if "change_before" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN change_before TEXT")
+    if "change_after" not in biz_columns:
+        cursor.execute("ALTER TABLE businesses ADD COLUMN change_after TEXT")
 
     # 인허가 변동건 메모 테이블 (license_date + business_name 당 1건)
     cursor.execute('''

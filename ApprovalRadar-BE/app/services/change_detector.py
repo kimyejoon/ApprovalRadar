@@ -119,3 +119,75 @@ class ChangeDetector:
             result.infer_update_detail = result.prev_business_name
 
         return result
+
+
+def infer_change_type_from_bf_af(chng_prvns: str, bf: str, af: str) -> tuple:
+    """
+    CHNG_PRVNS + BF/AF 문자열 패턴 분석 → (infer_update_type, infer_update_detail) 반환.
+
+    판별 우선순위:
+    1. "지위승계" in CHNG_PRVNS → 대표자변경
+    2. BF/AF가 주소 패턴 → 변경민원-주소
+    3. BF/AF가 이름 패턴 (마스킹 *) → 대표자변경 (성함변경과 일원화)
+    4. 나머지 → 변경민원-상호명
+    5. "초기자료등록" → 초기수집(과거변경있음)
+    """
+    chng_prvns = chng_prvns or ""
+    bf = bf or ""
+    af = af or ""
+
+    # 0. 초기자료등록
+    if "초기자료등록" in chng_prvns:
+        detail = f"{bf} → {af}" if bf or af else None
+        return ("초기수집(과거변경있음)", detail)
+
+    # 1. 지위승계 → 대표자변경
+    if "지위승계" in chng_prvns:
+        detail = f"{bf} → {af}" if bf or af else None
+        return ("대표자변경", detail)
+
+    # 2. BF/AF 내용으로 유형 판별
+    if bf or af:
+        sample = af or bf  # AF 우선, 없으면 BF
+
+        # 주소 패턴: 시/도/구/동/로/길 등 행정구역 키워드
+        if _is_address_pattern(sample):
+            detail = f"{bf[:30]}... → {af[:30]}..." if len(bf) > 30 or len(af) > 30 else f"{bf} → {af}"
+            return ("변경민원-주소", detail)
+
+        # 이름 패턴: 마스킹 * 포함 + 비교적 짧은 문자열
+        if _is_name_pattern(sample):
+            detail = f"{bf} → {af}"
+            return ("대표자변경", detail)
+
+        # 나머지 → 상호명 변경
+        detail = f"{bf} → {af}"
+        return ("변경민원-상호명", detail)
+
+    # 3. BF/AF 없음 → 일반 변경민원
+    return ("인허가변동", None)
+
+
+def _is_address_pattern(text: str) -> bool:
+    """주소 패턴 판별: 시/도/구/동/로/길 등 행정구역 키워드 포함 여부."""
+    import re
+    if not text:
+        return False
+    # 행정구역 키워드
+    addr_keywords = re.compile(
+        r'(특별시|광역시|특별자치도|특별자치시|'
+        r'\d+동\)|읍\s|면\s|리\s|'
+        r'로\s\d|길\s\d|대로\s|번길\s|'
+        r'\d+호\s|\d+층)'
+    )
+    return bool(addr_keywords.search(text))
+
+
+def _is_name_pattern(text: str) -> bool:
+    """이름 패턴 판별: 마스킹 * 포함 + 짧은 문자열."""
+    if not text:
+        return False
+    # 마스킹 패턴: 김**, 이*******, S******************** 등
+    if '*' in text and len(text) <= 30:
+        return True
+    return False

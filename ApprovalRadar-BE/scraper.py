@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from database import init_db
 from app.clients.foodsafety_api import ApiClient, ApiKeysExhaustedError
 from app.services.diff_crawler import DiffCrawlerEngine
-from app.services.change_detector import ChangeDetector, ChangeResult
+from app.services.change_detector import ChangeDetector, ChangeResult, infer_change_type_from_bf_af
 from app.core.logger import logger
 
 from app.repositories.business_repository import BusinessRepository
@@ -155,9 +155,16 @@ async def run_scraper_for_service(service_id: str):
 
                     if not db_record:
                         # ── 신규 등록 ──────────────────────────────────────────
-                        infer_update_type = (
-                            "신규등록" if license_date == event_date else "초기수집(과거변경있음)"
-                        )
+                        # BF/AF 기반 스마트 추론 (CHNG_PRVNS 있을 때)
+                        if fields.get("change_reason"):
+                            infer_update_type, infer_update_detail = infer_change_type_from_bf_af(
+                                fields["change_reason"], fields["change_before"], fields["change_after"]
+                            )
+                        else:
+                            infer_update_type = (
+                                "신규등록" if license_date == event_date else "초기수집(과거변경있음)"
+                            )
+                            infer_update_detail = None
                         record = {
                             "license_no": lcns_no,
                             "business_name": fields["business_name"],
@@ -169,9 +176,12 @@ async def run_scraper_for_service(service_id: str):
                             "industry_type": fields["industry_type"],
                             "last_event_date": event_date,
                             "infer_update_type": infer_update_type,
-                            "infer_update_detail": None,
+                            "infer_update_detail": infer_update_detail,
                             "last_event_time": event_time,
                             "license_time": license_time,
+                            "change_reason": fields.get("change_reason"),
+                            "change_before": fields.get("change_before"),
+                            "change_after": fields.get("change_after"),
                         }
                         business_repo.insert_business(record, conn=conn)
                         # 1. 원본 API 응답(JSON) DB 저장
@@ -462,10 +472,16 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
                 skipped_dup += 1
                 continue
 
-            # 신규 이력 INSERT
-            infer_update_type = (
-                "신규등록" if license_date == event_date else "인허가변동"
-            )
+            # 신규 이력 INSERT — BF/AF 기반 스마트 추론
+            if fields.get("change_reason"):
+                infer_update_type, infer_update_detail = infer_change_type_from_bf_af(
+                    fields["change_reason"], fields["change_before"], fields["change_after"]
+                )
+            else:
+                infer_update_type = (
+                    "신규등록" if license_date == event_date else "인허가변동"
+                )
+                infer_update_detail = None
             record = {
                 "license_no": lcns_no,
                 "business_name": fields["business_name"],
@@ -477,9 +493,12 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
                 "industry_type": fields["industry_type"],
                 "last_event_date": event_date,
                 "infer_update_type": infer_update_type,
-                "infer_update_detail": None,
+                "infer_update_detail": infer_update_detail,
                 "last_event_time": event_time,
                 "license_time": license_time,
+                "change_reason": fields.get("change_reason"),
+                "change_before": fields.get("change_before"),
+                "change_after": fields.get("change_after"),
             }
             business_repo.insert_business(record, conn=conn)
             raw_repo.insert_raw_data(lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now, conn=conn)
