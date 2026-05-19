@@ -53,10 +53,11 @@ def init_db():
     cursor.execute('PRAGMA journal_mode=WAL;')
     cursor.execute('PRAGMA synchronous=NORMAL;')
     
-    # Create businesses table with JSON columns for history
+    # Create businesses table — 동일 LCNS의 여러 인허가변동 이력을 개별 보관
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS businesses (
-            license_no TEXT PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            license_no TEXT NOT NULL,
             business_name TEXT,
             address TEXT,
             representative_name TEXT,
@@ -64,8 +65,8 @@ def init_db():
             license_date TEXT,
             phone_number TEXT,
             industry_type TEXT,
-            representative_history TEXT DEFAULT '[]', -- JSON array
-            licensing_history TEXT DEFAULT '[]', -- JSON array
+            representative_history TEXT DEFAULT '[]',
+            licensing_history TEXT DEFAULT '[]',
             last_event_date TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -79,9 +80,69 @@ def init_db():
             last_event_time TEXT,
             license_time TEXT,
             is_read INTEGER DEFAULT 0,
-            read_at TEXT
+            read_at TEXT,
+            UNIQUE(license_no, last_event_date)
         )
     ''')
+
+    # ── 기존 license_no PK → id PK 마이그레이션 ──
+    cursor.execute("PRAGMA table_info(businesses)")
+    biz_cols_info = cursor.fetchall()
+    # 기존 테이블의 첫 번째 컬럼이 license_no이고 pk=1이면 구버전
+    if biz_cols_info and biz_cols_info[0][1] == 'license_no' and biz_cols_info[0][5] == 1:
+        cursor.execute('ALTER TABLE businesses RENAME TO businesses_old')
+        cursor.execute('''
+            CREATE TABLE businesses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                license_no TEXT NOT NULL,
+                business_name TEXT,
+                address TEXT,
+                representative_name TEXT,
+                business_status TEXT,
+                license_date TEXT,
+                phone_number TEXT,
+                industry_type TEXT,
+                representative_history TEXT DEFAULT '[]',
+                licensing_history TEXT DEFAULT '[]',
+                last_event_date TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_new INTEGER DEFAULT 1,
+                update_type TEXT,
+                prev_business_status TEXT,
+                prev_representative_name TEXT,
+                prev_business_name TEXT,
+                infer_update_type TEXT,
+                infer_update_detail TEXT,
+                last_event_time TEXT,
+                license_time TEXT,
+                is_read INTEGER DEFAULT 0,
+                read_at TEXT,
+                UNIQUE(license_no, last_event_date)
+            )
+        ''')
+        cursor.execute('''
+            INSERT INTO businesses (
+                license_no, business_name, address, representative_name,
+                business_status, license_date, phone_number, industry_type,
+                representative_history, licensing_history, last_event_date,
+                created_at, updated_at, is_new, update_type,
+                prev_business_status, prev_representative_name, prev_business_name,
+                infer_update_type, infer_update_detail, last_event_time,
+                license_time, is_read, read_at
+            )
+            SELECT
+                license_no, business_name, address, representative_name,
+                business_status, license_date, phone_number, industry_type,
+                representative_history, licensing_history, last_event_date,
+                created_at, updated_at, is_new, update_type,
+                prev_business_status, prev_representative_name, prev_business_name,
+                infer_update_type, infer_update_detail, last_event_time,
+                license_time, is_read, read_at
+            FROM businesses_old
+        ''')
+        cursor.execute('DROP TABLE businesses_old')
+        print('[DB 마이그레이션] businesses: license_no PK → id AUTOINCREMENT + UNIQUE(license_no, last_event_date)')
     
     # 기존 테이블 구조 확인 및 마이그레이션
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='crawler_state'")
@@ -157,14 +218,32 @@ def init_db():
         )
     ''')
     
-    # 원시 API 데이터(JSON) 보관 테이블
+    # 원시 API 데이터(JSON) 보관 테이블 — 동일 LCNS의 여러 이력을 보관
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS api_raw_data (
-            license_no TEXT PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            license_no TEXT NOT NULL,
             raw_json TEXT,
             fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    # api_raw_data 기존 PK 마이그레이션
+    cursor.execute("PRAGMA table_info(api_raw_data)")
+    raw_cols = cursor.fetchall()
+    if raw_cols and raw_cols[0][1] == 'license_no' and raw_cols[0][5] == 1:
+        cursor.execute('ALTER TABLE api_raw_data RENAME TO api_raw_data_old')
+        cursor.execute('''
+            CREATE TABLE api_raw_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                license_no TEXT NOT NULL,
+                raw_json TEXT,
+                fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('INSERT INTO api_raw_data (license_no, raw_json, fetched_at) SELECT license_no, raw_json, fetched_at FROM api_raw_data_old')
+        cursor.execute('DROP TABLE api_raw_data_old')
+        print('[DB 마이그레이션] api_raw_data: license_no PK → id AUTOINCREMENT')
     
     # 시스템 로깅 테이블 (DB 로깅용)
     cursor.execute('''

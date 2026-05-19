@@ -265,61 +265,46 @@ class RollingScanner:
                     scanned += 1
                     continue
 
-                # ── [최적화] DB 미존재 레코드 batch 감지 ──────────────────
-                # 이미 fetch한 1000건에서 LCNS_NO를 추출 → batch SQL로 DB에 있는지 확인
-                # DB에 없는 레코드 = 아직 수집하지 않은 데이터 → 즉시 수집
+                # ── DB 미존재 이벤트 batch 감지 ──────────────────
+                # (LCNS_NO, CHNG_DT) 쌍으로 확인 — 동일 LCNS라도
+                # 다른 CHNG_DT면 별도 인허가변동 이력이므로 수집 대상
                 lcns_list = [item.get("LCNS_NO", "") for item in items if item.get("LCNS_NO")]
                 if lcns_list:
-                    # batch 조회: IN 절로 한 번에 확인
+                    # batch 조회: DB에 이미 있는 (license_no, last_event_date) 쌍
                     placeholders = ",".join(["?"] * len(lcns_list))
                     existing_cursor = db_conn.execute(
                         f"SELECT license_no, last_event_date FROM businesses WHERE license_no IN ({placeholders})",
                         lcns_list
                     )
-                    existing_map = {row[0]: row[1] for row in existing_cursor.fetchall()}
-                    existing_set = set(existing_map.keys())
+                    existing_pairs = {(row[0], row[1]) for row in existing_cursor.fetchall()}
 
-                    # DB에 없는 레코드 추출
+                    # DB에 (LCNS, CHNG_DT) 쌍이 없는 레코드 = 신규 이력 → 수집
                     missing_items = [
                         item for item in items
-                        if item.get("LCNS_NO", "") and item["LCNS_NO"] not in existing_set
+                        if item.get("LCNS_NO", "")
+                        and (item["LCNS_NO"], item.get("CHNG_DT", "")) not in existing_pairs
                     ]
                     if missing_items:
                         db_miss_count += len(missing_items)
                         new_rows.extend(missing_items)
-                        if len(missing_items) >= 5:  # 5건 이상일 때만 로그 (노이즈 방지)
+
+                        # 오늘 변동분 카운팅
+                        today_in_missing = sum(
+                            1 for item in missing_items
+                            if item.get("CHNG_DT", "") == today_str
+                        )
+                        if today_in_missing:
+                            today_found += today_in_missing
+                            logger.info(
+                                f"[{svc}] 🆕 커서 {label} page {page_start:,}: "
+                                f"오늘({today_str}) 변동분 {today_in_missing}건 즉시 감지!"
+                            )
+
+                        if len(missing_items) >= 5:
                             logger.info(
                                 f"[{svc}] 📥 커서 {label} page {page_start:,}: "
                                 f"DB 미존재 {len(missing_items)}건 발견 → 수집 대상 추가"
                             )
-
-                    # ── [핵심] 오늘 CHNG_DT인데 DB에 이미 있는 레코드 → 변동 업데이트 수집 ──
-                    today_update_items = [
-                        item for item in items
-                        if item.get("LCNS_NO", "") in existing_set
-                        and item.get("CHNG_DT", "") == today_str
-                        and existing_map.get(item["LCNS_NO"]) != today_str  # DB의 기존 event_date와 다를 때만
-                    ]
-                    if today_update_items:
-                        new_rows.extend(today_update_items)
-                        today_found += len(today_update_items)
-                        logger.info(
-                            f"[{svc}] 🆕 커서 {label}: 오늘({today_str}) 변동분 "
-                            f"{len(today_update_items)}건 즉시 감지!"
-                        )
-
-                # ── 오늘 CHNG_DT 존재 여부 카운팅 (DB 미존재 신규 포함) ──────
-                today_new_count = sum(
-                    1 for item in items
-                    if item.get("CHNG_DT", "") == today_str
-                    and item.get("LCNS_NO", "") not in existing_set
-                ) if lcns_list else 0
-                if today_new_count:
-                    today_found += today_new_count
-                    logger.info(
-                        f"[{svc}] 🆕 커서 {label} page {page_start:,}: "
-                        f"오늘({today_str}) 신규 {today_new_count}건 (DB 미존재)"
-                    )
 
                 # ── fingerprint 비교 ──────────────────────────────────
                 current_fp = compute_page_fingerprint(items)

@@ -427,25 +427,25 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
 
     with get_db() as conn:
         # batch SELECT: 1000건씩 IN절 조회 (SQLite 변수 제한 대응)
-        existing_records = {}
+        # ── Step 2: batch SELECT — (license_no, last_event_date) 쌍으로 중복 확인 ──
+        existing_pairs = set()
         for i in range(0, len(unique_lcns), 500):
             batch = unique_lcns[i:i+500]
             placeholders = ",".join(["?"] * len(batch))
             cursor = conn.execute(
-                f"SELECT * FROM businesses WHERE license_no IN ({placeholders})",
+                f"SELECT license_no, last_event_date FROM businesses WHERE license_no IN ({placeholders})",
                 batch
             )
             for row in cursor.fetchall():
-                existing_records[row["license_no"]] = dict(row)
+                existing_pairs.add((row["license_no"], row["last_event_date"]))
 
         logger.info(
-            f"  📋 batch SELECT 완료: {len(unique_lcns)}건 조회 → "
-            f"기존 {len(existing_records)}건, 신규 {len(unique_lcns) - len(existing_records)}건"
+            f"  📋 batch SELECT 완료: {len(unique_lcns)}건 LCNS 조회, "
+            f"기존 이력 {len(existing_pairs)}쌍"
         )
 
-        # ── Step 3: bulk INSERT/UPDATE ──
+        # ── Step 3: INSERT only (동일 LCNS + 동일 event_date만 스킵) ──
         insert_count = 0
-        update_count = 0
         today_str = datetime.datetime.now().strftime("%Y%m%d")
         today_changed = 0  # 오늘 변동분만 (SSE 발행 기준)
 
@@ -457,94 +457,38 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
             license_date = m["license_date"]
             license_time = m["license_time"]
 
-            db_record = existing_records.get(lcns_no)
+            pair = (lcns_no, event_date)
+            if pair in existing_pairs:
+                skipped_dup += 1
+                continue
 
-            if not db_record:
-                # 신규 INSERT
-                infer_update_type = (
-                    "신규등록" if license_date == event_date else "초기수집(과거변경있음)"
-                )
-                record = {
-                    "license_no": lcns_no,
-                    "business_name": fields["business_name"],
-                    "address": fields["address"],
-                    "representative_name": fields["representative_name"],
-                    "business_status": fields["business_status"],
-                    "license_date": license_date,
-                    "phone_number": fields["phone_number"],
-                    "industry_type": fields["industry_type"],
-                    "last_event_date": event_date,
-                    "infer_update_type": infer_update_type,
-                    "infer_update_detail": None,
-                    "last_event_time": event_time,
-                    "license_time": license_time,
-                }
-                business_repo.insert_business(record, conn=conn)
-                raw_repo.insert_raw_data(lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now, conn=conn)
-                insert_count += 1
-                actually_changed += 1
-                if event_date == today_str:
-                    today_changed += 1
-                # INSERT 후 existing_records에 추가 (같은 LCNS의 후속 row 처리용)
-                existing_records[lcns_no] = record
-
-            else:
-                # 기존 레코드 존재 — 동일 event_date이면 스킵
-                prev_event_date = db_record.get("last_event_date", "")
-                if prev_event_date == event_date:
-                    skipped_dup += 1
-                    continue
-
-                # 새로운 변동 이벤트
-                change: ChangeResult = detector.detect(
-                    db_record=db_record,
-                    new_rep_name=fields["representative_name"],
-                    new_business_status=fields["business_status"],
-                    new_business_name=fields["business_name"],
-                    now=now,
-                )
-                resolved_infer_type = "인허가변동"
-                resolved_infer_detail = f"변동일자: {prev_event_date} → {event_date}"
-                if change.infer_update_type:
-                    resolved_infer_type = change.infer_update_type
-                    resolved_infer_detail = change.infer_update_detail
-
-                updates = {
-                    "business_name": fields["business_name"],
-                    "address": fields["address"],
-                    "representative_name": fields["representative_name"],
-                    "business_status": (
-                        fields["business_status"]
-                        if fields["business_status"] is not None
-                        else db_record.get("business_status")
-                    ),
-                    "phone_number": fields["phone_number"],
-                    "industry_type": (
-                        fields["industry_type"] or db_record.get("industry_type")
-                    ),
-                    "representative_history": json.dumps(
-                        change.rep_history, ensure_ascii=False
-                    ),
-                    "licensing_history": json.dumps(
-                        change.lic_history, ensure_ascii=False
-                    ),
-                    "update_type": change.update_type,
-                    "prev_business_status": change.prev_business_status,
-                    "prev_representative_name": change.prev_representative_name,
-                    "prev_business_name": change.prev_business_name,
-                    "infer_update_type": resolved_infer_type,
-                    "infer_update_detail": resolved_infer_detail,
-                    "last_event_date": event_date,
-                    "last_event_time": event_time,
-                    "license_time": license_time,
-                    "updated_at": now,
-                }
-                business_repo.update_business(lcns_no, updates, conn=conn)
-                raw_repo.insert_raw_data(lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now, conn=conn)
-                update_count += 1
-                actually_changed += 1
-                if event_date == today_str:
-                    today_changed += 1
+            # 신규 이력 INSERT
+            infer_update_type = (
+                "신규등록" if license_date == event_date else "인허가변동"
+            )
+            record = {
+                "license_no": lcns_no,
+                "business_name": fields["business_name"],
+                "address": fields["address"],
+                "representative_name": fields["representative_name"],
+                "business_status": fields["business_status"],
+                "license_date": license_date,
+                "phone_number": fields["phone_number"],
+                "industry_type": fields["industry_type"],
+                "last_event_date": event_date,
+                "infer_update_type": infer_update_type,
+                "infer_update_detail": None,
+                "last_event_time": event_time,
+                "license_time": license_time,
+            }
+            business_repo.insert_business(record, conn=conn)
+            raw_repo.insert_raw_data(lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now, conn=conn)
+            insert_count += 1
+            actually_changed += 1
+            if event_date == today_str:
+                today_changed += 1
+            # 중복 INSERT 방지
+            existing_pairs.add(pair)
 
         conn.commit()
 
@@ -555,7 +499,7 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
     if actually_changed > 0:
         logger.info(
             f"✅ [{svc_name}] flush 완료: {len(mapped_rows)}건 → "
-            f"INSERT {insert_count} / UPDATE {update_count} / 스킵 {skipped_dup} "
+            f"INSERT {insert_count} / 스킵 {skipped_dup} "
             f"({elapsed:.1f}초) {log_suffix}"
         )
     else:
