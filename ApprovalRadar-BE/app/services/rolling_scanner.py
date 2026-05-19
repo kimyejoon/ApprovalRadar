@@ -73,9 +73,8 @@ class RollingScanner:
         fingerprints: dict = state.get("page_fingerprints", {})
         scan_times: dict = state.get("page_scan_times", {})
 
-        # 전체 예산을 Oldest-First에 투입 (Random Probe 없음)
-        MIN_AGE_SEC = 3600
-        oldest_pages = self._select_oldest_pages(scan_times, total_pages, pages_per_cycle, MIN_AGE_SEC)
+        # 순수 Oldest-First: min_age 제약 없이 가장 오래된 N개 선택
+        oldest_pages = self._select_oldest_pages(scan_times, total_pages, pages_per_cycle, min_age_sec=0)
 
         if oldest_pages:
             max_age = self._get_page_age(scan_times, oldest_pages[0])
