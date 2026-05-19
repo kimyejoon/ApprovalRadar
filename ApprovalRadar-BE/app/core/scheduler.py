@@ -207,6 +207,14 @@ def start_scheduler():
     # 전략 A가 놓친 건 있으면 DB 저장 + SSE 발행. 없으면 전략 A 정상 확인 로그만 출력.
     scheduler.add_job(_evening_chng_dt_job, 'cron', hour=19, minute=0, id="evening_chng_dt_job")
 
+    # ✅ [저녁 고밀도 폴링] 18:30~20:30 구간 10분 주기 (평일만)
+    # 19시 배치 실행 직후 감지 지연: 30분 → 10분으로 단축
+    # 추가 API 비용: ~18회/주기 × 8주기 ≈ 144회/일 (5키 한도 내)
+    scheduler.add_job(_evening_dense_poll_start, 'cron', hour=18, minute=30,
+                      day_of_week='mon-fri', id="evening_dense_start_job")
+    scheduler.add_job(_evening_dense_poll_end, 'cron', hour=20, minute=30,
+                      day_of_week='mon-fri', id="evening_dense_end_job")
+
     # 앱 시작 시 즉시 1회 실행 (blocking 방지를 위해 스케줄러에 위임)
     logger.info("Adding initial catch-up scraper job to background...")
     scheduler.add_job(_scraper_job, 'date', run_date=datetime.now(), id="initial_scraper_job")
@@ -256,3 +264,38 @@ def reschedule_scraper_job(new_interval_minutes: int) -> None:
     except Exception as e:
         logger.error(f"[스케줄러] 크롤링 주기 변경 실패: {e}")
         raise
+
+
+# ── 저녁 고밀도 폴링: 18:30~20:30 구간 10분 주기 ────────────────────────────
+# 목적: 19시 배치 실행 직후 감지 지연을 30분 → 10분으로 단축
+# 평일(월~금)에만 동작. 18:30에 10분으로 압축, 20:30에 원래 주기 복원.
+_base_interval_before_evening: int = 30  # 복원용 기준 주기 저장
+
+
+def _evening_dense_poll_start():
+    """18:30 — 폴링 주기를 10분으로 압축 (평일에만 실행)."""
+    global _base_interval_before_evening
+    if datetime.now().weekday() >= 5:  # 토·일 스킵
+        return
+    from app.core.config import settings as _s
+    _base_interval_before_evening = _s.SCRAPER_INTERVAL_MINUTES
+    logger.info(
+        f"[저녁 고밀도 폴링] 18:30 — 주기 {_base_interval_before_evening}분 → 10분으로 압축 "
+        f"(19시 배치 감지 지연 단축)"
+    )
+    reschedule_scraper_job(10)
+    _s.SCRAPER_INTERVAL_MINUTES = 10
+
+
+def _evening_dense_poll_end():
+    """20:30 — 폴링 주기를 원래 값으로 복원."""
+    global _base_interval_before_evening
+    if datetime.now().weekday() >= 5:  # 토·일 스킵
+        return
+    from app.core.config import settings as _s
+    restore = _base_interval_before_evening
+    logger.info(
+        f"[저녁 고밀도 폴링] 20:30 — 주기 10분 → {restore}분으로 복원"
+    )
+    reschedule_scraper_job(restore)
+    _s.SCRAPER_INTERVAL_MINUTES = restore
