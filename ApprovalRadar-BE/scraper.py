@@ -457,6 +457,7 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
 
         # ── Step 3: INSERT only (동일 LCNS + 동일 event_date만 스킵) ──
         insert_count = 0
+        inserted_lcns_list = []  # Backfill 대상 추적
         today_str = datetime.datetime.now().strftime("%Y%m%d")
         today_changed = 0  # 오늘 변동분만 (SSE 발행 기준)
 
@@ -506,6 +507,7 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
             raw_repo.insert_raw_data(lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now, conn=conn)
             insert_count += 1
             actually_changed += 1
+            inserted_lcns_list.append(lcns_no)
             if event_date == today_str:
                 today_changed += 1
             # 중복 INSERT 방지
@@ -538,6 +540,20 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
         logger.info(
             f"🔔 [{svc_name}] 오늘 변동분 {today_changed}건 감지 → SSE 발행!"
         )
+
+    # ── 신규 INSERT 건 → 즉시 세부업종 Backfill ──
+    if inserted_lcns_list:
+        unique_lcns = list(dict.fromkeys(inserted_lcns_list))
+        import threading
+        from app.services.industry_filler import fill_industry_for_licenses
+        logger.info(
+            f"[즉시 Backfill] {len(unique_lcns)}건 I2500 백필 → 백그라운드 시작"
+        )
+        threading.Thread(
+            target=lambda lcns=unique_lcns: asyncio.run(fill_industry_for_licenses(lcns)),
+            daemon=True,
+            name=f"BackfillThread-flush-{service_id}",
+        ).start()
 
 
 if __name__ == "__main__":
