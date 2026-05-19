@@ -11,7 +11,7 @@ class Settings:
     # I2859: 식품업소 인허가변경정보 (LOCP_ADDR, BSN_STATE_NM, PRSDNT_NM)
     # I2861: 음식점업소 인허가변경정보 (SITE_ADDR, CHNG_DT - I2500과 동일 필드)
     # → DiffCrawlerEngine이 주기적으로 tail을 비교하여 신규 변동을 감지
-    SERVICES = ["I2861", "I2859"]
+    SERVICES = ["I2861"]
 
     # ─── Backfill 전용 서비스 (스캐닝 ❌, 건별 단건 조회 ⭕) ──────────────────
     # I2500: 식품 인허가 세부정보 (LCNS_NO 필터로 특정 업소의 '세부업종'만 조회)
