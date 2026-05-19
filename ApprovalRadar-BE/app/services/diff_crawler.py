@@ -624,6 +624,7 @@ class DiffCrawlerEngine:
                 logger.info(f"[{svc}] 🔍 기동 첫 주기: 저장 피벗 정합성 선제 검증 중...")
                 startup_stale, shift_info = await pivot_manager.sample_check(
                     state["pivots"], self.api_client, svc,
+                    sample_ratio=1.0,  # ratio 먼저 적용되는 버그 방지: max_samples만 바인딩
                     max_samples=MAX_SAMPLES_BY_SVC.get(svc, 20)
                 )
                 if startup_stale:
@@ -683,6 +684,7 @@ class DiffCrawlerEngine:
                 # I2861 30샘플 × ~3.5초 ≈ 105초 (30분 주기 었 충분)
                 changed, shift_info = await pivot_manager.sample_check(
                     pivots, self.api_client, svc,
+                    sample_ratio=1.0,  # ratio 먼저 적용되는 버그 방지: max_samples만 바인딩
                     max_samples=MAX_SAMPLES_BY_SVC.get(svc, 20)
                 )
                 if changed:
