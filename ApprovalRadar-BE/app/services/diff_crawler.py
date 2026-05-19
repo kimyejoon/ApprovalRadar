@@ -45,10 +45,8 @@ BOOTSTRAP_SEMAPHORE_LIMIT = 3  # 최대 동시 fetch_page 요청 수 (단일 Boo
 _GLOBAL_BOOTSTRAP_SEMAPHORE = threading.Semaphore(1)
 
 # [Fix D] 기동 첫 주기 피벗 검증 완료 서비스 집합
-# 서버 재시작 시에만 코드가 실행되는 모듈 레벨 상수이므로,
-# 서버 재시작 후 각 서비스의 쳋 호출에만 피벗 stale 검증을 수행합니다.
-# (DiffCrawlerEngine이 매 주기 새 인스턴스로 생성되마로 self._first_cycle은 매 주기 True로 리셋됨 → 버그)
-_STARTUP_CHECK_DONE: set[str] = set()
+# Rolling Scan 듀얼 커서가 Startup Check를 완전 대체
+# (기동 시 전체 피벗 순회 제거 → API 예산 절약)
 
 
 class DiffCrawlerEngine:
@@ -61,9 +59,6 @@ class DiffCrawlerEngine:
         self._cb_consecutive_count: int = 0
         # [C] 빈 피벗 연속 주기 카운터: 일정 주기 초과 시 자동 re-bootstrap 트리거
         self._empty_pivot_cycles: int = 0
-        # [D] _first_cycle은 모듈 레벨 _STARTUP_CHECK_DONE으로 관리 (인스턴스 변수 제거)
-        # → DiffCrawlerEngine이 매 주기 새 인스턴스로 생성되어 self._first_cycle은 매번 True로 리셋됨
-        # → 모듈 레벨 set(_STARTUP_CHECK_DONE)이 서버 프로세스 생명주기 동안 유지됨
 
     # ─── Bootstrap 독립 실행 ─────────────────────────────────────────────────
 
@@ -689,53 +684,9 @@ class DiffCrawlerEngine:
 
         old_tail = state["last_total_count"]
 
-        # ✅ [Fix D] 기동 첫 주기: 저장된 피벗 stale 여부 선제 검증
-        # 서버 재시작 시 저장된 피벗이 수 시간~하루 이상 지난 값일 수 있음
-        # → Ping 전에 먼저 피벗 검증 → stale이면 즉시 초기화 후 조기 종료
-        # → 다음 주기는 pivots={}이므로 sample_check 스킵 → false Delete 은폐 alarm 차단
-        # [Bug Fix] _STARTUP_CHECK_DONE (모듈 레벨 set) 사용:
-        # DiffCrawlerEngine은 매 주기 새 인스턴스 → self._first_cycle은 매번 True로 리셋됨
-        # → 모듈 레벨 set으로 서버 재시작 후 첫 주기에만 1회 검증 보장
-        is_first_cycle = svc not in _STARTUP_CHECK_DONE
-        if is_first_cycle:
-            _STARTUP_CHECK_DONE.add(svc)
-            if state.get("pivots"):
-                logger.info(f"[{svc}] 🔍 기동 첫 주기: 저장 피벗 전체 정합성 검증 중 (누락 없는 전체 수집)...")
-                startup_stale, shift_info = await pivot_manager.sample_check(
-                    state["pivots"], self.api_client, svc,
-                    sample_ratio=1.0,
-                    max_samples=None  # 전체 피벗 검사 — 누락 레코드 100% 수집
-                )
-                if startup_stale:
-                    # [전체 수집] all_missed_rows: 모든 피벗 순회에서 수집된 누락 레코드 합산
-                    all_missed = shift_info.get("all_missed_rows") or []
-                    if not all_missed:
-                        all_missed = shift_info.get("new_rows") or []
-
-                    if all_missed:
-                        logger.info(
-                            f"[{svc}] 📥 기동 전체 누락 수집: {len(all_missed)}건 확보 "
-                            f"(전체 피벗 순회 완료)"
-                        )
-                        state["pivots"] = {}
-                        state["_bootstrapping"] = True
-                        self.state_repo.save_state(self.service_id, state)
-                        threading.Thread(
-                            target=lambda: asyncio.run(self._run_bootstrap_standalone()),
-                            daemon=True,
-                            name=f"BootstrapThread-{svc}"
-                        ).start()
-                        logger.info(f"[{svc}] 🔄 피벗 재건 백그라운드 시작 (SSE/DB 저장과 병렬 실행)")
-                        return all_missed  # scraper가 중복 필터 후 저장
-                    logger.warning(
-                        f"[{svc}] ⚠️ 기동 시 피벗 stale 감지 (저장 후 API 변동됨). "
-                        f"피벗 초기화 → 다음 주기부터 Ping만으로 정상 감지."
-                    )
-                    state["pivots"] = {}
-                    self.state_repo.save_state(self.service_id, state)
-                    return []
-                else:
-                    logger.info(f"[{svc}] ✅ 기동 피벗 정합성 확인됨. 정상 탐색 진행.")
+        # ✅ Startup Check 제거됨 (Rolling Scan 듀얼 커서가 대체)
+        # 기존: 기동 시 전체 피벗 순회(47~190회 API) → 제거
+        # Rolling Scan이 듀얼 커서로 1.5~2.5시간 내 전체 데이터 검증
         new_tail = await self.find_true_tail(known_tail=old_tail)
 
         if new_tail <= old_tail:

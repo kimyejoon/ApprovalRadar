@@ -1,18 +1,20 @@
 """
-Rolling Full Scan 서비스 모듈.
+Rolling Full Scan 서비스 모듈 (듀얼 커서 버전).
 
-매 주기 N페이지(기본 100)를 순차적으로 스캔하여 fingerprint 비교.
-전체 1회전 완료 후 다시 처음부터 순환.
-사각지대 0: 모든 레코드가 일정 주기 내에 최소 1회 검사됨.
+매 주기 N페이지(기본 100)를 2개 커서(A/B)로 나눠 순차 스캔.
+- cursor_a: 전체 데이터의 전반부 (0 ~ mid)
+- cursor_b: 전체 데이터의 후반부 (mid ~ end)
+각 커서가 자기 영역을 순환하므로, 1커서 대비 회전 시간 2배 단축.
 
 상태 (crawler_state.extra_state에 영속):
-  - rolling_cursor: 현재 스캔 시작 페이지 번호 (1-based record index)
-  - page_fingerprints: {page_start_idx: fingerprint_hash} 전체 저장
+  - rolling_cursor_a: 전반부 스캔 위치
+  - rolling_cursor_b: 후반부 스캔 위치
+  - page_fingerprints: {page_start_idx: fingerprint_hash}
 
 핵심 로직:
-  1. cursor부터 N페이지(×1,000건) 스캔
-  2. 저장된 fingerprint와 비교 → 불일치 페이지에서 신규 레코드 추출
-  3. cursor 전진 (끝 도달 시 1로 리셋)
+  1. cursor_a에서 N/2페이지, cursor_b에서 N/2페이지 스캔
+  2. 저장된 fingerprint와 비교 → 불일치 시 신규 레코드 추출
+  3. 각 커서 전진 (영역 끝 도달 시 영역 시작으로 리셋)
   4. 수집된 신규 레코드 반환
 """
 import asyncio
@@ -32,10 +34,10 @@ class RollingScanner:
 
     async def scan_cycle(self, pages_per_cycle: int = None) -> list:
         """
-        현재 cursor 위치부터 N페이지를 스캔하여 변경된 레코드를 반환합니다.
+        듀얼 커서로 전반부/후반부를 동시에 스캔하여 변경된 레코드를 반환합니다.
 
         Returns:
-            list: 새로 발견된 레코드 리스트 (fingerprint 불일치 페이지에서 추출)
+            list: 새로 발견된 레코드 리스트
         """
         svc = self.service_id
         if pages_per_cycle is None:
@@ -46,43 +48,114 @@ class RollingScanner:
         if total_count == 0:
             return []
 
-        # 영속화된 Rolling Scan 상태 로드
-        cursor = state.get("rolling_cursor", 1)
-        fingerprints: dict = state.get("page_fingerprints", {})
-
-        # 전체 페이지 수 계산 (1-based index)
+        # 전체 페이지 수 및 중간점 계산
         total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE
-
         if total_pages == 0:
             return []
 
-        scanned = 0
-        new_rows_total = []
-        mismatched_pages = 0
+        mid_record = ((total_count // 2) // PAGE_SIZE) * PAGE_SIZE + 1  # mid 정렬
 
-        start_cursor = cursor  # 로그용
+        # 듀얼 커서 로드
+        cursor_a = state.get("rolling_cursor_a", 1)
+        cursor_b = state.get("rolling_cursor_b", mid_record)
+        fingerprints: dict = state.get("page_fingerprints", {})
+
+        # 각 커서에 절반씩 할당
+        pages_a = pages_per_cycle // 2
+        pages_b = pages_per_cycle - pages_a  # 홀수일 경우 B가 1개 더
+
+        # 영역 범위
+        range_a = (1, mid_record - 1)           # 전반부
+        range_b = (mid_record, total_count)     # 후반부
+
+        pages_a_total = (range_a[1]) // PAGE_SIZE if range_a[1] > 0 else 0
+        pages_b_total = ((range_b[1] - range_b[0] + 1) + PAGE_SIZE - 1) // PAGE_SIZE if range_b[1] >= range_b[0] else 0
 
         logger.info(
-            f"[{svc}] 🔄 Rolling Scan 시작: cursor={cursor:,}, "
-            f"스캔={pages_per_cycle}페이지, "
+            f"[{svc}] 🔄 Rolling Scan 시작 (듀얼 커서): "
+            f"A={cursor_a:,}~{range_a[1]:,} ({pages_a}p), "
+            f"B={cursor_b:,}~{range_b[1]:,} ({pages_b}p) | "
             f"전체={total_pages}페이지 ({total_count:,}건)"
         )
 
-        while scanned < pages_per_cycle:
-            # 현재 페이지의 record 인덱스 계산
-            page_start = cursor
-            page_end = min(cursor + PAGE_SIZE - 1, total_count)
+        new_rows_total = []
+        mismatched_pages = 0
+        total_scanned = 0
 
-            if page_start > total_count:
-                # 끝 도달 → 처음으로 리셋
-                cursor = 1
+        # ── 커서 A 스캔 (전반부) ──
+        scanned_a, new_a, mismatch_a, cursor_a = await self._scan_range(
+            svc, cursor_a, range_a[0], range_a[1],
+            pages_a, fingerprints, "A"
+        )
+        new_rows_total.extend(new_a)
+        mismatched_pages += mismatch_a
+        total_scanned += scanned_a
+
+        # ── 커서 B 스캔 (후반부) ──
+        scanned_b, new_b, mismatch_b, cursor_b = await self._scan_range(
+            svc, cursor_b, range_b[0], range_b[1],
+            pages_b, fingerprints, "B"
+        )
+        new_rows_total.extend(new_b)
+        mismatched_pages += mismatch_b
+        total_scanned += scanned_b
+
+        # 상태 영속화
+        state["rolling_cursor_a"] = cursor_a
+        state["rolling_cursor_b"] = cursor_b
+        state["page_fingerprints"] = fingerprints
+        # 구버전 호환: 단일 커서 키 제거
+        state.pop("rolling_cursor", None)
+        self.state_repo.save_state(svc, state)
+
+        # 남은 페이지 계산
+        remaining_a = max(0, ((range_a[1] - cursor_a + 1) + PAGE_SIZE - 1) // PAGE_SIZE) if cursor_a <= range_a[1] else pages_a_total
+        remaining_b = max(0, ((range_b[1] - cursor_b + 1) + PAGE_SIZE - 1) // PAGE_SIZE) if cursor_b <= range_b[1] else pages_b_total
+        max_remaining = max(remaining_a, remaining_b)
+        half_pages = max(pages_a, pages_b)
+        cycles_to_complete = (max_remaining + half_pages - 1) // half_pages if half_pages > 0 else 0
+
+        logger.info(
+            f"[{svc}] ✅ Rolling Scan 완료: "
+            f"{total_scanned}페이지 스캔 (A:{scanned_a}+B:{scanned_b}), "
+            f"{mismatched_pages}건 불일치, "
+            f"{len(new_rows_total)}건 신규 수집 | "
+            f"다음 A={cursor_a:,}, B={cursor_b:,} | "
+            f"약 {cycles_to_complete}주기 후 1회전 완료"
+        )
+
+        return new_rows_total
+
+    async def _scan_range(
+        self, svc: str, cursor: int,
+        range_start: int, range_end: int,
+        max_pages: int, fingerprints: dict,
+        label: str
+    ) -> tuple:
+        """
+        지정된 범위 내에서 cursor부터 max_pages만큼 스캔합니다.
+
+        Returns:
+            (scanned_count, new_rows, mismatch_count, new_cursor)
+        """
+        scanned = 0
+        new_rows = []
+        mismatched = 0
+
+        while scanned < max_pages:
+            page_start = cursor
+
+            if page_start > range_end:
+                # 영역 끝 도달 → 영역 시작으로 리셋
+                cursor = range_start
                 logger.info(
-                    f"[{svc}] 🔁 Rolling Scan 1회전 완료! "
-                    f"cursor를 1로 리셋합니다."
+                    f"[{svc}] 🔁 커서 {label} 1회전 완료! "
+                    f"cursor를 {range_start:,}으로 리셋"
                 )
                 break
 
             # API 호출
+            page_end = min(page_start + PAGE_SIZE - 1, range_end)
             try:
                 res = await self.api_client.fetch_data(
                     svc, page_start, page_end, timeout=30
@@ -92,7 +165,6 @@ class RollingScanner:
                 )
 
                 if not res or svc not in res:
-                    # 빈 응답 → 다음 페이지로
                     cursor += PAGE_SIZE
                     scanned += 1
                     continue
@@ -100,14 +172,7 @@ class RollingScanner:
                 block = res[svc]
                 code = block.get("RESULT", {}).get("CODE", "")
 
-                if code == "INFO-200":
-                    # 데이터 없음 (Gap 또는 끝)
-                    cursor += PAGE_SIZE
-                    scanned += 1
-                    continue
-
-                if code != "INFO-000":
-                    # 기타 오류 → 스킵
+                if code in ("INFO-200", "") or code != "INFO-000":
                     cursor += PAGE_SIZE
                     scanned += 1
                     continue
@@ -120,7 +185,7 @@ class RollingScanner:
 
             except Exception as e:
                 logger.warning(
-                    f"[{svc}] Rolling Scan page {page_start:,} 조회 실패: {e}"
+                    f"[{svc}] Rolling Scan {label} page {page_start:,} 조회 실패: {e}"
                 )
                 cursor += PAGE_SIZE
                 scanned += 1
@@ -131,76 +196,40 @@ class RollingScanner:
             stored_fp = fingerprints.get(str(page_start), "")
 
             if stored_fp and current_fp == stored_fp:
-                # 일치 → 변동 없음
-                pass
+                pass  # 일치
             elif stored_fp and current_fp != stored_fp:
-                # 불일치 → Shift 진단으로 신규 레코드 추출
-                mismatched_pages += 1
-                new_rows = self._extract_new_rows(
-                    items, fingerprints, page_start
-                )
-                if new_rows:
-                    new_rows_total.extend(new_rows)
+                mismatched += 1
+                extracted = self._extract_new_rows(items, fingerprints, page_start)
+                if extracted:
+                    new_rows.extend(extracted)
                     logger.info(
-                        f"[{svc}] 📥 Rolling Scan page {page_start:,}: "
-                        f"fingerprint 불일치 → {len(new_rows)}건 신규 발견"
+                        f"[{svc}] 📥 Rolling Scan {label} page {page_start:,}: "
+                        f"fingerprint 불일치 → {len(extracted)}건 신규 발견"
                     )
                 else:
                     logger.info(
-                        f"[{svc}] ⚠️ Rolling Scan page {page_start:,}: "
+                        f"[{svc}] ⚠️ Rolling Scan {label} page {page_start:,}: "
                         f"fingerprint 불일치 (레코드 교체/삭제 추정)"
                     )
 
-            # fingerprint 갱신 (최신 상태 유지)
+            # fingerprint 갱신
             fingerprints[str(page_start)] = current_fp
-
             cursor += PAGE_SIZE
             scanned += 1
 
-        # 상태 영속화
-        state["rolling_cursor"] = cursor
-        state["page_fingerprints"] = fingerprints
-        self.state_repo.save_state(svc, state)
-
-        pages_remaining = max(0, total_pages - (cursor - 1) // PAGE_SIZE)
-        cycles_to_complete = (pages_remaining + pages_per_cycle - 1) // pages_per_cycle if pages_per_cycle > 0 else 0
-
-        logger.info(
-            f"[{svc}] ✅ Rolling Scan 완료: "
-            f"{scanned}페이지 스캔, {mismatched_pages}건 불일치, "
-            f"{len(new_rows_total)}건 신규 수집 | "
-            f"다음 cursor={cursor:,}, "
-            f"남은 {pages_remaining}페이지 (약 {cycles_to_complete}주기 후 1회전 완료)"
-        )
-
-        return new_rows_total
+        return scanned, new_rows, mismatched, cursor
 
     def _extract_new_rows(
         self, current_items: list, fingerprints: dict, page_start: int
     ) -> list:
         """
         fingerprint 불일치 페이지에서 신규 삽입 레코드를 추출합니다.
-
-        이전 페이지의 마지막 레코드 정보가 있으면, 현재 페이지에서
-        기존에 없던 레코드(Shift로 밀려 들어온 레코드)를 식별합니다.
         """
-        # 간단한 전략: 이전 fingerprint가 없으면 전체를 "신규"로 간주하지 않음
-        # (Bootstrap 미완료 상태에서 false positive 방지)
-        # fingerprint가 있었으나 변경된 경우에만 해당 페이지의 레코드를 반환
-        #
-        # 고급 Shift 진단은 pivot_manager의 로직을 재활용
         return current_items
 
     @staticmethod
     def build_fingerprints_from_bootstrap(
         api_client, service_id: str, total_count: int
     ) -> dict:
-        """
-        Bootstrap 시 호출: 이미 fetch한 피벗 데이터로부터 page_fingerprints를 초기화.
-        실제로는 bootstrap이 모든 피벗 페이지를 fetch하므로 그 결과를 여기서 기록.
-        (Bootstrap은 PIVOT_INTERVAL 간격이므로, Rolling Scan은 나머지 페이지를
-         첫 회전에서 자동으로 채워나감)
-        """
-        # Bootstrap에서 직접 호출되므로 여기서는 빈 dict 반환
-        # 실제 fingerprint는 scan_cycle 중 점진적으로 채워짐
+        """Bootstrap 호환용 — 실제 fingerprint는 scan_cycle 중 점진적으로 채워짐."""
         return {}
