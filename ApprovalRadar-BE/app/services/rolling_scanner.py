@@ -234,6 +234,14 @@ class RollingScanner:
             if today_items:
                 new_rows.extend(today_items)
                 today_found += len(today_items)
+                for ti in today_items:
+                    biz_name = ti.get("BSSH_NM", "업소명미상")
+                    lcns = ti.get("LCNS_NO", "?")
+                    reason = ti.get("CHNG_PRVNS", "")
+                    logger.info(
+                        f"[{svc}] 🔍 오늘 변동 감지: {biz_name} ({lcns}) "
+                        f"[사유: {reason or '미기재'}] @ page {page_start:,}"
+                    )
 
             # ── fingerprint 비교 ──────────────────────────────────
             current_fp = compute_page_fingerprint(items)

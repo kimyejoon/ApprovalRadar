@@ -381,15 +381,17 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
     now = datetime.datetime.now().isoformat()
 
     svc_name = {"I2859": "식품업소", "I2861": "음식점업소"}.get(service_id, service_id)
-    logger.info(f"🆕 [전략C/{svc_name}] {len(new_data_rows)}건 DB 저장 시작...")
+    logger.info(f"🆕 [{svc_name}] Rolling Scan flush: {len(new_data_rows)}건 DB 처리 시작...")
 
     actually_changed = 0
+    skipped_dup = 0
     with get_db() as conn:
         for row in new_data_rows:
             fields = _map_row_fields(service_id, row)
             if not fields or not fields["lcns_no"]:
                 continue
             lcns_no = fields["lcns_no"]
+            biz_name = fields["business_name"] or "업소명미상"
 
             event_date, event_time, license_date, license_time = _parse_datetime_fields(
                 fields["event_date_raw"], fields["license_date"]
@@ -418,10 +420,19 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
                 business_repo.insert_business(record, conn=conn)
                 raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
                 actually_changed += 1
+                logger.info(
+                    f"  ✅ 신규 INSERT: {biz_name} ({lcns_no}) "
+                    f"[{infer_update_type}] 변동일={event_date}"
+                )
             else:
                 # 동일 event_date이면 스킵 (이미 수집됨)
                 prev_event_date = db_record.get("last_event_date", "")
                 if prev_event_date == event_date:
+                    skipped_dup += 1
+                    logger.debug(
+                        f"  ⏭️ 스킵: {biz_name} ({lcns_no}) "
+                        f"— 이미 수집됨 (DB event_date={prev_event_date} == API={event_date})"
+                    )
                     continue
 
                 # 새로운 변동 이벤트
@@ -471,17 +482,29 @@ async def run_scraper_for_service_with_rows(service_id: str, new_data_rows: list
                 business_repo.update_business(lcns_no, updates, conn=conn)
                 raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
                 actually_changed += 1
+                logger.info(
+                    f"  ✅ 변동 UPDATE: {biz_name} ({lcns_no}) "
+                    f"[{resolved_infer_type}] {prev_event_date} → {event_date}"
+                )
         conn.commit()
 
-    logger.info(f"✅ [전략C/{svc_name}] {len(new_data_rows)}건 중 실제 변경 {actually_changed}건 DB 저장 완료")
-
-    # SSE — 실제 변경분만 발행
+    # ── 결과 요약 + SSE 발행 판단 사유 ──
     if actually_changed > 0:
+        logger.info(
+            f"✅ [{svc_name}] flush 완료: {len(new_data_rows)}건 중 "
+            f"신규/변동 {actually_changed}건 DB 저장, {skipped_dup}건 스킵(이미 수집) "
+            f"→ SSE 발행! (count={actually_changed})"
+        )
         from app.core.events import broadcaster
         update_data = json.dumps(
             {"type": "UPDATE", "count": actually_changed}, ensure_ascii=False
         )
         broadcaster.broadcast_sync(update_data)
+    else:
+        logger.info(
+            f"ℹ️ [{svc_name}] flush 완료: {len(new_data_rows)}건 모두 이미 수집됨 "
+            f"({skipped_dup}건 스킵) → SSE 미발행 (실제 변경 0건)"
+        )
 
 
 if __name__ == "__main__":
