@@ -228,6 +228,19 @@ async def trigger_job(job_type: str):
             )
             return TriggerResponse(success=True, message="🚀 Boost Scan (Random 50%) 즉시 실행 등록")
 
+        elif job_type == "chng_dt_poll":
+            # I2500 CHNG_DT Poller 즉시 실행
+            async def _run_poller():
+                from app.services.chng_dt_poller import poll_today_changes
+                result = await poll_today_changes()
+                logger.info(
+                    f"[Playground] CHNG_DT Poller 완료: "
+                    f"전체 {result['total']}건, 신규 {result['new']}건, 스킵 {result['skipped']}건"
+                )
+
+            asyncio.create_task(_run_poller())
+            return TriggerResponse(success=True, message="📡 I2500 CHNG_DT Poller 즉시 실행 시작")
+
         else:
             raise HTTPException(status_code=400, detail=f"알 수 없는 잡 타입: {job_type}")
     except Exception as e:

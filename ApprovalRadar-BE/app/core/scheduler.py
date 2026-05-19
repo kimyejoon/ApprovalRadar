@@ -211,12 +211,14 @@ def start_scheduler():
     # 매일 업무 시작 전 피벗 재생성으로 당일 변동 감지 정확도 보장
     scheduler.add_job(_daily_bootstrap_job, 'cron', hour=9, minute=0, id="daily_bootstrap_job")
 
-    # ❌ [전략 C 비활성화] CHNG_DT 파라미터가 실제 데이터를 필터링하지 않음 (2026-05-19 실증)
-    # CHNG_DT=오늘 조회 → total_count만 변경, 실제 row는 필터링 없이 전체 데이터 반환
-    # → 데이터셋 앞부분 레코드를 "신규"로 오인해 false positive 삽입 발생
-    # 주력 감지: Tail Ping + Multi-Point Sentinel (5분 간격)
-    # scheduler.add_job(_evening_chng_dt_job, 'cron', hour=19, minute=0, id="evening_chng_dt_job")
-    logger.info("[전략C] 비활성화됨 (CHNG_DT 필터 미작동 확인, Tail Ping + Sentinel이 대체)")
+    # ✅ [전략C 재활성화] I2500 CHNG_DT Poller (5분 간격)
+    # I2500 서비스는 CHNG_DT 파라미터 필터가 실제 작동 (I2861은 미작동)
+    # 오늘 변동된 업소를 직접 조회하여 Rolling Scan이 놓친 건을 즉시 보완
+    from app.services.chng_dt_poller import run_chng_dt_poller, POLL_INTERVAL_MINUTES
+    scheduler.add_job(run_chng_dt_poller, 'interval',
+                      minutes=POLL_INTERVAL_MINUTES,
+                      id="chng_dt_poller_job")
+    logger.info(f"[전략C] I2500 CHNG_DT Poller 등록: {POLL_INTERVAL_MINUTES}분 간격")
 
     # ✅ [저녁 고밀도 폴링] 18:30~20:30 구간 10분 주기 (평일만)
     # 19시 배치 실행 직후 감지 지연: 30분 → 10분으로 단축

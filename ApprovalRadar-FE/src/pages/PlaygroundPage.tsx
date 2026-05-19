@@ -281,6 +281,13 @@ export function PlaygroundPage() {
               <MagnifyingGlass className="w-4 h-4 text-orange-400" />
               Scraper
             </button>
+            <button
+              onClick={() => handleTrigger('chng_dt_poll')}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-emerald-400/30 bg-emerald-400/5 hover:bg-emerald-400/10 transition-all text-sm font-medium text-emerald-500 disabled:opacity-50 col-span-2"
+            >
+              📡 I2500 CHNG_DT Poller
+            </button>
           </div>
 
           {/* Range Scan */}
