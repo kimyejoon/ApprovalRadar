@@ -141,6 +141,13 @@ class RollingScanner:
         scanned = 0
         new_rows = []
         mismatched = 0
+        new_fp_count = 0  # 신규 fingerprint 저장 수
+        match_count = 0   # fingerprint 일치 수
+
+        logger.info(
+            f"[{svc}] 📡 커서 {label} 스캔 시작: "
+            f"범위 {cursor:,}~{range_end:,}, 최대 {max_pages}페이지"
+        )
 
         while scanned < max_pages:
             page_start = cursor
@@ -195,20 +202,25 @@ class RollingScanner:
             current_fp = compute_page_fingerprint(items)
             stored_fp = fingerprints.get(str(page_start), "")
 
-            if stored_fp and current_fp == stored_fp:
-                pass  # 일치
-            elif stored_fp and current_fp != stored_fp:
+            if not stored_fp:
+                # 첫 스캔: fingerprint 신규 저장
+                new_fp_count += 1
+            elif current_fp == stored_fp:
+                # 일치: 변동 없음
+                match_count += 1
+            else:
+                # 불일치: 변동 감지!
                 mismatched += 1
                 extracted = self._extract_new_rows(items, fingerprints, page_start)
                 if extracted:
                     new_rows.extend(extracted)
                     logger.info(
-                        f"[{svc}] 📥 Rolling Scan {label} page {page_start:,}: "
+                        f"[{svc}] 📥 커서 {label} page {page_start:,}: "
                         f"fingerprint 불일치 → {len(extracted)}건 신규 발견"
                     )
                 else:
-                    logger.info(
-                        f"[{svc}] ⚠️ Rolling Scan {label} page {page_start:,}: "
+                    logger.warning(
+                        f"[{svc}] ⚠️ 커서 {label} page {page_start:,}: "
                         f"fingerprint 불일치 (레코드 교체/삭제 추정)"
                     )
 
@@ -216,6 +228,21 @@ class RollingScanner:
             fingerprints[str(page_start)] = current_fp
             cursor += PAGE_SIZE
             scanned += 1
+
+            # 매 10페이지마다 진행률 로그
+            if scanned % 10 == 0:
+                logger.info(
+                    f"[{svc}] 📊 커서 {label} 진행: {scanned}/{max_pages}p "
+                    f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched}) "
+                    f"현재 page={page_start:,}"
+                )
+
+        # 커서별 완료 요약
+        logger.info(
+            f"[{svc}] ✅ 커서 {label} 완료: {scanned}p 스캔 "
+            f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched}) "
+            f"→ {len(new_rows)}건 수집"
+        )
 
         return scanned, new_rows, mismatched, cursor
 
