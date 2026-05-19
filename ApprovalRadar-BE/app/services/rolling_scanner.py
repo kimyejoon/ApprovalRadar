@@ -179,8 +179,11 @@ class RollingScanner:
         lcns_no_sort = 0    # 정렬 불명 페이지 수
 
         # DB batch 조회용 — 스레드 로컬 캐싱 커넥션 (close하지 않음)
-        from database import _get_thread_conn
-        db_conn = _get_thread_conn()
+        # DB batch 조회용 — 스캔 전체에서 재사용할 커넥션
+        import sqlite3
+        from database import DB_FILE
+        db_conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+        db_conn.row_factory = sqlite3.Row
 
         logger.info(
             f"[{svc}] 📡 커서 {label} 스캔 시작: "
@@ -344,7 +347,10 @@ class RollingScanner:
                     )
 
         finally:
-            pass  # _get_thread_conn()은 스레드 로컬 캐싱 — close하지 않음
+            try:
+                db_conn.close()
+            except Exception:
+                pass
 
         # 커서별 완료 요약
         if today_found > 0:
