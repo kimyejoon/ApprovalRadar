@@ -158,6 +158,7 @@ class RollingScanner:
     ) -> tuple:
         """
         지정된 범위 내에서 cursor부터 max_pages만큼 스캔합니다.
+        [최적화] DB에 없는 레코드를 batch로 감지하여 즉시 수집.
 
         Returns:
             (scanned_count, new_rows, mismatch_count, new_cursor)
@@ -168,121 +169,147 @@ class RollingScanner:
         new_fp_count = 0  # 신규 fingerprint 저장 수
         match_count = 0   # fingerprint 일치 수
         today_found = 0   # 오늘 CHNG_DT 신규 발견 수
+        db_miss_count = 0  # DB 미존재 레코드 수
         today_str = datetime.now().strftime("%Y%m%d")
+
+        # DB batch 조회를 위한 커넥션 (재사용)
+        from database import get_db
+        from app.repositories.business_repository import BusinessRepository
+        db_conn = get_db().__enter__()
 
         logger.info(
             f"[{svc}] 📡 커서 {label} 스캔 시작: "
             f"범위 {cursor:,}~{range_end:,}, 최대 {max_pages}페이지 (오늘={today_str})"
         )
 
-        while scanned < max_pages:
-            page_start = cursor
+        try:
+            while scanned < max_pages:
+                page_start = cursor
 
-            if page_start > range_end:
-                # 영역 끝 도달 → 영역 시작으로 리셋
-                cursor = range_start
-                logger.info(
-                    f"[{svc}] 🔁 커서 {label} 1회전 완료! "
-                    f"cursor를 {range_start:,}으로 리셋"
-                )
-                break
+                if page_start > range_end:
+                    # 영역 끝 도달 → 영역 시작으로 리셋
+                    cursor = range_start
+                    logger.info(
+                        f"[{svc}] 🔁 커서 {label} 1회전 완료! "
+                        f"cursor를 {range_start:,}으로 리셋"
+                    )
+                    break
 
-            # API 호출
-            page_end = min(page_start + PAGE_SIZE - 1, range_end)
-            try:
-                res = await self.api_client.fetch_data(
-                    svc, page_start, page_end, timeout=30
-                )
-                await asyncio.sleep(
-                    random.uniform(settings.GAP_MIN, settings.GAP_MAX)
-                )
+                # API 호출
+                page_end = min(page_start + PAGE_SIZE - 1, range_end)
+                try:
+                    res = await self.api_client.fetch_data(
+                        svc, page_start, page_end, timeout=30
+                    )
+                    await asyncio.sleep(
+                        random.uniform(settings.GAP_MIN, settings.GAP_MAX)
+                    )
 
-                if not res or svc not in res:
+                    if not res or svc not in res:
+                        cursor += PAGE_SIZE
+                        scanned += 1
+                        continue
+
+                    block = res[svc]
+                    code = block.get("RESULT", {}).get("CODE", "")
+
+                    if code in ("INFO-200", "") or code != "INFO-000":
+                        cursor += PAGE_SIZE
+                        scanned += 1
+                        continue
+
+                    items = block.get("row", [])
+                    if not items:
+                        cursor += PAGE_SIZE
+                        scanned += 1
+                        continue
+
+                except Exception as e:
+                    logger.warning(
+                        f"[{svc}] Rolling Scan {label} page {page_start:,} 조회 실패: {e}"
+                    )
                     cursor += PAGE_SIZE
                     scanned += 1
                     continue
 
-                block = res[svc]
-                code = block.get("RESULT", {}).get("CODE", "")
+                # ── [최적화] DB 미존재 레코드 batch 감지 ──────────────────
+                # 이미 fetch한 1000건에서 LCNS_NO를 추출 → batch SQL로 DB에 있는지 확인
+                # DB에 없는 레코드 = 아직 수집하지 않은 데이터 → 즉시 수집
+                lcns_list = [item.get("LCNS_NO", "") for item in items if item.get("LCNS_NO")]
+                if lcns_list:
+                    # batch 조회: IN 절로 한 번에 확인
+                    placeholders = ",".join(["?"] * len(lcns_list))
+                    existing_cursor = db_conn.execute(
+                        f"SELECT license_no FROM businesses WHERE license_no IN ({placeholders})",
+                        lcns_list
+                    )
+                    existing_set = {row[0] for row in existing_cursor.fetchall()}
 
-                if code in ("INFO-200", "") or code != "INFO-000":
-                    cursor += PAGE_SIZE
-                    scanned += 1
-                    continue
+                    # DB에 없는 레코드 추출
+                    missing_items = [
+                        item for item in items
+                        if item.get("LCNS_NO", "") and item["LCNS_NO"] not in existing_set
+                    ]
+                    if missing_items:
+                        db_miss_count += len(missing_items)
+                        new_rows.extend(missing_items)
+                        if len(missing_items) >= 5:  # 5건 이상일 때만 로그 (노이즈 방지)
+                            logger.info(
+                                f"[{svc}] 📥 커서 {label} page {page_start:,}: "
+                                f"DB 미존재 {len(missing_items)}건 발견 → 수집 대상 추가"
+                            )
 
-                items = block.get("row", [])
-                if not items:
-                    cursor += PAGE_SIZE
-                    scanned += 1
-                    continue
-
-            except Exception as e:
-                logger.warning(
-                    f"[{svc}] Rolling Scan {label} page {page_start:,} 조회 실패: {e}"
+                # ── [관찰 모드] 오늘 CHNG_DT 존재 여부만 로깅 ──────────────
+                today_count_in_page = sum(
+                    1 for item in items
+                    if item.get("CHNG_DT", "") == today_str
                 )
+                if today_count_in_page:
+                    today_found += today_count_in_page
+                    logger.debug(
+                        f"[{svc}] 📊 커서 {label} page {page_start:,}: "
+                        f"오늘({today_str}) {today_count_in_page}건 존재 "
+                        f"(관찰 모드, 수집은 Tail Ping/전략C에서)"
+                    )
+
+                # ── fingerprint 비교 ──────────────────────────────────
+                current_fp = compute_page_fingerprint(items)
+                stored_fp = fingerprints.get(str(page_start), "")
+
+                if not stored_fp:
+                    # 첫 스캔: fingerprint 신규 저장
+                    new_fp_count += 1
+                elif current_fp == stored_fp:
+                    # 일치: 변동 없음
+                    match_count += 1
+                else:
+                    # 불일치: 변동 감지!
+                    mismatched += 1
+                    # DB miss 체크에서 이미 수집했으므로 중복 추가 방지
+                    logger.debug(
+                        f"[{svc}] 커서 {label} page {page_start:,}: "
+                        f"fingerprint 불일치 (DB miss 체크에서 이미 처리)"
+                    )
+
+                # fingerprint 갱신
+                fingerprints[str(page_start)] = current_fp
                 cursor += PAGE_SIZE
                 scanned += 1
-                continue
 
-            # ── [관찰 모드] 오늘 CHNG_DT 존재 여부만 로깅 ──────────────
-            # 주력 탐지: Tail Ping + Shift/Pivot, fingerprint 불일치
-            # today_filter는 전략C(19:00)에서 교차검증
-            today_count_in_page = sum(
-                1 for item in items
-                if item.get("CHNG_DT", "") == today_str
-            )
-            if today_count_in_page:
-                today_found += today_count_in_page
-                logger.debug(
-                    f"[{svc}] 📊 커서 {label} page {page_start:,}: "
-                    f"오늘({today_str}) {today_count_in_page}건 존재 "
-                    f"(관찰 모드, 수집은 Tail Ping/전략C에서)"
-                )
-
-            # ── fingerprint 비교 ──────────────────────────────────
-            current_fp = compute_page_fingerprint(items)
-            stored_fp = fingerprints.get(str(page_start), "")
-
-            if not stored_fp:
-                # 첫 스캔: fingerprint 신규 저장
-                new_fp_count += 1
-            elif current_fp == stored_fp:
-                # 일치: 변동 없음
-                match_count += 1
-            else:
-                # 불일치: 변동 감지! (오늘 외 레코드도 포함)
-                mismatched += 1
-                extracted = self._extract_new_rows(items, fingerprints, page_start)
-                if extracted:
-                    # 오늘 CHNG_DT 레코드는 이미 위에서 추가됨 → 오늘 외 레코드만 추가
-                    non_today = [
-                        r for r in extracted
-                        if r.get("CHNG_DT", "") != today_str
-                    ]
-                    if non_today:
-                        new_rows.extend(non_today)
+                # 매 10페이지마다 진행률 로그
+                if scanned % 10 == 0:
                     logger.info(
-                        f"[{svc}] 📥 커서 {label} page {page_start:,}: "
-                        f"fingerprint 불일치 → {len(extracted)}건 신규 발견"
-                    )
-                else:
-                    logger.warning(
-                        f"[{svc}] ⚠️ 커서 {label} page {page_start:,}: "
-                        f"fingerprint 불일치 (레코드 교체/삭제 추정)"
+                        f"[{svc}] 📊 커서 {label} 진행: {scanned}/{max_pages}p "
+                        f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched} "
+                        f"DB미존재:{db_miss_count} 오늘:{today_found}) 현재 page={page_start:,}"
                     )
 
-            # fingerprint 갱신
-            fingerprints[str(page_start)] = current_fp
-            cursor += PAGE_SIZE
-            scanned += 1
-
-            # 매 10페이지마다 진행률 로그
-            if scanned % 10 == 0:
-                logger.info(
-                    f"[{svc}] 📊 커서 {label} 진행: {scanned}/{max_pages}p "
-                    f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched} "
-                    f"오늘:{today_found}) 현재 page={page_start:,}"
-                )
+        finally:
+            # DB 커넥션 정리
+            try:
+                db_conn.close()
+            except Exception:
+                pass
 
         # 커서별 완료 요약
         if today_found > 0:
@@ -292,7 +319,7 @@ class RollingScanner:
         logger.info(
             f"[{svc}] ✅ 커서 {label} 완료: {scanned}p 스캔 "
             f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched} "
-            f"오늘:{today_found}) → {len(new_rows)}건 수집"
+            f"DB미존재:{db_miss_count} 오늘:{today_found}) → {len(new_rows)}건 수집"
         )
 
         return scanned, new_rows, mismatched, cursor
