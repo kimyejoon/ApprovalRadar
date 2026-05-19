@@ -738,8 +738,8 @@ class DiffCrawlerEngine:
 
             # flush_callback: 커서별 완료 시 즉시 scraper 호출 (DB INSERT + SSE)
             # → 커서 A 완료 → 즉시 SSE → 커서 B 시작
-            async def _flush_rolling_rows(rows: list):\r
-                from scraper import run_scraper_for_service_with_rows\r
+            async def _flush_rolling_rows(rows: list):
+                from scraper import run_scraper_for_service_with_rows
                 await run_scraper_for_service_with_rows(svc, rows, collected_by="rolling_scan")
 
             logger.info(
