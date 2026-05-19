@@ -1,24 +1,16 @@
-"""
-Rolling Full Scan 서비스 모듈 (2-Track 아키텍처).
+"""Rolling Full Scan 서비스 모듈.
 
-=== Track 1: Sequential Scan (듀얼 커서 A/B) ===
-전체 데이터를 순차적으로 스캔하여 과거 누락 데이터를 보완합니다.
-- cursor_a: 전반부 (0 ~ mid) 순차 스캔
-- cursor_b: 후반부 (mid ~ end) 순차 스캔
-
-=== Track 2: Random Probe ===
-전체 범위에서 랜덤 페이지를 샘플링하여 오늘 변동분을 빠르게 감지합니다.
-- 매 주기 30% 페이지를 랜덤 위치에서 스캔
-- Sequential이 아직 미도달한 구간의 오늘 데이터를 확률적으로 감지
-- Tail Ping 부스트 시 Random 비중 50%로 증가
+스캔 모드:
+  OLDEST_FIRST — 순수 Oldest-First. 모든 페이지를 연식순 스캔. (기본값)
+  HYBRID       — Oldest-First 70% + Random Probe 30%. (레거시)
 
 상태 (crawler_state.extra_state에 영속):
-  - rolling_cursor_a: 전반부 스캔 위치
-  - rolling_cursor_b: 후반부 스캔 위치
   - page_fingerprints: {page_start_idx: fingerprint_hash}
+  - page_scan_times:   {page_start_idx: ISO timestamp}
 """
 import asyncio
 import random
+from enum import Enum
 from datetime import datetime, timedelta
 from app.core.config import settings
 from app.core.logger import logger
@@ -28,28 +20,43 @@ from app.services.pivot_manager import compute_page_fingerprint
 PAGE_SIZE = 1000  # API 페이지당 최대 조회 건수
 
 
+class ScanMode(Enum):
+    """스캔 전략 모드. config 또는 코드에서 선택."""
+    OLDEST_FIRST = "oldest_first"  # 순수 연식순 (추천)
+    HYBRID = "hybrid"              # Oldest 70% + Random 30% (레거시)
+
+
 class RollingScanner:
     def __init__(self, api_client, service_id: str, state_repo):
         self.api_client = api_client
         self.service_id = service_id
         self.state_repo = state_repo
 
-    async def scan_cycle(self, pages_per_cycle: int = None, flush_callback=None, boosted: bool = False) -> list:
+    async def scan_cycle(
+        self,
+        pages_per_cycle: int = None,
+        flush_callback=None,
+        boosted: bool = False,
+        mode: ScanMode = ScanMode.OLDEST_FIRST,
+    ) -> list:
         """
-        Oldest-First Rolling Scan: 가장 오래된 페이지 우선 + Random Probe.
-
-        전략:
-        - 1시간 이상 경과한 페이지를 오래된 순으로 선택 (미스캔 = 최우선)
-        - 30% Random Probe (부스트 시 50%)
+        Rolling Scan 메인 진입점.
 
         Args:
             pages_per_cycle: 주기당 총 스캔 페이지 수
-            flush_callback: async callable(rows) — 완료 시 즉시 호출.
-            boosted: True면 Random Probe 비중 증가
-
-        Returns:
-            list: 새로 발견된 레코드 리스트 (flush_callback 미사용 시)
+            flush_callback: async callable(rows) — 발견 즉시 호출
+            boosted: True면 Random Probe 비중 증가 (HYBRID 전용)
+            mode: ScanMode.OLDEST_FIRST | ScanMode.HYBRID
         """
+        if mode == ScanMode.HYBRID:
+            return await self._scan_hybrid(pages_per_cycle, flush_callback, boosted)
+        return await self._scan_oldest_first(pages_per_cycle, flush_callback)
+
+    # ══════════════════════════════════════════════════════════════
+    # Mode: OLDEST_FIRST — 순수 연식순 (100% 유효 스캔)
+    # ══════════════════════════════════════════════════════════════
+
+    async def _scan_oldest_first(self, pages_per_cycle: int = None, flush_callback=None) -> list:
         svc = self.service_id
         if pages_per_cycle is None:
             pages_per_cycle = settings.ROLLING_SCAN_PAGES_PER_CYCLE
@@ -66,16 +73,9 @@ class RollingScanner:
         fingerprints: dict = state.get("page_fingerprints", {})
         scan_times: dict = state.get("page_scan_times", {})
 
-        # ── 페이지 분배: Oldest-First + Random ──
-        if boosted:
-            pages_random = pages_per_cycle // 2
-        else:
-            pages_random = max(10, pages_per_cycle * 3 // 10)
-        pages_oldest = pages_per_cycle - pages_random
-
-        # ── Track 1: Oldest-First 페이지 선택 ──
-        MIN_AGE_SEC = 3600  # 1시간 이상 경과한 페이지만
-        oldest_pages = self._select_oldest_pages(scan_times, total_pages, pages_oldest, MIN_AGE_SEC)
+        # 전체 예산을 Oldest-First에 투입 (Random Probe 없음)
+        MIN_AGE_SEC = 3600
+        oldest_pages = self._select_oldest_pages(scan_times, total_pages, pages_per_cycle, MIN_AGE_SEC)
 
         if oldest_pages:
             max_age = self._get_page_age(scan_times, oldest_pages[0])
@@ -85,19 +85,17 @@ class RollingScanner:
             max_age = min_age = 0.0
             unscanned = 0
 
-        mode = "🚀 BOOST" if boosted else "🔄 Oldest-First"
         logger.info(
-            f"[{svc}] {mode} Rolling Scan: "
-            f"Oldest {len(oldest_pages)}p (미스캔 {unscanned}p, "
-            f"최고연식 {max_age:.1f}h, 최저 {min_age:.1f}h) + "
-            f"Random {pages_random}p | 전체={total_pages}p ({total_count:,}건)"
+            f"[{svc}] 🔄 Oldest-First Scan: "
+            f"{len(oldest_pages)}p (미스캔 {unscanned}p, "
+            f"최고연식 {max_age:.1f}h, 최저 {min_age:.1f}h) | "
+            f"전체={total_pages}p ({total_count:,}건)"
         )
 
         new_rows_total = []
         total_scanned = 0
         mismatched_pages = 0
 
-        # ── Oldest-First 스캔 ──
         for page_start in oldest_pages:
             if shutdown_event.is_set():
                 break
@@ -111,41 +109,101 @@ class RollingScanner:
             elif new_rows:
                 new_rows_total.extend(new_rows)
 
-        # ── Track 2: Random Probe ──
+        # 상태 영속화
+        state["page_fingerprints"] = fingerprints
+        state["page_scan_times"] = scan_times
+        self.state_repo.save_state(svc, state)
+
+        scanned_page_count = sum(1 for k in scan_times if scan_times[k])
+        coverage_pct = round(scanned_page_count / total_pages * 100, 1) if total_pages > 0 else 0
+
+        logger.info(
+            f"[{svc}] ✅ Oldest-First 완료: {total_scanned}p, "
+            f"{mismatched_pages}건 불일치, {len(new_rows_total)}건 수집 | "
+            f"커버리지: {scanned_page_count}/{total_pages}p ({coverage_pct}%)"
+        )
+        return new_rows_total
+
+    # ══════════════════════════════════════════════════════════════
+    # Mode: HYBRID — Oldest-First + Random Probe (레거시, 회귀용 보존)
+    # ══════════════════════════════════════════════════════════════
+
+    async def _scan_hybrid(self, pages_per_cycle: int = None, flush_callback=None, boosted: bool = False) -> list:
+        svc = self.service_id
+        if pages_per_cycle is None:
+            pages_per_cycle = settings.ROLLING_SCAN_PAGES_PER_CYCLE
+
+        state = self.state_repo.load_state(svc)
+        total_count = state.get("last_total_count", 0)
+        if total_count == 0:
+            return []
+
+        total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE
+        if total_pages == 0:
+            return []
+
+        fingerprints: dict = state.get("page_fingerprints", {})
+        scan_times: dict = state.get("page_scan_times", {})
+
+        pages_random = pages_per_cycle // 2 if boosted else max(10, pages_per_cycle * 3 // 10)
+        pages_oldest = pages_per_cycle - pages_random
+
+        MIN_AGE_SEC = 3600
+        oldest_pages = self._select_oldest_pages(scan_times, total_pages, pages_oldest, MIN_AGE_SEC)
+
+        if oldest_pages:
+            max_age = self._get_page_age(scan_times, oldest_pages[0])
+            min_age = self._get_page_age(scan_times, oldest_pages[-1])
+            unscanned = sum(1 for ps in oldest_pages if str(ps) not in scan_times)
+        else:
+            max_age = min_age = 0.0
+            unscanned = 0
+
+        mode_label = "🚀 BOOST" if boosted else "🔄 Hybrid"
+        logger.info(
+            f"[{svc}] {mode_label} Scan: Oldest {len(oldest_pages)}p "
+            f"(미스캔 {unscanned}p, 최고연식 {max_age:.1f}h, 최저 {min_age:.1f}h) + "
+            f"Random {pages_random}p | 전체={total_pages}p"
+        )
+
+        new_rows_total = []
+        total_scanned = 0
+        mismatched_pages = 0
+
+        for page_start in oldest_pages:
+            if shutdown_event.is_set():
+                break
+            scanned, new_rows, mismatch = await self._scan_single_page(
+                svc, page_start, total_count, fingerprints, scan_times
+            )
+            total_scanned += scanned
+            mismatched_pages += mismatch
+            if new_rows and flush_callback:
+                await flush_callback(new_rows)
+            elif new_rows:
+                new_rows_total.extend(new_rows)
+
         scanned_r, new_r = await self._scan_random_probe(
             svc, pages_random, total_count, 1, total_count, (1, total_count), (1, total_count), scan_times
         )
         total_scanned += scanned_r
         if new_r and flush_callback:
             await flush_callback(new_r)
-            logger.info(
-                f"[{svc}] ⚡ Random Probe flush: {len(new_r)}건 → scraper 파이프라인"
-            )
         elif new_r:
             new_rows_total.extend(new_r)
 
-        # 상태 영속화 (커서 불필요 — Oldest-First는 상태 없음)
         state["page_fingerprints"] = fingerprints
         state["page_scan_times"] = scan_times
-        state.pop("rolling_cursor", None)
-        state.pop("rolling_cursor_a", None)
-        state.pop("rolling_cursor_b", None)
         self.state_repo.save_state(svc, state)
 
-        # 커버리지 계산
         scanned_page_count = sum(1 for k in scan_times if scan_times[k])
         coverage_pct = round(scanned_page_count / total_pages * 100, 1) if total_pages > 0 else 0
 
-        flushed_total = (len(new_r) if new_r and flush_callback else 0)
-
         logger.info(
-            f"[{svc}] ✅ Rolling Scan 완료: "
-            f"{total_scanned}p (Oldest:{len(oldest_pages)} + Rand:{scanned_r}), "
-            f"{mismatched_pages}건 불일치, "
-            f"{flushed_total + len(new_rows_total)}건 수집 | "
+            f"[{svc}] ✅ Hybrid 완료: {total_scanned}p (Oldest:{len(oldest_pages)} + Rand:{scanned_r}), "
+            f"{mismatched_pages}건 불일치, {len(new_rows_total)}건 수집 | "
             f"커버리지: {scanned_page_count}/{total_pages}p ({coverage_pct}%)"
         )
-
         return new_rows_total
 
     def _select_oldest_pages(self, scan_times: dict, total_pages: int, count: int, min_age_sec: int = 3600) -> list:
