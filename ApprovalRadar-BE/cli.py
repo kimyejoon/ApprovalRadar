@@ -26,10 +26,11 @@ def test_tail():
 
     async def _run():
         from app.repositories.state_repository import StateRepository
+        from app.core.config import settings as _s
         state_repo = StateRepository()
 
         async with ApiClient() as client:
-            services = ["I2859", "I2861"]
+            services = getattr(_s, "SERVICES", ["I2861"])
             svc_names = {"I2859": "식품업소", "I2861": "음식점업소"}
 
             for i, service_id in enumerate(services):
