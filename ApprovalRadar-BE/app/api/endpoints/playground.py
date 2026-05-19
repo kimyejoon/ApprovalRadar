@@ -117,56 +117,6 @@ async def get_scheduler_status():
 
 # ─── 수동 트리거 ─────────────────────────────────────────────────────────────
 
-@router.post("/trigger/{job_type}", response_model=TriggerResponse)
-async def trigger_job(job_type: str):
-    """지정한 잡을 즉시 실행합니다.
-    
-    job_type: scraper | rolling_scan | tail_ping | boost_scan
-    """
-    try:
-        if job_type == "scraper":
-            from app.core.scheduler import trigger_immediate_scrape
-            trigger_immediate_scrape()
-            return TriggerResponse(success=True, message="Scraper + Boost Scan 트리거 완료")
-
-        elif job_type == "rolling_scan":
-            from app.core.scheduler import scheduler, _scraper_job
-            import time
-            scheduler.add_job(
-                _scraper_job, 'date',
-                run_date=datetime.now(),
-                id=f"manual_rolling_{int(time.time())}",
-            )
-            return TriggerResponse(success=True, message="Rolling Scan 즉시 실행 등록")
-
-        elif job_type == "tail_ping":
-            from app.services.tail_ping_job import run_tail_ping
-            from app.core.scheduler import scheduler
-            import time
-            scheduler.add_job(
-                run_tail_ping, 'date',
-                run_date=datetime.now(),
-                id=f"manual_tail_ping_{int(time.time())}",
-            )
-            return TriggerResponse(success=True, message="Tail Ping 즉시 실행 등록")
-
-        elif job_type == "boost_scan":
-            from app.core.scheduler import scheduler, _boosted_rolling_scan_job
-            import time
-            scheduler.add_job(
-                _boosted_rolling_scan_job, 'date',
-                run_date=datetime.now(),
-                id=f"manual_boost_{int(time.time())}",
-            )
-            return TriggerResponse(success=True, message="🚀 Boost Scan (Random 50%) 즉시 실행 등록")
-
-        else:
-            raise HTTPException(status_code=400, detail=f"알 수 없는 잡 타입: {job_type}")
-    except Exception as e:
-        logger.error(f"[Playground] 트리거 실패: {e}")
-        return TriggerResponse(success=False, message=str(e))
-
-
 class RangeScanRequest(BaseModel):
     start: int   # 스캔 시작 레코드 번호 (예: 1, 500001)
     end: int     # 스캔 종료 레코드 번호 (예: 10000, 952999)
@@ -233,6 +183,57 @@ async def trigger_range_scan(req: RangeScanRequest):
     except Exception as e:
         logger.error(f"[Playground] Range Scan 트리거 실패: {e}")
         return TriggerResponse(success=False, message=str(e))
+
+
+@router.post("/trigger/{job_type}", response_model=TriggerResponse)
+async def trigger_job(job_type: str):
+    """지정한 잡을 즉시 실행합니다.
+    
+    job_type: scraper | rolling_scan | tail_ping | boost_scan
+    """
+    try:
+        if job_type == "scraper":
+            from app.core.scheduler import trigger_immediate_scrape
+            trigger_immediate_scrape()
+            return TriggerResponse(success=True, message="Scraper + Boost Scan 트리거 완료")
+
+        elif job_type == "rolling_scan":
+            from app.core.scheduler import scheduler, _scraper_job
+            import time
+            scheduler.add_job(
+                _scraper_job, 'date',
+                run_date=datetime.now(),
+                id=f"manual_rolling_{int(time.time())}",
+            )
+            return TriggerResponse(success=True, message="Rolling Scan 즉시 실행 등록")
+
+        elif job_type == "tail_ping":
+            from app.services.tail_ping_job import run_tail_ping
+            from app.core.scheduler import scheduler
+            import time
+            scheduler.add_job(
+                run_tail_ping, 'date',
+                run_date=datetime.now(),
+                id=f"manual_tail_ping_{int(time.time())}",
+            )
+            return TriggerResponse(success=True, message="Tail Ping 즉시 실행 등록")
+
+        elif job_type == "boost_scan":
+            from app.core.scheduler import scheduler, _boosted_rolling_scan_job
+            import time
+            scheduler.add_job(
+                _boosted_rolling_scan_job, 'date',
+                run_date=datetime.now(),
+                id=f"manual_boost_{int(time.time())}",
+            )
+            return TriggerResponse(success=True, message="🚀 Boost Scan (Random 50%) 즉시 실행 등록")
+
+        else:
+            raise HTTPException(status_code=400, detail=f"알 수 없는 잡 타입: {job_type}")
+    except Exception as e:
+        logger.error(f"[Playground] 트리거 실패: {e}")
+        return TriggerResponse(success=False, message=str(e))
+
 
 
 # ─── 페이지 스캔 히스토리 ────────────────────────────────────────────────────
