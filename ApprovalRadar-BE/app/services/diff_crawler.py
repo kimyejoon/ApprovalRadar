@@ -398,7 +398,86 @@ class DiffCrawlerEngine:
             logger.info(f"[{self.service_id}] ✅ Bootstrap 피벗 정합성 검증 완료.")
         self._empty_pivot_cycles = 0  # in-memory 동기화
         self._cb_consecutive_count = 0
+
+        # ── Bootstrap 완료 후 오늘 날짜 보완 ──────────────────────────────────
+        # 시나리오: 오후 10시 최초 설치 or 전략C(19:00)가 아직 미실행인 경우
+        # Bootstrap은 Tail 기준선만 설정하므로, 오늘 API에 이미 있는 레코드가
+        # 우리 DB에 없을 수 있음 → CHNG_DT=오늘로 직접 조회하여 미수집분 보완.
+        # 단, 19시 이전에는 API가 오늘 날짜를 차단하므로 19시 이후에만 실행.
+        from datetime import datetime
+        now = datetime.now()
+        if now.hour >= 19:
+            today_str = now.strftime("%Y%m%d")
+            logger.info(
+                f"[{self.service_id}] 📅 Bootstrap 완료 후 오늘({today_str}) 데이터 보완 시작 "
+                f"(19시 이후 최초 실행 대응)..."
+            )
+            try:
+                today_rows = await self._fetch_today_補完(today_str)
+                if today_rows:
+                    logger.info(
+                        f"[{self.service_id}] 📥 오늘 날짜 보완: {len(today_rows)}건 발견 → "
+                        f"DB 미수집분 필터 후 저장"
+                    )
+                    return today_rows   # scraper layer에서 중복 필터 후 저장
+                else:
+                    logger.info(f"[{self.service_id}] ✅ 오늘 날짜 보완: 추가 수집 대상 없음.")
+            except Exception as e:
+                logger.warning(f"[{self.service_id}] 오늘 날짜 보완 실패 (무시): {e}")
+
         return state
+
+    async def _fetch_today_補完(self, today_str: str) -> list:
+        """Bootstrap 후 오늘 날짜(CHNG_DT=today) 데이터를 CHNG_DT 파라미터로 직접 조회.
+        API의 19시 이후 허용 조건을 활용하여 미수집 레코드를 보완한다."""
+        svc = self.service_id
+        rows_found = []
+        # CHNG_DT 파라미터 직접 조회 (전략C와 동일한 방식)
+        for key in self.api_client._key_pool:
+            url = (
+                f"https://openapi.foodsafetykorea.go.kr/api/{key}/{svc}/json/1/1000"
+                f"?CHNG_DT={today_str}"
+            )
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                        data = await resp.json(content_type=None)
+                block = data.get(svc, {})
+                code = block.get("RESULT", {}).get("CODE", "")
+                if code == "INFO-300":
+                    continue
+                rows = block.get("row", [])
+                if rows:
+                    rows_found.extend(rows)
+                    total_str = block.get("total_count", "0")
+                    total = int(total_str) if str(total_str).isdigit() else 0
+                    logger.info(
+                        f"[{svc}] 📅 오늘({today_str}) CHNG_DT 직접 조회: "
+                        f"{len(rows)}건 수신 (total={total})"
+                    )
+                    # 1,000건 초과 시 페이지 추가 조회
+                    if total > 1000:
+                        page = 2
+                        while (page - 1) * 1000 < total:
+                            st = (page - 1) * 1000 + 1
+                            ed = page * 1000
+                            url2 = (
+                                f"https://openapi.foodsafetykorea.go.kr/api/{key}/{svc}/json/{st}/{ed}"
+                                f"?CHNG_DT={today_str}"
+                            )
+                            async with session.get(url2, timeout=aiohttp.ClientTimeout(total=15)) as r2:
+                                d2 = await r2.json(content_type=None)
+                            rows2 = d2.get(svc, {}).get("row", [])
+                            if not rows2:
+                                break
+                            rows_found.extend(rows2)
+                            page += 1
+                break
+            except Exception as e:
+                logger.debug(f"[{svc}] 오늘 보완 조회 실패 (키 {key[:6]}): {e}")
+                continue
+        return rows_found
 
     # ─── 델타 감지 ────────────────────────────────────────────────────────────
 
