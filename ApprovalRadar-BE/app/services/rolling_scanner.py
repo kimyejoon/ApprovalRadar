@@ -273,10 +273,11 @@ class RollingScanner:
                     # batch 조회: IN 절로 한 번에 확인
                     placeholders = ",".join(["?"] * len(lcns_list))
                     existing_cursor = db_conn.execute(
-                        f"SELECT license_no FROM businesses WHERE license_no IN ({placeholders})",
+                        f"SELECT license_no, last_event_date FROM businesses WHERE license_no IN ({placeholders})",
                         lcns_list
                     )
-                    existing_set = {row[0] for row in existing_cursor.fetchall()}
+                    existing_map = {row[0]: row[1] for row in existing_cursor.fetchall()}
+                    existing_set = set(existing_map.keys())
 
                     # DB에 없는 레코드 추출
                     missing_items = [
@@ -292,17 +293,32 @@ class RollingScanner:
                                 f"DB 미존재 {len(missing_items)}건 발견 → 수집 대상 추가"
                             )
 
-                # ── [관찰 모드] 오늘 CHNG_DT 존재 여부만 로깅 ──────────────
-                today_count_in_page = sum(
+                    # ── [핵심] 오늘 CHNG_DT인데 DB에 이미 있는 레코드 → 변동 업데이트 수집 ──
+                    today_update_items = [
+                        item for item in items
+                        if item.get("LCNS_NO", "") in existing_set
+                        and item.get("CHNG_DT", "") == today_str
+                        and existing_map.get(item["LCNS_NO"]) != today_str  # DB의 기존 event_date와 다를 때만
+                    ]
+                    if today_update_items:
+                        new_rows.extend(today_update_items)
+                        today_found += len(today_update_items)
+                        logger.info(
+                            f"[{svc}] 🆕 커서 {label}: 오늘({today_str}) 변동분 "
+                            f"{len(today_update_items)}건 즉시 감지!"
+                        )
+
+                # ── 오늘 CHNG_DT 존재 여부 카운팅 (DB 미존재 신규 포함) ──────
+                today_new_count = sum(
                     1 for item in items
                     if item.get("CHNG_DT", "") == today_str
-                )
-                if today_count_in_page:
-                    today_found += today_count_in_page
-                    logger.debug(
-                        f"[{svc}] 📊 커서 {label} page {page_start:,}: "
-                        f"오늘({today_str}) {today_count_in_page}건 존재 "
-                        f"(관찰 모드, 수집은 Tail Ping/전략C에서)"
+                    and item.get("LCNS_NO", "") not in existing_set
+                ) if lcns_list else 0
+                if today_new_count:
+                    today_found += today_new_count
+                    logger.info(
+                        f"[{svc}] 🆕 커서 {label} page {page_start:,}: "
+                        f"오늘({today_str}) 신규 {today_new_count}건 (DB 미존재)"
                     )
 
                 # ── fingerprint 비교 ──────────────────────────────────
