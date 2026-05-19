@@ -119,7 +119,6 @@ EXE_PATH="$BE_DIR/dist_exe/ApprovalRadar"
 # ── 배포 패키지 정리 ──────────────────────────────────────────────────────────
 step "배포 패키지 정리"
 
-rm -rf "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
 
 # ── 실행 파일 복사 (.app 번들 우선, 없으면 단일 바이너리 폴백) ─────────────────
@@ -127,6 +126,8 @@ APP_BUNDLE="$BE_DIR/dist_exe/ApprovalRadar.app"
 EXE_BIN="$BE_DIR/dist_exe/ApprovalRadar"
 
 if [ -d "$APP_BUNDLE" ]; then
+    # .app 번들은 항상 최신으로 교체
+    rm -rf "$RELEASE_DIR/ApprovalRadar.app"
     info ".app 번들 감지 → dist_release/ApprovalRadar.app 로 복사 중..."
     cp -r "$APP_BUNDLE" "$RELEASE_DIR/ApprovalRadar.app"
     chmod -R +x "$RELEASE_DIR/ApprovalRadar.app"
@@ -139,42 +140,23 @@ else
     error "빌드 결과물 없음: ApprovalRadar.app / ApprovalRadar 모두 찾을 수 없습니다."
 fi
 
-# .env (API 키 — 유저 편집 가능)
-cp "$BE_DIR/.env" "$RELEASE_DIR/.env"
+# .env: 기존 파일 보존 (사용자가 API 키를 커스터마이즈했을 수 있음)
+if [ ! -f "$RELEASE_DIR/.env" ]; then
+    cp "$BE_DIR/.env" "$RELEASE_DIR/.env"
+    success ".env 생성 (신규)"
+else
+    success ".env 보존 (기존 설정 유지)"
+fi
 
-# DB 파일 (미러링/운영 데이터 포함)
+# DB: 기존 파일 보존 (크롤링 데이터 포함), 없을 때만 복사
 DB_FILE="$BE_DIR/food_safety.db"
 RELEASE_DB="$RELEASE_DIR/food_safety.db"
-if [ -f "$DB_FILE" ]; then
-    # ✅ [Fix 2] 기존 dist_release DB에 crawler_state가 있으면 빌드 후 복원
-    # 개발 DB를 덮어쓰면 운영 중 저장된 Tail/피벗 상태가 리셋되는 문제 방지
-    CRAWLER_STATE_BACKUP=""
-    if [ -f "$RELEASE_DB" ] && command -v sqlite3 &>/dev/null; then
-        CRAWLER_STATE_CHECK=$(sqlite3 "$RELEASE_DB" \
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='crawler_state';" 2>/dev/null || echo "0")
-        if [ "$CRAWLER_STATE_CHECK" = "1" ]; then
-            CRAWLER_STATE_BACKUP=$(sqlite3 "$RELEASE_DB" \
-                "SELECT service_id, last_total_count, pivots, updated_at FROM crawler_state;" 2>/dev/null)
-            if [ -n "$CRAWLER_STATE_BACKUP" ]; then
-                info "기존 crawler_state 백업 완료 (재빌드 후 복원 예정)"
-            fi
-        fi
-    fi
-
+if [ -f "$RELEASE_DB" ]; then
+    success "DB 파일 보존 (기존 food_safety.db 유지)"
+elif [ -f "$DB_FILE" ]; then
     cp "$DB_FILE" "$RELEASE_DB"
     DB_SIZE=$(du -sh "$DB_FILE" | cut -f1)
-    success "DB 파일 포함 → food_safety.db ($DB_SIZE)"
-
-    # 기존 crawler_state 복원 (있는 경우)
-    if [ -n "$CRAWLER_STATE_BACKUP" ] && command -v sqlite3 &>/dev/null; then
-        while IFS='|' read -r svc_id tail_count pivots updated_at; do
-            [ -z "$svc_id" ] && continue
-            sqlite3 "$RELEASE_DB" \
-                "INSERT OR REPLACE INTO crawler_state (service_id, last_total_count, pivots, updated_at) \
-                 VALUES ('$svc_id', $tail_count, '$pivots', '$updated_at');" 2>/dev/null
-        done <<< "$CRAWLER_STATE_BACKUP"
-        success "crawler_state 복원 완료 → 재시작 시 Bootstrap 불필요"
-    fi
+    success "DB 파일 생성 → food_safety.db ($DB_SIZE)"
 else
     warn "food_safety.db 없음 → 앱 첫 실행 시 빈 DB 자동 생성됩니다."
 fi

@@ -109,19 +109,29 @@ echo.
 REM ── Package Release ──────────────────────────────────────────────────────────
 echo ====  Release Package  ====
 
-if exist "%RELEASE_DIR%" rmdir /s /q "%RELEASE_DIR%"
-mkdir "%RELEASE_DIR%"
+if not exist "%RELEASE_DIR%" mkdir "%RELEASE_DIR%"
 
+REM Always overwrite the executable
 copy /Y "%BE_DIR%\dist\ApprovalRadar.exe" "%RELEASE_DIR%\ApprovalRadar.exe" >nul
 
-copy /Y "%BE_DIR%\.env" "%RELEASE_DIR%\.env" >nul
-
-REM Copy DB file (mirrored operation data)
-if exist "%BE_DIR%\food_safety.db" (
-    copy /Y "%BE_DIR%\food_safety.db" "%RELEASE_DIR%\food_safety.db" >nul
-    echo [OK]    DB file included ^(food_safety.db^)
+REM .env: preserve existing (user may have customized API keys)
+if not exist "%RELEASE_DIR%\.env" (
+    copy /Y "%BE_DIR%\.env" "%RELEASE_DIR%\.env" >nul
+    echo [OK]    .env created ^(new^)
 ) else (
-    echo [WARN]  food_safety.db not found -- empty DB will be created on first launch.
+    echo [OK]    .env preserved ^(existing config kept^)
+)
+
+REM DB: preserve existing (contains crawled data), copy only if absent
+if not exist "%RELEASE_DIR%\food_safety.db" (
+    if exist "%BE_DIR%\food_safety.db" (
+        copy /Y "%BE_DIR%\food_safety.db" "%RELEASE_DIR%\food_safety.db" >nul
+        echo [OK]    DB file created ^(food_safety.db^)
+    ) else (
+        echo [WARN]  food_safety.db not found -- empty DB will be created on first launch.
+    )
+) else (
+    echo [OK]    DB file preserved ^(existing food_safety.db kept^)
 )
 
 REM Create README (ASCII only to avoid encoding issues in .bat)
