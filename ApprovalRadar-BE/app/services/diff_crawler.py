@@ -472,25 +472,33 @@ class DiffCrawlerEngine:
 
     # ─── 델타 감지 ────────────────────────────────────────────────────────────
 
-    async def _compute_shift_offsets(self, pivots: dict, pivot_indices: list, diff_count: int) -> dict:
+    # [최적화] 연속 미발견 조기 중단 임계값
+    SHIFT_EARLY_EXIT_THRESHOLD = 5
+
+    async def _compute_shift_offsets(self, pivots: dict, pivot_indices: list, diff_count: int) -> dict | None:
         """
         [Phase 1] 피벗별 Shift 오프셋을 메모리 기반 청크 스캔으로 계산합니다.
 
-        기존 방식(단건 fetch_single 루프)의 문제:
-          - diff_count=500 시 API 500회 단건 호출 → 장기 다운타임 후 Key 고갈 위험
-
         개선 방식(청크 스캔):
-          - 탐색 범위 [p_idx+current_shift, p_idx+diff_count]를 PAGE_SIZE(1,000건) 단위로
-            fetch_page 1~2회 호출 후 메모리 리스트에서 선형 탐색
-          - diff_count=500 시 피벗 1개당 API 1회 → 피벗 60개 전체 60회로 단축 (88% 절감)
-          - Fallback: 피벗 레코드가 삭제 등으로 발견되지 않으면 current_shift 유지 후 다음 피벗 진행
+          - 탐색 범위를 PAGE_SIZE(1,000건) 단위로 fetch_page 1~2회 호출
+          - diff_count=500 시 피벗 1개당 API 1회 → 전체 60회로 단축
+
+        [최적화] 조기 중단 (Early Exit):
+          - 연속 5개 피벗이 모두 미발견이면 → API 전체 재정렬로 판단
+          - None 반환 → 호출자가 재부트스트랩으로 전환
+          - 190회 → 5회로 97% 절감
+
+        Returns:
+          dict: 정상 shift 결과
+          None: 전체 재정렬 감지 → 재부트스트랩 필요
         """
         shift_amounts = {}
         current_shift = 0
+        consecutive_miss = 0  # 연속 미발견 카운터
 
         logger.info(
             f"[{self.service_id}] ⏳ 피벗 Shift 분석 시작: 저장된 피벗 {len(pivot_indices)}개를 구간별로 스캔 "
-            f"(diff_count={diff_count:,}, 포트 모드로 API 호출 최소화)"
+            f"(diff_count={diff_count:,}, 조기중단={self.SHIFT_EARLY_EXIT_THRESHOLD}연속 미발견 시)"
         )
         for i, p_idx in enumerate(pivot_indices):
             old_data = pivots[str(p_idx)]
@@ -502,16 +510,11 @@ class DiffCrawlerEngine:
             found = False
 
             # [Feedback-1 Fix] 탐색 범위: 피벗 이전 구간도 포함
-            # 삽입이 피벗 인덱스보다 앞 구간에서 발생하면 해당 피벗 레코드가 뒤로 밀림
-            # → 기존: [p_idx+current_shift, p_idx+diff_count] (앞 구간 miss 가능)
-            # → 수정: [max(prev_pivot_end, p_idx-diff_count), p_idx+diff_count]
             if i > 0:
                 prev_p_idx = pivot_indices[i - 1]
                 prev_shift = shift_amounts.get(prev_p_idx, current_shift)
-                # 이전 피벗의 새 위치 이후부터 탐색 (중복 탐색 방지)
                 search_start = max(prev_p_idx + prev_shift + 1, p_idx - diff_count)
             else:
-                # 첫 피벗: diff_count만큼 앞으로 확장
                 search_start = max(1, p_idx - diff_count)
             search_end = p_idx + diff_count
             current_search_pos = search_start
@@ -526,24 +529,33 @@ class DiffCrawlerEngine:
                 chunk_end = min(current_search_pos + PAGE_SIZE - 1, search_end)
                 rows = await self._fetch_page(current_search_pos, chunk_end)
 
-                for i, row in enumerate(rows):
+                for j, row in enumerate(rows):
                     if (
                         row.get("LCNS_NO") == expected_lcns_no
                         and row.get("CHNG_DT") == expected_chng_dt
                     ):
-                        # 실제 API 인덱스에서 p_idx를 빼면 offset
-                        found_offset = (current_search_pos - p_idx) + i
+                        found_offset = (current_search_pos - p_idx) + j
                         found = True
                         break
 
                 current_search_pos += PAGE_SIZE
 
             if not found:
+                consecutive_miss += 1
                 logger.warning(
                     f"[{self.service_id}] ⚠️ [청크 스캔] p_idx={p_idx:,} 피벗 레코드 미발견 "
-                    f"(LCNS_NO={expected_lcns_no}). current_shift={current_shift} 유지 (Fallback)"
+                    f"(LCNS_NO={expected_lcns_no}). 연속 미발견: {consecutive_miss}/{self.SHIFT_EARLY_EXIT_THRESHOLD}"
                 )
+                # [최적화] 조기 중단: 연속 N개 피벗 미발견 → 전체 재정렬로 판단
+                if consecutive_miss >= self.SHIFT_EARLY_EXIT_THRESHOLD:
+                    logger.warning(
+                        f"[{self.service_id}] 🛑 연속 {consecutive_miss}개 피벗 미발견! "
+                        f"API 전체 재정렬로 판단 → 피벗 Shift 분석 조기 중단. "
+                        f"재부트스트랩으로 전환합니다. (잔여 피벗 {len(pivot_indices) - i - 1}개 스킵)"
+                    )
+                    return None  # 호출자에서 재부트스트랩 트리거
             else:
+                consecutive_miss = 0  # 발견 시 연속 카운터 리셋
                 logger.debug(
                     f"[{self.service_id}] [청크 스캔] p_idx={p_idx:,} → offset={found_offset} 확정"
                 )
@@ -561,7 +573,7 @@ class DiffCrawlerEngine:
                 f"해당 구간에 신규 데이터 삽입 가능성 확인"
             )
         else:
-            logger.info(f"[{self.service_id}] 피벗 분석 결과: 모든 피벗 Shift=0 (데이터 타일단 나타남)")
+            logger.info(f"[{self.service_id}] 피벗 분석 결과: 모든 피벗 Shift=0 (데이터 Tail단 추가)")
         return shift_amounts
 
     async def _download_new_rows(self, pivot_indices: list, shift_amounts: dict, old_tail: int, new_tail: int, diff_count: int) -> list:
@@ -791,6 +803,34 @@ class DiffCrawlerEngine:
             f" — 신규 인허가변동 {diff_count:,}건 포착! 구간 분석 시작..."
         )
 
+        # ── [최적화] 소량 변동(≤10건): Tail 직접 수집 ──────────────────────────
+        # diff_count가 작으면 피벗 Shift 분석(190회 API)이 비효율적.
+        # → old_tail+1 ~ new_tail 구간만 직접 다운로드 (API 1~2회)
+        DIRECT_COLLECT_THRESHOLD = 10
+        if diff_count <= DIRECT_COLLECT_THRESHOLD:
+            logger.info(
+                f"[{svc}] ⚡ diff_count={diff_count:,}건 ≤ {DIRECT_COLLECT_THRESHOLD} "
+                f"→ Tail 직접 수집 (피벗 Shift 분석 스킵)"
+            )
+            new_data_rows = []
+            fetch_start = old_tail + 1
+            while fetch_start <= new_tail:
+                fetch_end = min(fetch_start + PAGE_SIZE - 1, new_tail)
+                rows = await self._fetch_page(fetch_start, fetch_end)
+                new_data_rows.extend(rows)
+                fetch_start += PAGE_SIZE
+
+            # Tail만 갱신 (피벗은 기존 유지 — 소량 추가이므로 피벗 구조 변동 없음)
+            state["last_total_count"] = new_tail
+            self.state_repo.save_state(self.service_id, state)
+
+            logger.info(
+                f"[{svc}] 💾 Tail 직접 수집 완료: {len(new_data_rows):,}건 "
+                f"(tail {old_tail:,} → {new_tail:,})"
+            )
+            return new_data_rows
+
+        # ── 대량 변동(>10건): 피벗 Shift 분석 경로 ────────────────────────────
         pivots = state["pivots"]
         pivot_indices = sorted([int(k) for k in pivots.keys()])
         if pivot_indices:
@@ -800,12 +840,36 @@ class DiffCrawlerEngine:
             )
         else:
             logger.warning(
-                f"[{svc}] 피벗 없음! Tail만으로 신규 구간 플립을 특정할 수 없음. "
+                f"[{svc}] 피벗 없음! Tail만으로 신규 구간을 특정할 수 없음. "
                 f"Tail 다운로드만 진행."
             )
 
         # Step 3: Pivot 검사 (Shift 오프셋 확인)
         shift_amounts = await self._compute_shift_offsets(pivots, pivot_indices, diff_count)
+
+        # [최적화] shift_amounts=None → 전체 재정렬 감지 → 재부트스트랩
+        if shift_amounts is None:
+            logger.warning(
+                f"[{svc}] 🔄 전체 재정렬 감지 → Tail 업데이트 후 재부트스트랩 트리거"
+            )
+            # Tail은 갱신하되 피벗은 재부트스트랩에서 다시 생성
+            state["last_total_count"] = new_tail
+            state["pivots"] = {}  # 피벗 초기화 → 다음 주기에 부트스트랩 실행
+            state["_bootstrapping"] = True
+            self.state_repo.save_state(self.service_id, state)
+
+            # 비동기 재부트스트랩 시작
+            import threading
+            def _bg_bootstrap():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(self._run_bootstrap_standalone())
+                finally:
+                    loop.close()
+            threading.Thread(target=_bg_bootstrap, daemon=True, name=f"rebootstrap-{svc}").start()
+            logger.info(f"[{svc}] 🔄 백그라운드 재부트스트랩 시작됨")
+            return []
 
         # Step 4: 신규 데이터 다운로드
         new_data_rows = await self._download_new_rows(pivot_indices, shift_amounts, old_tail, new_tail, diff_count)
