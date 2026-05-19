@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowClockwise, Play, RocketLaunch, Broadcast, MagnifyingGlass, Lightning, ChartLine } from '@phosphor-icons/react';
+import { ArrowClockwise, Play, RocketLaunch, Broadcast, MagnifyingGlass, Lightning } from '@phosphor-icons/react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -47,25 +47,7 @@ interface PageScanEntry {
   last_scanned: string | null;
 }
 
-interface ChngDtPollEntry {
-  polled_at: string;
-  total_api_count: number;
-  new_inserted: number;
-  already_exists: number;
-  pages_fetched: number;
-  elapsed_sec: number;
-}
 
-interface ChngDtTrend {
-  target_date: string;
-  entries: ChngDtPollEntry[];
-  latest_total: number;
-  total_inserted: number;
-  yesterday_date: string;
-  yesterday_entries: ChngDtPollEntry[];
-  today_date: string;
-  today_entries: ChngDtPollEntry[];
-}
 
 // ─── API Helpers ────────────────────────────────────────────────────────────
 
@@ -110,11 +92,7 @@ async function fetchPageScanHistory(): Promise<{ total_pages: number; scanned_pa
   return res.json();
 }
 
-async function fetchChngDtTrend(): Promise<ChngDtTrend> {
-  const res = await fetch(`${BASE}/chng-dt-trend`);
-  if (!res.ok) throw new Error('Failed');
-  return res.json();
-}
+
 
 // ─── Helper Components ──────────────────────────────────────────────────────
 
@@ -149,7 +127,7 @@ export function PlaygroundPage() {
   const [today, setToday] = useState<TodayDetection | null>(null);
   const [tailHistory, setTailHistory] = useState<TailHistoryEntry[]>([]);
   const [pageScan, setPageScan] = useState<{ total_pages: number; scanned_pages: number; entries: PageScanEntry[] } | null>(null);
-  const [chngDtTrend, setChngDtTrend] = useState<ChngDtTrend | null>(null);
+
   const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [rangeStart, setRangeStart] = useState<string>('1');
@@ -157,18 +135,16 @@ export function PlaygroundPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const [sched, det, tail, pages, trend] = await Promise.all([
+      const [sched, det, tail, pages] = await Promise.all([
         fetchSchedulerStatus(),
         fetchTodayDetection(),
         fetchTailHistory(),
         fetchPageScanHistory(),
-        fetchChngDtTrend(),
       ]);
       setScheduler(sched);
       setToday(det);
       setTailHistory(tail);
       setPageScan(pages);
-      setChngDtTrend(trend);
     } catch (e) {
       console.error('Playground refresh failed:', e);
     }
@@ -312,13 +288,7 @@ export function PlaygroundPage() {
               <MagnifyingGlass className="w-4 h-4 text-orange-400" />
               Scraper
             </button>
-            <button
-              onClick={() => handleTrigger('chng_dt_poll')}
-              disabled={loading}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-emerald-400/30 bg-emerald-400/5 hover:bg-emerald-400/10 transition-all text-sm font-medium text-emerald-500 disabled:opacity-50 col-span-2"
-            >
-              📡 I2500 CHNG_DT Poller
-            </button>
+
           </div>
 
           {/* Range Scan */}
@@ -451,127 +421,7 @@ export function PlaygroundPage() {
         </Card>
       </div>
 
-      {/* Row 2.5: CHNG_DT Poller Trend */}
-      <Card>
-        <SectionTitle icon={<ChartLine className="w-5 h-5 text-cyan-400" />} title="전략C: CHNG_DT 폴링 트렌드" />
-        {chngDtTrend && chngDtTrend.entries.length > 0 ? (
-          <div>
-            {/* Summary stats */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="text-center p-3 rounded-lg bg-background">
-                <div className="text-2xl font-bold text-cyan-400">{chngDtTrend.latest_total.toLocaleString()}</div>
-                <div className="text-xs text-text-muted mt-1">API 전체 건수</div>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-background">
-                <div className="text-2xl font-bold text-brand">{chngDtTrend.total_inserted}</div>
-                <div className="text-xs text-text-muted mt-1">신규 INSERT</div>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-background">
-                <div className="text-lg font-bold text-text-primary">
-                  {chngDtTrend.target_date.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3')}
-                </div>
-                <div className="text-xs text-text-muted mt-1">조회 대상일</div>
-              </div>
-            </div>
 
-            {/* Line chart */}
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={chngDtTrend.entries.map(e => ({
-                    time: e.polled_at.slice(11, 16),
-                    total: e.total_api_count,
-                    inserted: e.new_inserted,
-                    elapsed: e.elapsed_sec,
-                  }))}
-                  margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-                  <XAxis
-                    dataKey="time"
-                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
-                  />
-                  <YAxis
-                    yAxisId="left"
-                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
-                    tickFormatter={(v: number) => `${(v / 1000).toFixed(1)}k`}
-                  />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--surface)',
-                      border: '1px solid var(--border-standard)',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                    formatter={(value: number, name: string) => [
-                      name === 'total' ? `${value.toLocaleString()}건` : `${value}건`,
-                      name === 'total' ? 'API 전체' : '신규 INSERT'
-                    ]}
-                  />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="total"
-                    stroke="#06b6d4"
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: '#06b6d4' }}
-                    name="total"
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="inserted"
-                    stroke="#3ecf8e"
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: '#3ecf8e' }}
-                    name="inserted"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-6 mt-2 text-xs text-text-muted">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-0.5 bg-cyan-400 rounded" />
-                API 전체 건수
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-0.5 bg-brand rounded" />
-                신규 INSERT
-              </div>
-            </div>
-
-            {/* Poll history log */}
-            {chngDtTrend.entries.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-xs font-medium text-text-muted mb-2">최근 폴링 이력</h3>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {[...chngDtTrend.entries].reverse().slice(0, 10).map((e, i) => (
-                    <div key={i} className="flex items-center justify-between px-3 py-1.5 rounded bg-background text-xs">
-                      <span className="text-text-muted font-mono">{e.polled_at.slice(11, 19)}</span>
-                      <span className="text-text-primary">API {e.total_api_count.toLocaleString()}건</span>
-                      <span className={`font-semibold ${e.new_inserted > 0 ? 'text-brand' : 'text-text-muted'}`}>
-                        +{e.new_inserted}
-                      </span>
-                      <span className="text-text-muted">{e.elapsed_sec}s</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="h-40 flex items-center justify-center text-sm text-text-muted">
-            폴링 데이터 수집 중... (CHNG_DT Poller 실행 후 표시됩니다)
-          </div>
-        )}
-      </Card>
 
       {/* Row 3: Page Scan History */}
       <Card>
