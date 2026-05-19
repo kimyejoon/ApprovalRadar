@@ -59,6 +59,53 @@ def _reload_settings_keys():
         logger.error(f"[settings] API 키 갱신 중 오류: {e}")
 
 
+def _recalculate_optimal_settings():
+    """API 키 수 변경에 맞춰 Rolling Scan 페이지 수와 크롤링 주기를 자동 최적화합니다."""
+    from app.core.config import settings, compute_optimal_defaults, _get_service_page_counts
+
+    num_keys = len(settings.API_KEYS)
+    if num_keys == 0:
+        return
+
+    try:
+        page_counts = _get_service_page_counts()
+        result = compute_optimal_defaults(
+            num_api_keys=num_keys,
+            services_page_counts=page_counts,
+            tail_ping_calls_per_cycle=len(settings.SERVICES) * 2,
+        )
+        if not result:
+            return
+
+        old_pages = settings.ROLLING_SCAN_PAGES_PER_CYCLE
+        new_pages = result["total_pages_per_cycle"]
+        old_interval = settings.SCRAPER_INTERVAL_MINUTES
+        new_interval = result["interval_minutes"]
+
+        changes = []
+        if old_pages != new_pages:
+            settings.ROLLING_SCAN_PAGES_PER_CYCLE = new_pages
+            changes.append(f"Rolling {old_pages}→{new_pages}p/주기")
+
+        if old_interval != new_interval:
+            settings.SCRAPER_INTERVAL_MINUTES = new_interval
+            try:
+                from app.core.scheduler import reschedule_scraper_job
+                reschedule_scraper_job(new_interval)
+            except Exception:
+                pass
+            changes.append(f"주기 {old_interval}→{new_interval}분")
+
+        if changes:
+            max_rot = max(result["rotation_hours"].values())
+            logger.info(
+                f"[자동 최적화] 키 {num_keys}개 기준: {', '.join(changes)}, "
+                f"1회전 ~{max_rot}h, API {result['budget_usage_pct']}%"
+            )
+    except Exception as e:
+        logger.warning(f"[자동 최적화] 계산 실패 (무시): {e}")
+
+
 # ─── 키 목록 조회 ────────────────────────────────────────────────────────────
 
 @router.get(
@@ -137,6 +184,7 @@ async def create_api_key(body: ApiKeyCreateRequest):
         raise HTTPException(status_code=500, detail="API 키 추가 실패")
 
     _reload_settings_keys()
+    _recalculate_optimal_settings()
     logger.info(f"[settings] API 키 추가: {_mask_key(key_value)} | 메모: {body.memo}")
 
     # ── 소진 상태 검증 및 크롤링 자동 재개 ──────────────────────────────────
@@ -226,6 +274,7 @@ async def update_api_key(key_id: int, body: ApiKeyUpdateRequest):
         raise HTTPException(status_code=500, detail="API 키 수정 실패")
 
     _reload_settings_keys()
+    _recalculate_optimal_settings()
     logger.info(f"[settings] API 키 수정: {_mask_key(row['key_value'])} | active={new_active}")
 
     return ApiKeyItem(
@@ -265,6 +314,7 @@ async def delete_api_key(key_id: int):
         raise HTTPException(status_code=500, detail="API 키 삭제 실패")
 
     _reload_settings_keys()
+    _recalculate_optimal_settings()
     logger.info(f"[settings] API 키 삭제: {masked}")
     return {"status": "ok", "deleted_key": masked}
 

@@ -224,24 +224,20 @@ class RollingScanner:
                 scanned += 1
                 continue
 
-            # ── 오늘 CHNG_DT 신규분 즉시 감지 ──────────────────────────
-            # fingerprint 상태와 무관하게, 오늘 변동분은 무조건 수집
-            # scraper 파이프라인이 DB 중복 필터 처리
-            today_items = [
-                item for item in items
+            # ── [관찰 모드] 오늘 CHNG_DT 존재 여부만 로깅 ──────────────
+            # 주력 탐지: Tail Ping + Shift/Pivot, fingerprint 불일치
+            # today_filter는 전략C(19:00)에서 교차검증
+            today_count_in_page = sum(
+                1 for item in items
                 if item.get("CHNG_DT", "") == today_str
-            ]
-            if today_items:
-                new_rows.extend(today_items)
-                today_found += len(today_items)
-                for ti in today_items:
-                    biz_name = ti.get("BSSH_NM", "업소명미상")
-                    lcns = ti.get("LCNS_NO", "?")
-                    reason = ti.get("CHNG_PRVNS", "")
-                    logger.info(
-                        f"[{svc}] 🔍 오늘 변동 감지: {biz_name} ({lcns}) "
-                        f"[사유: {reason or '미기재'}] @ page {page_start:,}"
-                    )
+            )
+            if today_count_in_page:
+                today_found += today_count_in_page
+                logger.debug(
+                    f"[{svc}] 📊 커서 {label} page {page_start:,}: "
+                    f"오늘({today_str}) {today_count_in_page}건 존재 "
+                    f"(관찰 모드, 수집은 Tail Ping/전략C에서)"
+                )
 
             # ── fingerprint 비교 ──────────────────────────────────
             current_fp = compute_page_fingerprint(items)

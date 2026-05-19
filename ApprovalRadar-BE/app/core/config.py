@@ -23,8 +23,8 @@ class Settings:
     # Crawler Settings
     MAX_WORKERS = 2
     GAP_SECONDS = 3.0   # 하위 호환성 유지
-    GAP_MIN = 1.5       # Jitter 최솟값(초) - WAF/IP 차단 방지용 무작위 지연
-    GAP_MAX = 4.0       # Jitter 최댓값(초)
+    GAP_MIN = 0.5       # Jitter 최솟값(초) - WAF 차단 시 키 전환으로 우회
+    GAP_MAX = 1.5       # Jitter 최댓값(초) - 축소하여 스캔 속도 향상
     # 탐색 최소주기 - .env의 SCRAPER_INTERVAL_MINUTES 로 오버라이드 가능 (기본값 30분)
     SCRAPER_INTERVAL_MINUTES: int = 30
     
@@ -97,7 +97,7 @@ def compute_optimal_defaults(
     daily_limit_per_key: int = 1000,
     services_page_counts: dict = None,
     target_rotation_hours: float = 3.0,
-    avg_api_delay_sec: float = 3.5,
+    avg_api_delay_sec: float = 2.5,
     tail_ping_calls_per_cycle: int = 4,
     safety_margin: float = 0.80,
 ) -> dict:

@@ -2,6 +2,7 @@
 import asyncio
 # pyrefly: ignore [missing-import]
 import httpx
+import time
 import threading
 import datetime
 from app.core.config import settings
@@ -23,6 +24,10 @@ class ApiClient:
     _usage: dict[str, dict] = {}
     # ✅ 키 회복 체크용 공유 AsyncClient (클래스 레벨)
     _recovery_client: "httpx.AsyncClient | None" = None
+    # ✅ 마지막으로 작동한 키 인덱스 (클래스 공유 → 키 로테이션 폭풍 방지)
+    _last_working_key_idx: int = 0
+    # ✅ 키 리프레시 최소 간격 (초)
+    _REFRESH_INTERVAL: float = 60.0
 
     # ─── 내부 유틸리티 ──────────────────────────────────────────────────────
 
@@ -143,7 +148,12 @@ class ApiClient:
         # 매 생성 시 DB에서 최신 키 리로드 (런타임 중 추가된 키 즉시 반영)
         settings._load_api_keys()
         self.api_keys = settings.API_KEYS.copy()
-        self.current_key_idx = 0
+        # ✅ 클래스 레벨 마지막 유효 키부터 시작 (키 로테이션 폭풍 방지)
+        with self._class_lock:
+            if self._last_working_key_idx < len(self.api_keys):
+                self.current_key_idx = self._last_working_key_idx
+            else:
+                self.current_key_idx = 0
         self.key_lock = threading.Lock()
         self.exhausted_keys = set()
         # WAF 동시 접근 방지: 키별 요청 직렬화 Lock
@@ -151,6 +161,8 @@ class ApiClient:
         self._session = self._create_session()
         # 이 세션에서의 총 API 호출 횟수 카운터 (CLI 보고용)
         self._call_count: int = 0
+        # ✅ 키 리프레시 타임스탬프
+        self._last_refresh_time: float = time.time()
 
     def refresh_keys(self):
         """DB에서 최신 API 키 리스트를 리프레시합니다.
@@ -267,6 +279,9 @@ class ApiClient:
 
         if code in ("INFO-000", "INFO-200"):
             ApiClient._increment_usage(api_key, service_id)
+            # ✅ 성공한 키 인덱스를 클래스에 공유 (다음 인스턴스 시작점)
+            with self._class_lock:
+                ApiClient._last_working_key_idx = self.current_key_idx
             return res
 
 
@@ -303,6 +318,12 @@ class ApiClient:
         - 한도 초과(INFO-300 등) 시 자동으로 키를 회전하고 재시도합니다.
         - 서버 에러(ERROR-500 등)나 네트워크 에러 발생 시 지수 백오프를 적용하여 재시도합니다.
         """
+        # ✅ 주기적 키 리프레시 (60초 간격, 런타임 중 추가된 키 반영)
+        now_ts = time.time()
+        if now_ts - self._last_refresh_time > self._REFRESH_INTERVAL:
+            self.refresh_keys()
+            self._last_refresh_time = now_ts
+
         self._call_count += 1  # 호출 횟수 카운터
         if ApiClient.is_exhausted():
             raise ApiKeysExhaustedError("All API keys are exhausted for today.")

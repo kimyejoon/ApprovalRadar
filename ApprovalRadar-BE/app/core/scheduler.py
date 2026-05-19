@@ -187,6 +187,15 @@ def start_scheduler():
     # 10분마다 소진 키 회복 체크 → 회복 시 즉시 크롤링 재가동
     scheduler.add_job(_check_api_key_recovery, 'interval', minutes=10, id="key_recovery_job")
 
+    # ✅ 독립 Tail Ping (5분 간격, 크롤링 주기와 무관)
+    # API 1회 호출로 Tail 변동 감지 → 변동 시 즉시 Scraper 트리거
+    # 감지 지연: 30분 → 5분으로 단축 (API 비용: ~288회/일)
+    from app.services.tail_ping_job import run_tail_ping, TAIL_PING_INTERVAL_MINUTES
+    scheduler.add_job(run_tail_ping, 'interval',
+                      minutes=TAIL_PING_INTERVAL_MINUTES,
+                      id="tail_ping_job")
+    logger.info(f"독립 Tail Ping 잡 등록: {TAIL_PING_INTERVAL_MINUTES}분 간격")
+
     # ✅ 세부업종(industry_type) 백필 6시간 주기 - Key 소진/네트워크 오류로 중단 시 자동 재시도
     scheduler.add_job(_backfill_job, 'interval', hours=6, id="backfill_job")
 
