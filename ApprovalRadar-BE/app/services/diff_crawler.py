@@ -59,6 +59,8 @@ class DiffCrawlerEngine:
         self._cb_consecutive_count: int = 0
         # [C] 빈 피벗 연속 주기 카운터: 일정 주기 초과 시 자동 re-bootstrap 트리거
         self._empty_pivot_cycles: int = 0
+        # [최적화] API 재정렬 감지 플래그 — find_true_tail()에서 설정, scan_for_updates()에서 소비
+        self._reshuffled: bool = False
 
     # ─── Bootstrap 독립 실행 ─────────────────────────────────────────────────
 
@@ -257,6 +259,7 @@ class DiffCrawlerEngine:
                     f"[{svc}] ⚠️ known_tail={known_tail:,} 위치에 데이터 없음! "
                     f"API 재정렬로 tail 축소 감지. 이진탐색으로 실제 tail 재탐색..."
                 )
+                self._reshuffled = True  # 호출자에게 재정렬 사실 전달
                 # known_tail을 0으로 취급하여 처음부터 탐색
                 known_tail = 0
             else:
@@ -695,7 +698,33 @@ class DiffCrawlerEngine:
         # ✅ Startup Check 제거됨 (Rolling Scan 듀얼 커서가 대체)
         # 기존: 기동 시 전체 피벗 순회(47~190회 API) → 제거
         # Rolling Scan이 듀얼 커서로 1.5~2.5시간 내 전체 데이터 검증
+        self._reshuffled = False  # 매 주기 초기화
         new_tail = await self.find_true_tail(known_tail=old_tail)
+
+        # ── [최적화] API 재정렬 감지 시 즉시 재부트스트랩 ──────────────────────
+        # 역방향 검증 실패 → 재정렬 확정. diff_count가 양수여도 신규 데이터가 아님.
+        # 피벗도 전부 stale → 직접 수집/Shift 분석 모두 무의미. 즉시 재부트스트랩.
+        if self._reshuffled:
+            logger.warning(
+                f"[{svc}] 🔄 API 재정렬 감지 (known_tail 역방향 검증 실패) "
+                f"→ Tail={new_tail:,}으로 갱신 후 즉시 재부트스트랩"
+            )
+            state["last_total_count"] = new_tail
+            state["pivots"] = {}  # 피벗 초기화
+            state["_bootstrapping"] = True
+            self.state_repo.save_state(self.service_id, state)
+
+            import threading
+            def _bg_bootstrap():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(self._run_bootstrap_standalone())
+                finally:
+                    loop.close()
+            threading.Thread(target=_bg_bootstrap, daemon=True, name=f"reshuffle-bootstrap-{svc}").start()
+            logger.info(f"[{svc}] 🔄 백그라운드 재부트스트랩 시작됨 (API 재정렬 대응)")
+            return []
 
         if new_tail <= old_tail:
             elapsed = time.time() - start_time
