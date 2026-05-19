@@ -172,10 +172,15 @@ class RollingScanner:
         db_miss_count = 0  # DB 미존재 레코드 수
         today_str = datetime.now().strftime("%Y%m%d")
 
-        # DB batch 조회를 위한 커넥션 (재사용)
-        from database import get_db
-        from app.repositories.business_repository import BusinessRepository
-        db_conn = get_db().__enter__()
+        # ── 인사이트 통계 수집용 ──
+        all_chng_dts = []   # 전체 CHNG_DT 수집 (분포 분석)
+        lcns_sort_asc = 0   # LCNS_NO 오름차순 페이지 수
+        lcns_sort_desc = 0  # LCNS_NO 내림차순 페이지 수
+        lcns_no_sort = 0    # 정렬 불명 페이지 수
+
+        # DB batch 조회용 — 스레드 로컬 캐싱 커넥션 (close하지 않음)
+        from database import _get_thread_conn
+        db_conn = _get_thread_conn()
 
         logger.info(
             f"[{svc}] 📡 커서 {label} 스캔 시작: "
@@ -291,25 +296,55 @@ class RollingScanner:
                         f"fingerprint 불일치 (DB miss 체크에서 이미 처리)"
                     )
 
+                # ── [인사이트] 페이지별 CHNG_DT/LCNS_NO 통계 ──────────────
+                page_chng_dts = [item.get("CHNG_DT", "") for item in items if item.get("CHNG_DT")]
+                all_chng_dts.extend(page_chng_dts)
+
+                # LCNS_NO 정렬 패턴 분석
+                lcns_nos = [item.get("LCNS_NO", "") for item in items if item.get("LCNS_NO")]
+                if len(lcns_nos) >= 2:
+                    is_asc = all(lcns_nos[i] <= lcns_nos[i+1] for i in range(min(10, len(lcns_nos)-1)))
+                    is_desc = all(lcns_nos[i] >= lcns_nos[i+1] for i in range(min(10, len(lcns_nos)-1)))
+                    if is_asc:
+                        lcns_sort_asc += 1
+                    elif is_desc:
+                        lcns_sort_desc += 1
+                    else:
+                        lcns_no_sort += 1
+
                 # fingerprint 갱신
                 fingerprints[str(page_start)] = current_fp
                 cursor += PAGE_SIZE
                 scanned += 1
 
-                # 매 10페이지마다 진행률 로그
+                # 매 10페이지마다 진행률 + 인사이트 로그
                 if scanned % 10 == 0:
+                    # CHNG_DT 분포 분석
+                    insight = ""
+                    if all_chng_dts:
+                        sorted_dts = sorted(all_chng_dts)
+                        oldest = sorted_dts[0]
+                        newest = sorted_dts[-1]
+                        # 연도별 분포 요약
+                        year_dist = {}
+                        for dt in all_chng_dts:
+                            yr = dt[:4] if len(dt) >= 4 else "????"
+                            year_dist[yr] = year_dist.get(yr, 0) + 1
+                        top_years = sorted(year_dist.items(), key=lambda x: -x[1])[:3]
+                        yr_summary = " ".join(f"{y}:{c}" for y, c in top_years)
+                        sort_pattern = (
+                            f"LCNS정렬:↑{lcns_sort_asc}/↓{lcns_sort_desc}/∅{lcns_no_sort}"
+                        )
+                        insight = f" | DT범위:{oldest}~{newest} 연도분포:[{yr_summary}] {sort_pattern}"
+
                     logger.info(
                         f"[{svc}] 📊 커서 {label} 진행: {scanned}/{max_pages}p "
                         f"(일치:{match_count} 신규FP:{new_fp_count} 불일치:{mismatched} "
-                        f"DB미존재:{db_miss_count} 오늘:{today_found}) 현재 page={page_start:,}"
+                        f"DB미존재:{db_miss_count} 오늘:{today_found}){insight}"
                     )
 
         finally:
-            # DB 커넥션 정리
-            try:
-                db_conn.close()
-            except Exception:
-                pass
+            pass  # _get_thread_conn()은 스레드 로컬 캐싱 — close하지 않음
 
         # 커서별 완료 요약
         if today_found > 0:
