@@ -454,7 +454,7 @@ class RollingScanner:
                 stored_fp = fingerprints.get(str(page_start), "")
 
                 # 스캔 시각 기록
-                scan_times[str(page_start)] = datetime.now().strftime("%H:%M:%S")
+                scan_times[str(page_start)] = datetime.now().isoformat()
 
                 if not stored_fp:
                     # 첫 스캔: fingerprint 신규 저장
@@ -630,7 +630,7 @@ class RollingScanner:
 
                 # 스캔 시각 기록
                 if scan_times is not None:
-                    scan_times[str(page_start)] = datetime.now().strftime("%H:%M:%S")
+                    scan_times[str(page_start)] = datetime.now().isoformat()
 
                 # DB batch miss 체크
                 lcns_list = []
