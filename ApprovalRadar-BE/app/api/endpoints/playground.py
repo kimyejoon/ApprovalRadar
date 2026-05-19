@@ -381,3 +381,84 @@ async def get_tail_history(service_id: str = "I2861"):
     ]
 
     return TailHistoryResponse(service_id=service_id, entries=entries)
+
+
+# ─── CHNG_DT Poller 트렌드 ──────────────────────────────────────────────────
+
+class ChngDtPollEntry(BaseModel):
+    polled_at: str
+    total_api_count: int
+    new_inserted: int
+    already_exists: int
+    pages_fetched: int
+    elapsed_sec: float
+
+
+class ChngDtTrendResponse(BaseModel):
+    target_date: str
+    entries: List[ChngDtPollEntry]
+    latest_total: int
+    total_inserted: int
+
+
+@router.get("/chng-dt-trend")
+async def get_chng_dt_trend():
+    """
+    CHNG_DT Poller 시간별 트렌드 데이터.
+    어제+오늘 날짜의 폴링 이력을 반환합니다.
+    """
+    from datetime import timedelta
+
+    now = datetime.now()
+    today_str = now.strftime("%Y%m%d")
+    yesterday_str = (now - timedelta(days=1)).strftime("%Y%m%d")
+
+    with get_db() as conn:
+        # 어제 + 오늘 이력 조회
+        rows = conn.execute(
+            """SELECT poll_date, polled_at, total_api_count, new_inserted,
+                      already_exists, pages_fetched, elapsed_sec
+               FROM chng_dt_poll_history
+               WHERE poll_date IN (?, ?)
+               ORDER BY polled_at ASC""",
+            (yesterday_str, today_str)
+        ).fetchall()
+
+    # 날짜별로 그룹핑
+    yesterday_entries = []
+    today_entries = []
+    for r in rows:
+        entry = ChngDtPollEntry(
+            polled_at=r["polled_at"],
+            total_api_count=r["total_api_count"],
+            new_inserted=r["new_inserted"],
+            already_exists=r["already_exists"],
+            pages_fetched=r["pages_fetched"],
+            elapsed_sec=r["elapsed_sec"],
+        )
+        if r["poll_date"] == yesterday_str:
+            yesterday_entries.append(entry)
+        else:
+            today_entries.append(entry)
+
+    # 현재 시간대에 따라 주 대상 결정
+    if now.hour >= 19:
+        primary_date = today_str
+        primary_entries = today_entries
+    else:
+        primary_date = yesterday_str
+        primary_entries = yesterday_entries
+
+    latest_total = primary_entries[-1].total_api_count if primary_entries else 0
+    total_inserted = sum(e.new_inserted for e in primary_entries)
+
+    return {
+        "target_date": primary_date,
+        "entries": [e.model_dump() for e in primary_entries],
+        "latest_total": latest_total,
+        "total_inserted": total_inserted,
+        "yesterday_date": yesterday_str,
+        "yesterday_entries": [e.model_dump() for e in yesterday_entries],
+        "today_date": today_str,
+        "today_entries": [e.model_dump() for e in today_entries],
+    }

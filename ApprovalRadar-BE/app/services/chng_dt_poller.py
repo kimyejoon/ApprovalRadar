@@ -1,23 +1,19 @@
 """
 I2500 CHNG_DT 폴러 — 3-Way 전략의 세 번째 축.
 
-매 5분 간격으로 I2500 서비스에 CHNG_DT=오늘 파라미터를 넣어
-당일 변동된 업소 목록을 직접 조회합니다.
+매 5분 간격으로 I2500 서비스에 CHNG_DT 파라미터를 넣어
+변동 업소 목록을 직접 조회합니다.
 
-I2500은 I2861과 달리 CHNG_DT 필터가 실제 작동하므로,
-오늘 변경된 레코드를 즉시 가져올 수 있습니다.
+시간대별 전략:
+  - 00:00~18:59 → "어제" 날짜 폴링 (당일 데이터는 19:00 이후에야 반영)
+  - 19:00~23:59 → "오늘" 날짜 폴링 (주 대상) + "어제" 보조 폴링
 
-I2500 응답 필드:
-  PRSDNT_NM, INDUTY_CD_NM, PRMS_DT, LCNS_NO, BSSH_NM, TELNO, ADDR
-  (CHNG_DT 필드는 응답에 미포함 — 요청 파라미터로만 사용)
-
-기존 I2861 Rolling Scan과 Tail Ping이 놓칠 수 있는
-당일 변동분을 직접 감지하여 DB INSERT + SSE 발행합니다.
-
-API 비용: 최대 5~6회/주기 (5000건 기준 5페이지)
+매 폴링 결과는 chng_dt_poll_history 테이블에 영속 저장되어
+플레이그라운드에서 시간별 트렌드 차트를 그릴 수 있습니다.
 """
 import asyncio
 import datetime
+import time
 
 from app.core.logger import logger
 from app.core.events import shutdown_event
@@ -30,7 +26,6 @@ PAGE_SIZE = 1000
 POLL_INTERVAL_MINUTES = 5
 
 # I2500 → businesses 테이블 필드 매핑
-# I2500은 I2861과 필드명이 다르지만 LCNS_NO는 동일
 FIELD_MAP = {
     "LCNS_NO": "license_no",
     "BSSH_NM": "business_name",
@@ -38,25 +33,29 @@ FIELD_MAP = {
     "PRSDNT_NM": "representative_name",
     "TELNO": "phone_number",
     "INDUTY_CD_NM": "industry_type",
-    "PRMS_DT": "license_date",  # 인허가일자
+    "PRMS_DT": "license_date",
 }
 
 
-async def poll_today_changes(target_date: str = None):
+async def poll_changes_for_date(target_date: str) -> dict:
     """
-    I2500 CHNG_DT=오늘 조회 → DB에 없는 건만 INSERT.
+    I2500 CHNG_DT=target_date 조회 → DB에 없는 건만 INSERT.
 
     Args:
-        target_date: 조회할 날짜 (YYYYMMDD). None이면 오늘.
+        target_date: 조회할 날짜 (YYYYMMDD).
 
     Returns:
-        dict: {"total": API 전체, "new": 신규 INSERT, "skipped": 중복 스킵}
+        dict: {"total": API 전체, "new": 신규 INSERT, "skipped": 중복 스킵,
+               "date": 대상날짜, "pages": 페이지수, "elapsed": 소요시간}
     """
-    today_str = target_date or datetime.date.today().strftime("%Y%m%d")
-    result = {"total": 0, "new": 0, "skipped": 0, "date": today_str}
+    start_time = time.time()
+    result = {
+        "total": 0, "new": 0, "skipped": 0,
+        "date": target_date, "pages": 0, "elapsed": 0.0
+    }
 
     if ApiClient.is_exhausted():
-        logger.debug("[CHNG_DT Poller] API 키 소진 → 스킵")
+        logger.debug(f"[CHNG_DT Poller] API 키 소진 → {target_date} 스킵")
         return result
 
     if shutdown_event.is_set():
@@ -65,8 +64,6 @@ async def poll_today_changes(target_date: str = None):
     try:
         async with ApiClient() as api_client:
             # ── Step 1: 전체 페이지 순회 (빈 페이지까지 반복) ──
-            # ⚠️ I2500의 total_count는 endIdx와 동일값을 반환하므로 신뢰 불가
-            # → INFO-200(데이터 없음) 또는 반환 건수 < PAGE_SIZE 까지 반복
             all_items = []
             page = 1
             MAX_PAGES = 20  # 안전장치 (20,000건 상한)
@@ -76,26 +73,25 @@ async def poll_today_changes(target_date: str = None):
                 end = page * PAGE_SIZE
 
                 page_res = await api_client.fetch_data(
-                    SERVICE_ID, start, end, CHNG_DT=today_str, timeout=15
+                    SERVICE_ID, start, end, CHNG_DT=target_date, timeout=15
                 )
 
                 if not page_res or SERVICE_ID not in page_res:
-                    logger.warning(f"[CHNG_DT Poller] 페이지 {start}~{end} 응답 없음")
+                    logger.warning(f"[CHNG_DT Poller] {target_date} 페이지 {start}~{end} 응답 없음")
                     break
 
                 block = page_res[SERVICE_ID]
                 code = block.get("RESULT", {}).get("CODE", "")
 
                 if code == "INFO-200":
-                    # 데이터 없음 = 끝
                     if page == 1:
-                        logger.info(f"[CHNG_DT Poller] CHNG_DT={today_str} 변동분 없음")
+                        logger.info(f"[CHNG_DT Poller] CHNG_DT={target_date} 변동분 없음 (INFO-200)")
                     else:
-                        logger.info(f"[CHNG_DT Poller] 페이지 {page} INFO-200 → 수집 완료")
+                        logger.info(f"[CHNG_DT Poller] {target_date} 페이지 {page} → INFO-200, 수집 완료")
                     break
 
                 if code != "INFO-000":
-                    logger.warning(f"[CHNG_DT Poller] 페이지 {page} 응답 코드: {code}")
+                    logger.warning(f"[CHNG_DT Poller] {target_date} 페이지 {page} 응답 코드: {code}")
                     break
 
                 rows = block.get("row", [])
@@ -103,30 +99,28 @@ async def poll_today_changes(target_date: str = None):
                     break
 
                 all_items.extend(rows)
-                logger.info(
-                    f"[CHNG_DT Poller] 페이지 {page}({start}~{end}): {len(rows)}건"
-                )
 
                 if len(rows) < PAGE_SIZE:
-                    # 마지막 페이지 (1000건 미만 반환)
                     break
 
                 page += 1
-
                 if shutdown_event.is_set():
                     break
 
             result["total"] = len(all_items)
+            result["pages"] = page if all_items else 0
 
             if not all_items:
+                result["elapsed"] = round(time.time() - start_time, 1)
+                _save_poll_history(result)
                 return result
 
             logger.info(
-                f"[CHNG_DT Poller] I2500 CHNG_DT={today_str} 전체 {len(all_items):,}건 수집 완료 "
-                f"({page}페이지)"
+                f"[CHNG_DT Poller] I2500 CHNG_DT={target_date}: "
+                f"{len(all_items):,}건 수집 ({page}p)"
             )
 
-            # ── Step 2: DB 중복 체크 (LCNS, CHNG_DT 쌍) ──
+            # ── Step 2: DB 중복 체크 (LCNS, event_date 쌍) ──
             lcns_list = [item.get("LCNS_NO", "") for item in all_items if item.get("LCNS_NO")]
             existing_pairs = set()
 
@@ -148,53 +142,55 @@ async def poll_today_changes(target_date: str = None):
                 lcns = item.get("LCNS_NO", "")
                 if not lcns:
                     continue
-                # I2500 응답에는 CHNG_DT 필드가 없음 → 요청 파라미터의 날짜 사용
-                pair = (lcns, today_str)
+                pair = (lcns, target_date)
                 if pair not in existing_pairs:
                     new_items.append(item)
-                    existing_pairs.add(pair)  # 중복 방지
+                    existing_pairs.add(pair)
 
             result["skipped"] = len(all_items) - len(new_items)
 
             if not new_items:
                 logger.info(
-                    f"[CHNG_DT Poller] {len(all_items):,}건 모두 이미 수집됨 "
-                    f"→ Rolling Scan이 정상 작동 중 ✅"
+                    f"[CHNG_DT Poller] {target_date}: {len(all_items):,}건 전부 기존 수집됨 "
+                    f"→ Rolling Scan 정상 커버 중 ✅"
                 )
+                result["elapsed"] = round(time.time() - start_time, 1)
+                _save_poll_history(result)
                 return result
 
             # ── Step 4: I2500 → I2861 형식으로 변환하여 scraper 파이프라인 처리 ──
             mapped_rows = []
             for item in new_items:
-                # I2861 형식으로 변환 (scraper가 기대하는 필드)
                 i2861_row = {
                     "LCNS_NO": item.get("LCNS_NO", ""),
                     "BSSH_NM": item.get("BSSH_NM", ""),
                     "SITE_ADDR": item.get("ADDR", ""),
                     "PRSDNT_NM": item.get("PRSDNT_NM", ""),
-                    "BSN_STATE_NM": None,  # I2500에 없는 필드
+                    "BSN_STATE_NM": None,
                     "PRMS_DT": item.get("PRMS_DT", ""),
                     "TELNO": item.get("TELNO", ""),
                     "INDUTY_CD_NM": item.get("INDUTY_CD_NM", ""),
-                    "CHNG_DT": today_str,  # 요청 파라미터에서 사용
-                    # I2861 추가 필드 (I2500에 없음)
+                    "CHNG_DT": target_date,
                     "SITE_ADDR_RDN": item.get("ADDR", ""),
                 }
                 mapped_rows.append(i2861_row)
 
             logger.info(
-                f"[CHNG_DT Poller] 🆕 DB 미수집 {len(new_items):,}/{len(all_items):,}건 "
-                f"→ scraper 파이프라인 처리"
+                f"[CHNG_DT Poller] 🆕 {target_date}: "
+                f"신규 {len(new_items):,}/{len(all_items):,}건 → scraper 파이프라인"
             )
 
-            # scraper 파이프라인으로 위임
             from scraper import run_scraper_for_service_with_rows
             await run_scraper_for_service_with_rows("I2861", mapped_rows)
             result["new"] = len(new_items)
 
+            elapsed = round(time.time() - start_time, 1)
+            result["elapsed"] = elapsed
+
             logger.info(
-                f"🔔 [CHNG_DT Poller] 완료: CHNG_DT={today_str} "
-                f"전체 {len(all_items):,}건 중 신규 {len(new_items):,}건 INSERT → SSE 발행"
+                f"🔔 [CHNG_DT Poller] 완료: CHNG_DT={target_date} "
+                f"API {len(all_items):,}건 → 신규 {len(new_items):,}건 INSERT, "
+                f"기존 {result['skipped']:,}건 ({elapsed}초, {page}p)"
             )
 
     except ApiKeysExhaustedError:
@@ -202,9 +198,72 @@ async def poll_today_changes(target_date: str = None):
     except Exception as e:
         logger.error(f"[CHNG_DT Poller] 오류: {e}", exc_info=True)
 
+    result["elapsed"] = round(time.time() - start_time, 1)
+    _save_poll_history(result)
     return result
+
+
+def _save_poll_history(result: dict):
+    """폴링 결과를 DB에 영속 저장."""
+    try:
+        now_iso = datetime.datetime.now().isoformat()
+        with get_db() as conn:
+            conn.execute(
+                """INSERT INTO chng_dt_poll_history
+                   (poll_date, polled_at, total_api_count, new_inserted,
+                    already_exists, pages_fetched, elapsed_sec)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    result["date"], now_iso,
+                    result["total"], result["new"],
+                    result["skipped"], result["pages"],
+                    result["elapsed"]
+                )
+            )
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"[CHNG_DT Poller] 이력 저장 실패: {e}")
+
+
+async def _run_poller_async():
+    """
+    시간대별 폴링 전략:
+    - 00:00~18:59 → 어제 날짜만 폴링
+    - 19:00~23:59 → 오늘 폴링 (주) + 어제 보조 폴링
+    """
+    now = datetime.datetime.now()
+    today_str = now.strftime("%Y%m%d")
+    yesterday_str = (now - datetime.timedelta(days=1)).strftime("%Y%m%d")
+    hour = now.hour
+
+    if hour >= 19:
+        # 19:00 이후: 오늘 (주) + 어제 (보조)
+        logger.info(
+            f"[전략C] 🕐 {hour}시 → 오늘({today_str}) 주 폴링 + 어제({yesterday_str}) 보조"
+        )
+        today_result = await poll_changes_for_date(today_str)
+        yesterday_result = await poll_changes_for_date(yesterday_str)
+
+        logger.info(
+            f"[전략C] 📊 결과: 오늘({today_str}) API {today_result['total']:,}건 "
+            f"→ 신규 {today_result['new']}건 | "
+            f"어제({yesterday_str}) API {yesterday_result['total']:,}건 "
+            f"→ 신규 {yesterday_result['new']}건"
+        )
+    else:
+        # 00:00~18:59: 어제만
+        logger.info(
+            f"[전략C] 🕐 {hour}시 → 어제({yesterday_str}) 폴링 (당일 데이터 19시 이후 반영)"
+        )
+        yesterday_result = await poll_changes_for_date(yesterday_str)
+
+        logger.info(
+            f"[전략C] 📊 결과: 어제({yesterday_str}) API {yesterday_result['total']:,}건 "
+            f"→ 신규 {yesterday_result['new']}건 / 기존 {yesterday_result['skipped']:,}건 "
+            f"({yesterday_result['elapsed']}초)"
+        )
 
 
 def run_chng_dt_poller():
     """스케줄러 동기 래퍼."""
-    asyncio.run(poll_today_changes())
+    asyncio.run(_run_poller_async())

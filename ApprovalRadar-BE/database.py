@@ -191,6 +191,21 @@ def init_db():
     ''')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_business_memos_key ON business_memos (license_date, business_name);')
 
+    # ── CHNG_DT Poller 이력 테이블 (전략C 시간별 트렌드 추적) ──
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chng_dt_poll_history (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            poll_date       TEXT NOT NULL,
+            polled_at       TEXT NOT NULL,
+            total_api_count INTEGER DEFAULT 0,
+            new_inserted    INTEGER DEFAULT 0,
+            already_exists  INTEGER DEFAULT 0,
+            pages_fetched   INTEGER DEFAULT 0,
+            elapsed_sec     REAL DEFAULT 0
+        )
+    ''')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_chng_dt_poll_date ON chng_dt_poll_history (poll_date);')
+
     if has_crawler_state:
         cursor.execute("PRAGMA table_info(crawler_state)")
         columns = [row[1] for row in cursor.fetchall()]
