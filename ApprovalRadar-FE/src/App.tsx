@@ -4,6 +4,7 @@ import type { ActiveTab } from '@/components/layout/DashboardLayout';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { LogPage } from '@/pages/LogPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { PlaygroundPage } from '@/pages/PlaygroundPage';
 import { ToastProvider } from '@/components/ui/toast';
 import { useSSE } from '@/hooks/useSSE';
 import { SystemAlertPopup } from '@/components/ui/SystemAlertPopup';
@@ -61,6 +62,7 @@ export default function App() {
         {activeTab === 'dashboard' && <DashboardPage />}
         {activeTab === 'logs' && <LogPage />}
         {activeTab === 'settings' && <SettingsPage />}
+        {activeTab === 'playground' && <PlaygroundPage />}
       </DashboardLayout>
       <ToastProvider />
       <SystemAlertPopup />

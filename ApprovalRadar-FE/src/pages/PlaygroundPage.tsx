@@ -1,0 +1,395 @@
+import { useState, useEffect, useCallback } from 'react';
+import { ArrowClockwise, Play, RocketLaunch, Broadcast, MagnifyingGlass, Lightning } from '@phosphor-icons/react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
+import { API_BASE_URL } from '@/lib/api';
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface JobStatus {
+  job_id: string;
+  name: string;
+  next_run: string | null;
+  seconds_remaining: number | null;
+  is_running: boolean;
+}
+
+interface SchedulerStatus {
+  jobs: JobStatus[];
+  current_time: string;
+}
+
+interface TodayDetection {
+  today_date: string;
+  today_count: number;
+  total_records: number;
+  scan_coverage_pct: number;
+  recent_detections: {
+    business_name: string;
+    license_no: string;
+    industry_type: string;
+    event_date: string;
+    updated_at: string;
+    update_type: string;
+  }[];
+}
+
+interface TailHistoryEntry {
+  record_date: string;
+  total_count: number;
+}
+
+interface PageScanEntry {
+  page_number: number;
+  page_start: number;
+  fingerprint: string | null;
+}
+
+// ─── API Helpers ────────────────────────────────────────────────────────────
+
+const BASE = `${API_BASE_URL}/api/v1/playground`;
+
+async function fetchSchedulerStatus(): Promise<SchedulerStatus> {
+  const res = await fetch(`${BASE}/scheduler-status`);
+  if (!res.ok) throw new Error('Failed');
+  return res.json();
+}
+
+async function triggerJob(jobType: string): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${BASE}/trigger/${jobType}`, { method: 'POST' });
+  return res.json();
+}
+
+async function fetchTodayDetection(): Promise<TodayDetection> {
+  const res = await fetch(`${BASE}/today-detection/I2861`);
+  if (!res.ok) throw new Error('Failed');
+  return res.json();
+}
+
+async function fetchTailHistory(): Promise<TailHistoryEntry[]> {
+  const res = await fetch(`${BASE}/tail-history/I2861`);
+  if (!res.ok) throw new Error('Failed');
+  const data = await res.json();
+  return data.entries;
+}
+
+async function fetchPageScanHistory(): Promise<{ total_pages: number; scanned_pages: number; entries: PageScanEntry[] }> {
+  const res = await fetch(`${BASE}/page-scan-history/I2861`);
+  if (!res.ok) throw new Error('Failed');
+  return res.json();
+}
+
+// ─── Helper Components ──────────────────────────────────────────────────────
+
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`bg-surface border border-border-standard rounded-xl p-5 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
+  return (
+    <h2 className="flex items-center gap-2 text-base font-semibold mb-4 text-text-primary">
+      {icon}
+      {title}
+    </h2>
+  );
+}
+
+function formatRemaining(sec: number | null): string {
+  if (sec === null || sec < 0) return '—';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// ─── Main Page ──────────────────────────────────────────────────────────────
+
+export function PlaygroundPage() {
+  const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
+  const [today, setToday] = useState<TodayDetection | null>(null);
+  const [tailHistory, setTailHistory] = useState<TailHistoryEntry[]>([]);
+  const [pageScan, setPageScan] = useState<{ total_pages: number; scanned_pages: number; entries: PageScanEntry[] } | null>(null);
+  const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [sched, det, tail, pages] = await Promise.all([
+        fetchSchedulerStatus(),
+        fetchTodayDetection(),
+        fetchTailHistory(),
+        fetchPageScanHistory(),
+      ]);
+      setScheduler(sched);
+      setToday(det);
+      setTailHistory(tail);
+      setPageScan(pages);
+    } catch (e) {
+      console.error('Playground refresh failed:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const timer = setInterval(refresh, 10000); // 10초 자동 갱신
+    return () => clearInterval(timer);
+  }, [refresh]);
+
+  const handleTrigger = async (jobType: string) => {
+    setLoading(true);
+    setTriggerMsg(null);
+    try {
+      const result = await triggerJob(jobType);
+      setTriggerMsg(result.message);
+      setTimeout(() => setTriggerMsg(null), 5000);
+    } catch {
+      setTriggerMsg('트리거 실패');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-text-primary">크롤러 플레이그라운드</h1>
+          <p className="text-sm text-text-muted mt-0.5">실시간 크롤러 모니터링 및 수동 제어</p>
+        </div>
+        <button
+          onClick={refresh}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-border-standard hover:bg-surface transition-colors text-text-secondary"
+        >
+          <ArrowClockwise className="w-4 h-4" />
+          새로고침
+        </button>
+      </div>
+
+      {/* Toast */}
+      {triggerMsg && (
+        <div className="fixed top-4 right-4 z-50 bg-brand text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium animate-in slide-in-from-top-2">
+          {triggerMsg}
+        </div>
+      )}
+
+      {/* Row 1: Scheduler + Triggers */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Scheduler Status */}
+        <Card>
+          <SectionTitle icon={<ArrowClockwise className="w-5 h-5 text-brand" />} title="스케줄러 상태" />
+          {scheduler ? (
+            <div className="space-y-2">
+              <p className="text-xs text-text-muted mb-3">현재 시각: {scheduler.current_time}</p>
+              <div className="space-y-1.5">
+                {scheduler.jobs.map((job) => (
+                  <div
+                    key={job.job_id}
+                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-background text-sm"
+                  >
+                    <span className="text-text-secondary truncate max-w-[60%]">{job.name}</span>
+                    <div className="flex items-center gap-3">
+                      {job.next_run && (
+                        <span className="text-xs text-text-muted">{job.next_run}</span>
+                      )}
+                      <span className={`font-mono text-xs px-2 py-0.5 rounded ${
+                        job.seconds_remaining !== null && job.seconds_remaining < 60
+                          ? 'bg-brand/15 text-brand font-semibold'
+                          : 'bg-border-subtle text-text-muted'
+                      }`}>
+                        {formatRemaining(job.seconds_remaining)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-text-muted">로딩 중...</div>
+          )}
+        </Card>
+
+        {/* Trigger Buttons */}
+        <Card>
+          <SectionTitle icon={<Lightning className="w-5 h-5 text-yellow-500" />} title="수동 트리거" />
+          <p className="text-xs text-text-muted mb-4">사이클 사이 Term에서 즉시 실행합니다.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => handleTrigger('rolling_scan')}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-border-standard bg-background hover:bg-surface transition-all text-sm font-medium text-text-primary disabled:opacity-50"
+            >
+              <ArrowClockwise className="w-4 h-4 text-blue-400" />
+              Rolling Scan
+            </button>
+            <button
+              onClick={() => handleTrigger('boost_scan')}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-brand/30 bg-brand/5 hover:bg-brand/10 transition-all text-sm font-medium text-brand disabled:opacity-50"
+            >
+              <RocketLaunch className="w-4 h-4" />
+              Boost Scan
+            </button>
+            <button
+              onClick={() => handleTrigger('tail_ping')}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-border-standard bg-background hover:bg-surface transition-all text-sm font-medium text-text-primary disabled:opacity-50"
+            >
+              <Broadcast className="w-4 h-4 text-purple-400" />
+              Tail Ping
+            </button>
+            <button
+              onClick={() => handleTrigger('scraper')}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-border-standard bg-background hover:bg-surface transition-all text-sm font-medium text-text-primary disabled:opacity-50"
+            >
+              <MagnifyingGlass className="w-4 h-4 text-orange-400" />
+              Scraper
+            </button>
+          </div>
+        </Card>
+      </div>
+
+      {/* Row 2: Today Detection + Tail History Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Today Detection */}
+        <Card>
+          <SectionTitle icon={<Play className="w-5 h-5 text-red-400" />} title="오늘 감지 현황" />
+          {today ? (
+            <div>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="text-center p-3 rounded-lg bg-background">
+                  <div className="text-2xl font-bold text-brand">{today.today_count}</div>
+                  <div className="text-xs text-text-muted mt-1">오늘 변동건</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-background">
+                  <div className="text-2xl font-bold text-text-primary">{today.total_records.toLocaleString()}</div>
+                  <div className="text-xs text-text-muted mt-1">전체 레코드</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-background">
+                  <div className="text-2xl font-bold text-blue-400">{today.scan_coverage_pct}%</div>
+                  <div className="text-xs text-text-muted mt-1">FP 커버리지</div>
+                </div>
+              </div>
+
+              {/* Recent Detections */}
+              {today.recent_detections.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-xs font-medium text-text-muted mb-2">최근 감지 (오늘)</h3>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {today.recent_detections.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between px-3 py-1.5 rounded bg-background text-xs">
+                        <span className="text-text-primary truncate max-w-[40%]">{d.business_name}</span>
+                        <span className="text-text-muted">{d.industry_type}</span>
+                        <span className="text-brand font-mono">{d.update_type || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-text-muted">로딩 중...</div>
+          )}
+        </Card>
+
+        {/* Tail History Bar Chart */}
+        <Card>
+          <SectionTitle icon={<Broadcast className="w-5 h-5 text-purple-400" />} title="일별 Known Tail 추이" />
+          {tailHistory.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={tailHistory} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+                  <XAxis
+                    dataKey="record_date"
+                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                    tickFormatter={(v: string) => v.slice(5)}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                    tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+                    domain={['dataMin - 1000', 'dataMax + 1000']}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--surface)',
+                      border: '1px solid var(--border-standard)',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                    }}
+                    labelStyle={{ color: 'var(--text-secondary)' }}
+                    formatter={(value: number) => [`${value.toLocaleString()}건`, 'Total Count']}
+                    labelFormatter={(label: string) => `날짜: ${label}`}
+                  />
+                  <Bar dataKey="total_count" radius={[4, 4, 0, 0]}>
+                    {tailHistory.map((_, index) => (
+                      <Cell
+                        key={index}
+                        fill={index === tailHistory.length - 1 ? '#3ecf8e' : 'rgba(62, 207, 142, 0.3)'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-sm text-text-muted">
+              데이터 수집 중... (Tail Ping 실행 후 표시됩니다)
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Row 3: Page Scan History */}
+      <Card>
+        <SectionTitle icon={<MagnifyingGlass className="w-5 h-5 text-orange-400" />} title="페이지 스캔 히스토리" />
+        {pageScan ? (
+          <div>
+            <div className="flex items-center gap-4 mb-4">
+              <span className="text-sm text-text-secondary">
+                전체 {pageScan.total_pages}p 중 <span className="text-brand font-semibold">{pageScan.scanned_pages}p</span> 스캔 완료
+              </span>
+              <div className="flex-1 h-2 bg-border-subtle rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-brand rounded-full transition-all"
+                  style={{ width: `${pageScan.total_pages > 0 ? (pageScan.scanned_pages / pageScan.total_pages * 100) : 0}%` }}
+                />
+              </div>
+              <span className="text-sm text-text-muted font-mono">
+                {pageScan.total_pages > 0 ? (pageScan.scanned_pages / pageScan.total_pages * 100).toFixed(1) : 0}%
+              </span>
+            </div>
+
+            {/* Heatmap-style page grid */}
+            <div className="flex flex-wrap gap-[2px]">
+              {pageScan.entries.map((e) => (
+                <div
+                  key={e.page_number}
+                  className={`w-3 h-3 rounded-[2px] transition-colors cursor-pointer ${
+                    e.fingerprint ? 'bg-brand/60 hover:bg-brand' : 'bg-border-subtle hover:bg-border-standard'
+                  }`}
+                  title={`Page ${e.page_number} (${e.page_start.toLocaleString()}~) ${e.fingerprint ? `FP: ${e.fingerprint}` : '미스캔'}`}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-4 mt-3 text-xs text-text-muted">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-[2px] bg-brand/60" />
+                스캔 완료
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-[2px] bg-border-subtle" />
+                미스캔
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-text-muted">로딩 중...</div>
+        )}
+      </Card>
+    </div>
+  );
+}

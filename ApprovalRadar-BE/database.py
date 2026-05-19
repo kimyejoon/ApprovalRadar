@@ -220,6 +220,17 @@ def init_db():
         )
     ''')
 
+    # Tail(total_count) 일별 변화 추적 테이블
+    cursor.execute('''\
+        CREATE TABLE IF NOT EXISTS tail_history (
+            service_id  TEXT NOT NULL,
+            record_date TEXT NOT NULL,
+            total_count INTEGER NOT NULL,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (service_id, record_date)
+        )
+    ''')
+
     conn.commit()
     conn.close()
     

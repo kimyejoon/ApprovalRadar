@@ -52,6 +52,24 @@ async def tail_ping_all_services():
     service_ids = getattr(settings, "SERVICES", ["I2861"])
     detected_any = False
 
+    # tail_history 기록 (일별 스냅샷)
+    from datetime import datetime
+    from database import get_db
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    try:
+        with get_db() as conn:
+            for svc_id in service_ids:
+                st = state_repo.load_state(svc_id)
+                tc = st.get("last_total_count", 0)
+                if tc > 0:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO tail_history (service_id, record_date, total_count) VALUES (?, ?, ?)",
+                        (svc_id, today_str, tc)
+                    )
+            conn.commit()
+    except Exception:
+        pass
+
     async with ApiClient() as api_client:
         for svc_id in service_ids:
             if shutdown_event.is_set():

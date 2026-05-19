@@ -1,10 +1,11 @@
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter
-from app.api.endpoints import approvals, health, stream, admin, settings
+from app.api.endpoints import approvals, health, stream, admin, settings, playground
 
 api_router = APIRouter()
 api_router.include_router(approvals.router, prefix="/api/v1/approvals", tags=["approvals"])
 api_router.include_router(stream.router, prefix="/api/v1/stream", tags=["stream"])
 api_router.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 api_router.include_router(settings.router, prefix="/api/v1/admin/settings", tags=["settings"])
+api_router.include_router(playground.router, prefix="/api/v1/playground", tags=["playground"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
