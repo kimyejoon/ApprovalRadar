@@ -1,6 +1,6 @@
 import { CaretDown, CaretUp, ArrowsDownUp } from '@phosphor-icons/react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCodeCell } from '@/components/ui/Table';
-import { formatApprovalDate } from '@/lib/utils';
+import { formatApprovalDate, formatIndexedAt } from '@/lib/utils';
 import type { ApprovalMappedItem } from '@/lib/api';
 import type { SortKey } from '@/hooks/useApprovalRadar';
 import { CATEGORY_COLORS, CATEGORY_ICONS, INDUSTRY_ICONS } from '@/lib/constants';
@@ -176,7 +176,16 @@ export function ApprovalTable({
                   )}
                 </div>
               </TableCell>
-              <TableCell className="text-xs text-text-muted">{formatApprovalDate(item.approvalDate)}</TableCell>
+              <TableCell className="text-xs text-text-muted">
+                <div className="flex flex-col gap-0.5">
+                  <span>{formatApprovalDate(item.approvalDate)}</span>
+                  {item.raw.created_at && (
+                    <span className="text-[10px] text-text-muted/60 leading-tight">
+                      색인일: {formatIndexedAt(item.raw.created_at)}
+                    </span>
+                  )}
+                </div>
+              </TableCell>
               <TableCell className="font-mono text-xs">{item.phone}</TableCell>
             </TableRow>
           ))

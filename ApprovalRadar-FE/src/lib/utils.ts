@@ -33,6 +33,20 @@ export function formatApprovalDate(dateStr: string) {
   return `${y}년 ${m}월 ${d}일`;
 }
 
+export function formatIndexedAt(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const h = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+
+  return `${y}년 ${m}월 ${d}일 ${h}시 ${min}분`;
+}
+
 export function formatPhoneNumber(phone: string | null | undefined): string {
   if (!phone) return '-';
   
