@@ -73,3 +73,4 @@
 - 2026-05-20: 프로젝트 리팩토링을 위한 전반적인 분석 수행 및 LOC 300 이상 파일 목록/역할 도출
 - 2026-05-20: diff_crawler.py 모듈 리팩토링 및 클래스 분리 작업을 완료함. 기존 917줄의 단일 파일을 TailExplorer, PivotAnalyzer, DiffBootstrapper 3개의 헬퍼 클래스로 분리 및 Facade 패턴을 적용하여 가독성과 유지보수성을 대폭 향상시킴.
 - 2026-05-20: rolling_scanner.py 모듈 리팩토링 및 클래스 분리 작업을 완료함. 기존 815줄의 단일 파일을 rolling_scan_utils.py, rolling_scan_ops.py 로 분리하여 순수 유틸리티 함수와 DB 스캔 오퍼레이션을 캡슐화함으로써 가독성과 유지보수성을 대폭 향상시키고 LOC를 262줄로 줄임.
+- 2026-05-20: SettingsPage.tsx 리팩토링 및 컴포넌트 분리 작업을 완료함. 기존 757줄의 단일 파일을 KeyRow, CrawlIntervalSection, RollingScanSection 등의 기능별 서브 컴포넌트로 분할 및 api 모듈을 분리하여 가독성과 유지보수성을 대폭 향상시키고 LOC를 약 150줄로 줄임.

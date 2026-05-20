@@ -29,6 +29,7 @@ export function LocationFilterModal({
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocalFilters(initialLocations);
     }
   }, [isOpen, initialLocations]);

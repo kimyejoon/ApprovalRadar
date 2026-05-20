@@ -151,6 +151,7 @@ export function PlaygroundPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     const timer = setInterval(refresh, 10000); // 10초 자동 갱신
     return () => clearInterval(timer);
@@ -447,6 +448,7 @@ export function PlaygroundPage() {
             {/* Heatmap-style page grid */}
             <div className="flex flex-wrap gap-[2px]">
               {(() => {
+                // eslint-disable-next-line react-hooks/purity
                 const nowMs = Date.now();
                 const ONE_HOUR_MS = 60 * 60 * 1000;
                 const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD

@@ -403,3 +403,41 @@ export async function deleteMemo(params: MemoParams): Promise<void> {
   });
   if (!response.ok) throw new Error('Failed to delete memo');
 }
+
+// ─── Settings: Crawl & Rolling Scan ──────────────────────────────────────────
+
+export async function fetchCrawlInterval(): Promise<number> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/settings/crawl-interval`, { headers: { 'Accept': 'application/json' } });
+  if (!res.ok) throw new Error('크롤 주기 조회 실패');
+  const data = await res.json();
+  return data.interval_minutes;
+}
+
+export async function updateCrawlInterval(minutes: number): Promise<number> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/settings/crawl-interval`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ interval_minutes: minutes }),
+  });
+  if (!res.ok) throw new Error('크롤 주기 변경 실패');
+  const data = await res.json();
+  return data.interval_minutes;
+}
+
+export async function fetchRollingScanRate(): Promise<number> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/settings/rolling-scan-rate`, { headers: { 'Accept': 'application/json' } });
+  if (!res.ok) throw new Error('스캔 속도 조회 실패');
+  const data = await res.json();
+  return data.pages_per_cycle;
+}
+
+export async function updateRollingScanRate(pages: number): Promise<number> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/settings/rolling-scan-rate`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ pages_per_cycle: pages }),
+  });
+  if (!res.ok) throw new Error('스캔 속도 변경 실패');
+  const data = await res.json();
+  return data.pages_per_cycle;
+}
