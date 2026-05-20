@@ -92,9 +92,16 @@ class SmartSweepService:
     # ── API 조회 (비동기) ─────────────────────────────────────────────────────
 
     async def _fetch_seg(self, seg_start: int, seg_end: int) -> dict | None:
-        """단일 세그먼트 조회. (total_count, first_chng, rows) 반환."""
+        """
+        단일 세그먼트 조회. (total_count, first_chng, rows) 반환.
+        타임아웃 시 재시도 없이 즉시 None 반환 → 메인 스캐너와 API 경합 방지.
+        """
         try:
-            data = await self.api_client.fetch_data(SVC_ID, seg_start, seg_end, timeout=20)
+            # max_retries=1: 타임아웃/오류 시 재시도 없이 즉시 스킵
+            # timeout=8: 메인 스캐너의 20초보다 짧게 → SmartSweep이 우선 양보
+            data = await self.api_client.fetch_data(
+                SVC_ID, seg_start, seg_end, max_retries=1, timeout=8
+            )
             if not data or SVC_ID not in data:
                 return None
             block = data[SVC_ID]
@@ -107,7 +114,7 @@ class SmartSweepService:
             first_chng = rows[0].get("CHNG_DT", "") if rows else ""
             return {"total": total, "first_chng": first_chng, "rows": rows, "code": code}
         except Exception as e:
-            logger.debug(f"[SmartSweep] {seg_start}/{seg_end} 조회 실패: {e}")
+            logger.debug(f"[SmartSweep] {seg_start}/{seg_end} 조회 스킵: {e}")
             return None
 
     # ── 캐시 I/O ─────────────────────────────────────────────────────────────
@@ -150,9 +157,15 @@ class SmartSweepService:
     async def run_micro_probe(self) -> SweepResult:
         """
         Stratified 10개 탐침 → HOT/DELTA 분류.
-        HOT/DELTA 세그먼트의 rows 수집.
+        메인 스캐너(Oldest-First) 실행 중이면 API 경합 방지를 위해 skip.
         API 비용: 탐침 10 + collect × hit_count
         """
+        # ── 메인 스캐너 실행 중이면 양보 ─────────────────────────────────────
+        from app.core.scheduler import _scraper_lock
+        if _scraper_lock.locked():
+            logger.info("[SmartSweep] ⏭️ 메인 스캐너 실행 중 → Micro Probe 스킵 (API 경합 방지)")
+            return SweepResult()
+
         result = SweepResult()
         result.strategy = "micro_probe"
         t0 = time.time()
@@ -166,11 +179,17 @@ class SmartSweepService:
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
 
         for seg_start, seg_end in probes:
+            # 탐침 도중 메인 스캐너가 시작되면 즉시 중단
+            if _scraper_lock.locked():
+                logger.info("[SmartSweep] ⏭️ 메인 스캐너 시작됨 → 탐침 중단")
+                break
+
             seg_data = await self._fetch_seg(seg_start, seg_end)
             result.probe_calls += 1
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1.2)  # WAF 경합 방지: 메인 스캐너와 간격 확보
 
             if seg_data is None:
+                logger.info(f"[SmartSweep] ⚠ {seg_start:,}~{seg_end:,} 스킵 (타임아웃/오류)")
                 continue
 
             total = seg_data["total"]
@@ -199,11 +218,12 @@ class SmartSweepService:
             elif cls == "DELTA":
                 result.delta_segs.append(seg_info)
 
-        # HOT/DELTA 세그먼트 collect
-        for seg in result.hot_segs + result.delta_segs:
-            n = await self._collect_segment(seg, today, yesterday)
-            result.collected += n
-            result.probe_calls += 1  # collect API 1회
+        # HOT/DELTA 세그먼트 collect (메인 스캐너 유휴 시에만)
+        if not _scraper_lock.locked():
+            for seg in result.hot_segs + result.delta_segs:
+                n = await self._collect_segment(seg, today, yesterday)
+                result.collected += n
+                result.probe_calls += 1
 
         result.elapsed_sec = time.time() - t0
         self._save_log(result)
