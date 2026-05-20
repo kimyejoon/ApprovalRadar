@@ -126,6 +126,33 @@ app.add_middleware(
 # Include API Router
 app.include_router(api_router)
 
+# ── 도메인 예외 핸들러 등록 ───────────────────────────────────────────────
+from fastapi.responses import JSONResponse
+from app.core.exceptions import (
+    EntityNotFoundException, AlreadyExistsException, DatabaseOperationException
+)
+
+@app.exception_handler(EntityNotFoundException)
+async def entity_not_found_handler(request: Request, exc: EntityNotFoundException):
+    return JSONResponse(
+        status_code=404,
+        content={"status": "error", "message": exc.message}
+    )
+
+@app.exception_handler(AlreadyExistsException)
+async def already_exists_handler(request: Request, exc: AlreadyExistsException):
+    return JSONResponse(
+        status_code=409,
+        content={"status": "error", "message": exc.message}
+    )
+
+@app.exception_handler(DatabaseOperationException)
+async def database_operation_handler(request: Request, exc: DatabaseOperationException):
+    return JSONResponse(
+        status_code=500,
+        content={"status": "error", "message": exc.message}
+    )
+
 # ── 프론트엔드 정적 파일 서빙 ────────────────────────────────────────────────
 # 배포 빌드 시 FE dist/ 를 FastAPI 동일 포트에서 제공
 # PyInstaller 번들: sys._MEIPASS 기준, 개발 환경: BE 폴더 내 dist/ 참조
