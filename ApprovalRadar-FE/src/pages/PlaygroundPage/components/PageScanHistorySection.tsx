@@ -74,7 +74,8 @@ export function PageScanHistorySection({ pageScan }: PageScanHistorySectionProps
                 return pageScan.entries.map((e) => {
                   const hasTime = !!e.last_scanned;
                   const live = livePages[e.page_number];
-                  const label = e.label ?? '—';
+                  // SSE로 수신한 라이브 label 우선, fallback으로 API 응답 label
+                  const label = live?.label ?? e.label ?? '—';
 
                   let borderColor: string;
                   let bgColor: string;
