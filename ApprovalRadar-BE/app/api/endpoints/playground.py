@@ -5,72 +5,30 @@ Playground API 엔드포인트 — 크롤러 개발 테스트 및 모니터링�
 known_tail 일별 추이를 제공합니다.
 """
 import asyncio
-import json
+import time
 from datetime import datetime
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter, HTTPException
-# pyrefly: ignore [missing-import]
-from pydantic import BaseModel
-from typing import List, Optional
 
 from app.core.logger import logger
 from database import get_db
 
+# 스키마
+from app.schemas.playground import (
+    JobStatus, SchedulerStatusResponse, TriggerResponse,
+    PageScanEntry, PageScanHistoryResponse, TodayDetectionResponse,
+    TailHistoryEntry, TailHistoryResponse, RangeScanRequest,
+    ChngDtPollEntry, ChngDtTrendResponse
+)
+
+# 서비스
+from app.services.playground_jobs import (
+    run_range_scan_job,
+    run_oldest_first_job,
+    run_chng_dt_poller_job
+)
+
 router = APIRouter()
-
-
-# ─── 응답 스키마 ─────────────────────────────────────────────────────────────
-
-class JobStatus(BaseModel):
-    job_id: str
-    name: str
-    next_run: Optional[str] = None
-    seconds_remaining: Optional[float] = None
-    is_running: bool = False
-
-
-class SchedulerStatusResponse(BaseModel):
-    jobs: List[JobStatus]
-    current_time: str
-
-
-class TriggerResponse(BaseModel):
-    success: bool
-    message: str
-
-
-class PageScanEntry(BaseModel):
-    page_number: int
-    page_start: int
-    fingerprint: Optional[str] = None
-    last_scanned: Optional[str] = None
-
-
-class PageScanHistoryResponse(BaseModel):
-    total_pages: int
-    scanned_pages: int
-    entries: List[PageScanEntry]
-
-
-class TodayDetectionResponse(BaseModel):
-    today_date: str
-    today_count: int
-    yesterday_date: str = ""
-    yesterday_count: int = 0
-    total_records: int
-    scan_coverage_pct: float
-    recent_detections: List[dict]
-
-
-class TailHistoryEntry(BaseModel):
-    record_date: str
-    total_count: int
-
-
-class TailHistoryResponse(BaseModel):
-    service_id: str
-    entries: List[TailHistoryEntry]
-
 
 # ─── 스케줄러 상태 조회 ──────────────────────────────────────────────────────
 
@@ -119,11 +77,6 @@ async def get_scheduler_status():
 
 # ─── 수동 트리거 ─────────────────────────────────────────────────────────────
 
-class RangeScanRequest(BaseModel):
-    start: int   # 스캔 시작 레코드 번호 (예: 1, 500001)
-    end: int     # 스캔 종료 레코드 번호 (예: 10000, 952999)
-
-
 @router.post("/trigger/range-scan", response_model=TriggerResponse)
 async def trigger_range_scan(req: RangeScanRequest):
     """지정 범위를 즉시 스캔합니다. start~end 구간의 페이지를 순차 스캔."""
@@ -136,47 +89,7 @@ async def trigger_range_scan(req: RangeScanRequest):
             f"[Playground] 🎯 Range Scan 트리거: {req.start:,}~{req.end:,} ({pages}p)"
         )
 
-        async def _run_range_scan():
-            from app.clients.foodsafety_api import ApiClient
-            from app.repositories.state_repository import StateRepository
-            from app.services.rolling_scanner import RollingScanner
-
-            svc = "I2861"
-            api_client = ApiClient()
-            state_repo = StateRepository()
-            scanner = RollingScanner(api_client, svc, state_repo)
-
-            state = state_repo.load_state(svc)
-            fingerprints = state.get("page_fingerprints", {})
-            scan_times = state.get("page_scan_times", {})
-
-            max_pages = pages
-
-            # flush callback — scraper 파이프라인으로
-            async def _flush(rows):
-                from scraper import run_scraper_for_service_with_rows
-                await run_scraper_for_service_with_rows(svc, rows, collected_by="range_scan")
-
-            scanned, new_rows, mismatch, _ = await scanner._scan_range(
-                svc, req.start, req.start, req.end,
-                max_pages, fingerprints, scan_times, "RANGE"
-            )
-
-            if new_rows:
-                await _flush(new_rows)
-                logger.info(
-                    f"[Playground] ✅ Range Scan 완료: {scanned}p, {len(new_rows)}건 수집"
-                )
-            else:
-                logger.info(f"[Playground] ✅ Range Scan 완료: {scanned}p, 신규 0건")
-
-            # 상태 저장 (fingerprints + scan_times 업데이트)
-            state["page_fingerprints"] = fingerprints
-            state["page_scan_times"] = scan_times
-            state_repo.save_state(svc, state)
-
-        import asyncio
-        asyncio.create_task(_run_range_scan())
+        asyncio.create_task(run_range_scan_job(req.start, req.end, pages))
 
         return TriggerResponse(
             success=True,
@@ -191,7 +104,7 @@ async def trigger_range_scan(req: RangeScanRequest):
 async def trigger_job(job_type: str):
     """지정한 잡을 즉시 실행합니다.
     
-    job_type: scraper | rolling_scan | tail_ping | boost_scan
+    job_type: scraper | rolling_scan | tail_ping | boost_scan | oldest_first_scan | chng_dt_poll
     """
     try:
         if job_type == "scraper":
@@ -200,83 +113,44 @@ async def trigger_job(job_type: str):
             return TriggerResponse(success=True, message="Scraper + Boost Scan 트리거 완료")
 
         elif job_type == "oldest_first_scan":
-            """Oldest-First Rolling Scan 즉발: 연식 1h 이상 페이지 우선 전수 스캔."""
-            def _run_oldest_first():
-                import asyncio as _asyncio
-                from app.core.config import settings as _s
-                from app.clients.foodsafety_api import ApiClient
-                from app.repositories.state_repository import StateRepository
-                from app.services.rolling_scanner import RollingScanner
-
-                async def _inner():
-                    svc_ids = getattr(_s, "SERVICES", ["I2861"])
-                    async with ApiClient() as api_client:
-                        for svc_id in svc_ids:
-                            state_repo = StateRepository()
-                            scanner = RollingScanner(api_client, svc_id, state_repo)
-
-                            async def flush_cb(rows):
-                                from scraper import run_scraper_for_service_with_rows
-                                await run_scraper_for_service_with_rows(
-                                    svc_id, rows, collected_by="oldest_first_manual"
-                                )
-
-                            await scanner._scan_oldest_first(flush_callback=flush_cb)
-
-                _asyncio.run(_inner())
-
-            import time
             from app.core.scheduler import scheduler
             scheduler.add_job(
-                _run_oldest_first, 'date',
+                run_oldest_first_job, 'date',
                 run_date=datetime.now(),
                 id=f"manual_oldest_first_{int(time.time())}",
             )
-            return TriggerResponse(success=True, message="\ud83d\udd04 Oldest-First Scan \uc989\uc2dc \uc2e4\ud589 \ub4f1\ub85d (\uc5f0\uc2dd 1h\u2191 \uc6b0\uc120)")
+            return TriggerResponse(success=True, message="🔄 Oldest-First Scan 즉시 실행 등록 (연식 1h↑ 우선)")
 
         elif job_type == "rolling_scan":
-            # \ub808\uac70\uc2dc \ud638\ud658: DiffCrawler Scraper \uc2e4\ud589
             from app.core.scheduler import scheduler, _scraper_job
-            import time
             scheduler.add_job(
                 _scraper_job, 'date',
                 run_date=datetime.now(),
                 id=f"manual_rolling_{int(time.time())}",
             )
-            return TriggerResponse(success=True, message="Scraper (DiffCrawler) \uc989\uc2dc \uc2e4\ud589 \ub4f1\ub85d")
+            return TriggerResponse(success=True, message="Scraper (DiffCrawler) 즉시 실행 등록")
 
         elif job_type == "tail_ping":
             from app.services.tail_ping_job import run_tail_ping
             from app.core.scheduler import scheduler
-            import time
             scheduler.add_job(
                 run_tail_ping, 'date',
                 run_date=datetime.now(),
                 id=f"manual_tail_ping_{int(time.time())}",
             )
-            return TriggerResponse(success=True, message="Tail Ping \uc989\uc2dc \uc2e4\ud589 \ub4f1\ub85d")
+            return TriggerResponse(success=True, message="Tail Ping 즉시 실행 등록")
 
         elif job_type == "boost_scan":
             from app.core.scheduler import scheduler, _boosted_rolling_scan_job
-            import time
             scheduler.add_job(
                 _boosted_rolling_scan_job, 'date',
                 run_date=datetime.now(),
                 id=f"manual_boost_{int(time.time())}",
             )
-            return TriggerResponse(success=True, message="\ud83d\ude80 Boost Scan (Random 50%) \uc989\uc2dc \uc2e4\ud589 \ub4f1\ub85d")
+            return TriggerResponse(success=True, message="🚀 Boost Scan (Random 50%) 즉시 실행 등록")
 
         elif job_type == "chng_dt_poll":
-            # I2500 CHNG_DT Poller 즉시 실행
-            async def _run_poller():
-                from app.services.chng_dt_poller import poll_today_changes
-                result = await poll_today_changes()
-                logger.info(
-                    f"[Playground] CHNG_DT Poller 완료: "
-                    f"전체 {result['total']}건, 신규 {result['new']}건, 스킵 {result['skipped']}건"
-                )
-
-            asyncio.create_task(_run_poller())
+            asyncio.create_task(run_chng_dt_poller_job())
             return TriggerResponse(success=True, message="📡 I2500 CHNG_DT Poller 즉시 실행 시작")
 
         else:
@@ -284,7 +158,6 @@ async def trigger_job(job_type: str):
     except Exception as e:
         logger.error(f"[Playground] 트리거 실패: {e}")
         return TriggerResponse(success=False, message=str(e))
-
 
 
 # ─── 페이지 스캔 히스토리 ────────────────────────────────────────────────────
@@ -421,23 +294,7 @@ async def get_tail_history(service_id: str = "I2861"):
 
 # ─── CHNG_DT Poller 트렌드 ──────────────────────────────────────────────────
 
-class ChngDtPollEntry(BaseModel):
-    polled_at: str
-    total_api_count: int
-    new_inserted: int
-    already_exists: int
-    pages_fetched: int
-    elapsed_sec: float
-
-
-class ChngDtTrendResponse(BaseModel):
-    target_date: str
-    entries: List[ChngDtPollEntry]
-    latest_total: int
-    total_inserted: int
-
-
-@router.get("/chng-dt-trend")
+@router.get("/chng-dt-trend", response_model=ChngDtTrendResponse)
 async def get_chng_dt_trend():
     """
     CHNG_DT Poller 시간별 트렌드 데이터.
@@ -488,13 +345,13 @@ async def get_chng_dt_trend():
     latest_total = primary_entries[-1].total_api_count if primary_entries else 0
     total_inserted = sum(e.new_inserted for e in primary_entries)
 
-    return {
-        "target_date": primary_date,
-        "entries": [e.model_dump() for e in primary_entries],
-        "latest_total": latest_total,
-        "total_inserted": total_inserted,
-        "yesterday_date": yesterday_str,
-        "yesterday_entries": [e.model_dump() for e in yesterday_entries],
-        "today_date": today_str,
-        "today_entries": [e.model_dump() for e in today_entries],
-    }
+    return ChngDtTrendResponse(
+        target_date=primary_date,
+        entries=primary_entries,
+        latest_total=latest_total,
+        total_inserted=total_inserted,
+        yesterday_date=yesterday_str,
+        yesterday_entries=yesterday_entries,
+        today_date=today_str,
+        today_entries=today_entries,
+    )

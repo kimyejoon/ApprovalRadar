@@ -40,7 +40,7 @@ export interface PageScanEntry {
   last_scanned: string | null;
 }
 
-export interface PageScanHistory {
+export interface PageScanHistoryResponse {
   total_pages: number;
   scanned_pages: number;
   entries: PageScanEntry[];

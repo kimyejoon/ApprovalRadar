@@ -1,13 +1,8 @@
 import { Play } from '@phosphor-icons/react';
-import { Card } from './ui/Card';
-import { SectionTitle } from './ui/SectionTitle';
-import { TodayDetection } from '../types';
+import { Card, SectionTitle } from './Shared';
+import type { TodayDetection } from '../types';
 
-interface Props {
-  today: TodayDetection | null;
-}
-
-export function TodayDetectionCard({ today }: Props) {
+export function TodayDetectionCard({ today }: { today: TodayDetection | null }) {
   return (
     <Card>
       <SectionTitle icon={<Play className="w-5 h-5 text-red-400" />} title="오늘 감지 현황" />

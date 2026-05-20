@@ -1,14 +1,9 @@
 import { Broadcast } from '@phosphor-icons/react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-import { Card } from './ui/Card';
-import { SectionTitle } from './ui/SectionTitle';
-import { TailHistoryEntry } from '../types';
+import { Card, SectionTitle } from './Shared';
+import type { TailHistoryEntry } from '../types';
 
-interface Props {
-  tailHistory: TailHistoryEntry[];
-}
-
-export function TailHistoryCard({ tailHistory }: Props) {
+export function TailHistoryChartCard({ tailHistory }: { tailHistory: TailHistoryEntry[] }) {
   return (
     <Card>
       <SectionTitle icon={<Broadcast className="w-5 h-5 text-purple-400" />} title="일별 Known Tail 추이" />

@@ -1,55 +1,32 @@
-import { useState } from 'react';
 import { Lightning, ClockCounterClockwise, RocketLaunch, Broadcast, MagnifyingGlass, Play } from '@phosphor-icons/react';
-import { Card } from './ui/Card';
-import { SectionTitle } from './ui/SectionTitle';
-import { triggerJob, triggerRangeScan } from '../api';
+import { Card, SectionTitle } from './Shared';
 
-interface Props {
-  onMessage: (msg: string) => void;
+interface TriggerCardProps {
+  loading: boolean;
+  rangeStart: string;
+  rangeEnd: string;
+  setRangeStart: (val: string) => void;
+  setRangeEnd: (val: string) => void;
+  onTrigger: (jobType: string) => void;
+  onRangeScan: () => void;
 }
 
-export function ManualTriggerCard({ onMessage }: Props) {
-  const [loading, setLoading] = useState(false);
-  const [rangeStart, setRangeStart] = useState<string>('1');
-  const [rangeEnd, setRangeEnd] = useState<string>('10000');
-
-  const handleTrigger = async (jobType: string) => {
-    setLoading(true);
-    try {
-      const result = await triggerJob(jobType);
-      onMessage(result.message);
-    } catch {
-      onMessage('트리거 실패');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRangeScan = async () => {
-    const s = parseInt(rangeStart, 10);
-    const e = parseInt(rangeEnd, 10);
-    if (isNaN(s) || isNaN(e) || s < 1 || e < s) {
-      onMessage('잘못된 범위입니다');
-      return;
-    }
-    setLoading(true);
-    try {
-      const result = await triggerRangeScan(s, e);
-      onMessage(result.message);
-    } catch {
-      onMessage('Range Scan 트리거 실패');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export function TriggerCard({
+  loading,
+  rangeStart,
+  rangeEnd,
+  setRangeStart,
+  setRangeEnd,
+  onTrigger,
+  onRangeScan,
+}: TriggerCardProps) {
   return (
     <Card>
       <SectionTitle icon={<Lightning className="w-5 h-5 text-yellow-500" />} title="수동 트리거" />
       <p className="text-xs text-text-muted mb-4">사이클 사이 Term에서 즉시 실행합니다.</p>
       <div className="grid grid-cols-2 gap-3">
         <button
-          onClick={() => handleTrigger('oldest_first_scan')}
+          onClick={() => onTrigger('oldest_first_scan')}
           disabled={loading}
           className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-green-500/30 bg-green-500/5 hover:bg-green-500/10 transition-all text-sm font-medium text-green-400 disabled:opacity-50 col-span-2"
         >
@@ -57,7 +34,7 @@ export function ManualTriggerCard({ onMessage }: Props) {
           Oldest-First Scan <span className="text-xs text-text-muted ml-1">(연식 1h↑ 페이지 전수 스캔)</span>
         </button>
         <button
-          onClick={() => handleTrigger('boost_scan')}
+          onClick={() => onTrigger('boost_scan')}
           disabled={loading}
           className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-brand/30 bg-brand/5 hover:bg-brand/10 transition-all text-sm font-medium text-brand disabled:opacity-50"
         >
@@ -65,7 +42,7 @@ export function ManualTriggerCard({ onMessage }: Props) {
           Boost Scan
         </button>
         <button
-          onClick={() => handleTrigger('tail_ping')}
+          onClick={() => onTrigger('tail_ping')}
           disabled={loading}
           className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-border-standard bg-background hover:bg-surface transition-all text-sm font-medium text-text-primary disabled:opacity-50"
         >
@@ -73,7 +50,7 @@ export function ManualTriggerCard({ onMessage }: Props) {
           Tail Ping
         </button>
         <button
-          onClick={() => handleTrigger('scraper')}
+          onClick={() => onTrigger('scraper')}
           disabled={loading}
           className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-border-standard bg-background hover:bg-surface transition-all text-sm font-medium text-text-primary disabled:opacity-50"
         >
@@ -101,7 +78,7 @@ export function ManualTriggerCard({ onMessage }: Props) {
             className="w-28 px-3 py-2 rounded-lg border border-border-standard bg-background text-sm text-text-primary text-right font-mono focus:outline-none focus:ring-1 focus:ring-brand"
           />
           <button
-            onClick={handleRangeScan}
+            onClick={onRangeScan}
             disabled={loading}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-orange-400/30 bg-orange-400/5 hover:bg-orange-400/10 transition-all text-sm font-medium text-orange-500 disabled:opacity-50"
           >

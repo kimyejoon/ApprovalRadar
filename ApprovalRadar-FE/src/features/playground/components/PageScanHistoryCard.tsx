@@ -1,13 +1,8 @@
 import { MagnifyingGlass } from '@phosphor-icons/react';
-import { Card } from './ui/Card';
-import { SectionTitle } from './ui/SectionTitle';
-import { PageScanHistory } from '../types';
+import { Card, SectionTitle } from './Shared';
+import type { PageScanHistoryResponse } from '../types';
 
-interface Props {
-  pageScan: PageScanHistory | null;
-}
-
-export function PageScanHistoryCard({ pageScan }: Props) {
+export function PageScanHistoryCard({ pageScan }: { pageScan: PageScanHistoryResponse | null }) {
   return (
     <Card>
       <SectionTitle icon={<MagnifyingGlass className="w-5 h-5 text-orange-400" />} title="페이지 스캔 히스토리" />

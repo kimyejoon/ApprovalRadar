@@ -1,59 +1,29 @@
-import { useState, useEffect, useCallback } from 'react';
 import { ArrowClockwise } from '@phosphor-icons/react';
-import { 
-  fetchSchedulerStatus, 
-  fetchTodayDetection, 
-  fetchTailHistory, 
-  fetchPageScanHistory 
-} from '@/features/playground/api';
-import { 
-  SchedulerStatus, 
-  TodayDetection, 
-  TailHistoryEntry, 
-  PageScanHistory 
-} from '@/features/playground/types';
-import { SchedulerCard } from '@/features/playground/components/SchedulerCard';
-import { ManualTriggerCard } from '@/features/playground/components/ManualTriggerCard';
-import { TodayDetectionCard } from '@/features/playground/components/TodayDetectionCard';
-import { TailHistoryCard } from '@/features/playground/components/TailHistoryCard';
-import { PageScanHistoryCard } from '@/features/playground/components/PageScanHistoryCard';
+import { usePlayground } from '../features/playground/hooks/usePlayground';
+import {
+  SchedulerStatusCard,
+  TriggerCard,
+  TodayDetectionCard,
+  TailHistoryChartCard,
+  PageScanHistoryCard,
+} from '../features/playground/components';
 
 export function PlaygroundPage() {
-  const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
-  const [today, setToday] = useState<TodayDetection | null>(null);
-  const [tailHistory, setTailHistory] = useState<TailHistoryEntry[]>([]);
-  const [pageScan, setPageScan] = useState<PageScanHistory | null>(null);
-
-  const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    try {
-      const [sched, det, tail, pages] = await Promise.all([
-        fetchSchedulerStatus(),
-        fetchTodayDetection(),
-        fetchTailHistory(),
-        fetchPageScanHistory(),
-      ]);
-      setScheduler(sched);
-      setToday(det);
-      setTailHistory(tail);
-      setPageScan(pages);
-    } catch (e) {
-      console.error('Playground refresh failed:', e);
-    }
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    refresh();
-    const timer = setInterval(refresh, 10000); // 10초 자동 갱신
-    return () => clearInterval(timer);
-  }, [refresh]);
-
-  const handleMessage = (msg: string) => {
-    setTriggerMsg(msg);
-    setTimeout(() => setTriggerMsg(null), 5000);
-  };
+  const {
+    scheduler,
+    today,
+    tailHistory,
+    pageScan,
+    triggerMsg,
+    loading,
+    rangeStart,
+    rangeEnd,
+    setRangeStart,
+    setRangeEnd,
+    refresh,
+    handleTrigger,
+    handleRangeScan,
+  } = usePlayground();
 
   return (
     <div className="space-y-6">
@@ -81,14 +51,22 @@ export function PlaygroundPage() {
 
       {/* Row 1: Scheduler + Triggers */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SchedulerCard scheduler={scheduler} />
-        <ManualTriggerCard onMessage={handleMessage} />
+        <SchedulerStatusCard scheduler={scheduler} />
+        <TriggerCard
+          loading={loading}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          setRangeStart={setRangeStart}
+          setRangeEnd={setRangeEnd}
+          onTrigger={handleTrigger}
+          onRangeScan={handleRangeScan}
+        />
       </div>
 
       {/* Row 2: Today Detection + Tail History Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TodayDetectionCard today={today} />
-        <TailHistoryCard tailHistory={tailHistory} />
+        <TailHistoryChartCard tailHistory={tailHistory} />
       </div>
 
       {/* Row 3: Page Scan History */}
