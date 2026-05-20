@@ -75,6 +75,11 @@ async def tail_ping_all_services():
             if shutdown_event.is_set():
                 break
 
+            # I2861 서비스는 정기적인 Oldest First Scan으로만 수집하므로 Tail Ping 및 Sentinel 감지에서 제외
+            if svc_id == "I2861":
+                logger.debug(f"[Tail Ping] {svc_id} 서비스는 Oldest First Scan 전용이므로 감지 루프 제외")
+                continue
+
             try:
                 state = state_repo.load_state(svc_id)
                 known_tail = state.get("last_total_count", 0)

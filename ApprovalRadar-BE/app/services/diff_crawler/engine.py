@@ -62,11 +62,97 @@ class DiffCrawlerEngine:
         """처음부터 피벗을 생성하고 정합성을 검증합니다."""
         return await bootstrapper.bootstrap(self)
 
+    async def _run_i2861_oldest_first_scan(self, state: dict, start_time: float) -> list:
+        """
+        I2861 전용 Oldest First Scan:
+        1. 전체 5개 페이지(총 ~4,800여건)에 대하여 각 페이지의 last_scanned_at 타임스탬프를 관리.
+        2. 임계치(1시간, 3600초) 이상 지났거나 기록이 없는 페이지는 최우선(Oldest) 스캔 대상으로 선정.
+        3. 이번 주기에서는 우선순위로 선정된 페이지와 순차적 롤링 대상 페이지를 1~2개 조합하여 스캔 수행.
+        4. 스캔 성공 시 타임스탬프를 현재 시각으로 갱신하고, 수집된 데이터를 scraper 파이프라인으로 위임.
+        """
+        svc = self.service_id
+        logger.info(f"[{svc}] 🚀 Oldest First Scan 시작...")
+
+        extra = state.setdefault("extra_state", {})
+        page_timestamps = extra.setdefault("page_timestamps", {})
+
+        now_ts = int(time.time())
+        total_pages = 5  # I2861 라이브 데이터 기준 약 4,800건이므로 5페이지
+
+        # 각 페이지별 경과 시간 확인
+        oldest_pages = []
+        for p in range(1, total_pages + 1):
+            p_str = str(p)
+            last_scanned = page_timestamps.get(p_str, 0)
+            elapsed = now_ts - last_scanned
+            if elapsed >= 3600:
+                oldest_pages.append((p, elapsed))
+
+        # 가장 오래된 페이지 정렬
+        oldest_pages.sort(key=lambda x: x[1], reverse=True)
+        
+        target_pages = []
+        if oldest_pages:
+            # 1시간 초과된 페이지 우선 (최대 2개 페이지 스캔)
+            target_pages = [p for p, _ in oldest_pages[:2]]
+            logger.info(
+                f"[{svc}] 🕐 마지막 스캔 후 1시간 초과된 Oldest 페이지 발견 → 스캔 선정: "
+                f"{[f'P{p}' for p in target_pages]}"
+            )
+        else:
+            # 1시간 초과가 없으면 가장 마지막 조회 시각이 오랜 순서대로 1개 롤링
+            rolling_candidates = []
+            for p in range(1, total_pages + 1):
+                rolling_candidates.append((p, page_timestamps.get(str(p), 0)))
+            rolling_candidates.sort(key=lambda x: x[1])
+            target_pages = [rolling_candidates[0][0]]
+            logger.info(f"[{svc}] 🎯 평시 롤링 스캔 페이지 선정: P{target_pages[0]}")
+
+        new_data_rows = []
+        scanned_success_pages = []
+        
+        for page in target_pages:
+            start_idx = (page - 1) * PAGE_SIZE + 1
+            end_idx = page * PAGE_SIZE
+            
+            logger.info(f"[{svc}] 📥 페이지 {page} 조회 중: {start_idx:,} ~ {end_idx:,}")
+            try:
+                rows = await self._fetch_page(start_idx, end_idx)
+                if rows:
+                    new_data_rows.extend(rows)
+                scanned_success_pages.append(page)
+            except Exception as e:
+                logger.error(f"[{svc}] ❌ 페이지 {page} Fetch 오류: {e}")
+
+        # 타임스탬프 업데이트
+        for page in scanned_success_pages:
+            page_timestamps[str(page)] = now_ts
+        
+        state["last_total_count"] = max(state.get("last_total_count", 0), 4800)
+        self.state_repo.save_state(svc, state)
+
+        if new_data_rows:
+            from scraper import run_scraper_for_service_with_rows
+            await run_scraper_for_service_with_rows(svc, new_data_rows, collected_by="rolling_scan")
+
+        elapsed_sec = time.time() - start_time
+        logger.info(
+            f"[{svc}] ✔️ Oldest First Scan 완료. "
+            f"성공: {[f'P{p}' for p in scanned_success_pages]} | "
+            f"신규 획득: {len(new_data_rows):,}건 | "
+            f"소요시간: {elapsed_sec:.1f}초"
+        )
+        return new_data_rows
+
     async def scan_for_updates(self) -> list:
         """주기적으로 실행되어 차분(Delta)을 감지합니다."""
         svc = self.service_id
         start_time = time.time()
         state = self.state_repo.load_state(svc)
+
+        # I2861 서비스는 정교한 이진탐색/피벗 감지 대신 Oldest First Scan 처리로 분기
+        if svc == "I2861":
+            return await self._run_i2861_oldest_first_scan(state, start_time)
 
         self._empty_pivot_cycles = state.get("empty_pivot_cycles", 0)
         self._cb_consecutive_count = state.get("cb_consecutive_count", 0)

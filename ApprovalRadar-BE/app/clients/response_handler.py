@@ -26,7 +26,15 @@ class ResponseHandler:
             logger.warning(f"[API 서버 오류] {code}: {msg}.")
             return None
 
-        logger.error(f"[API 파라미터/기타 오류] {code}: {msg}")
+        # INFO-700 등 파라미터 유효성 검사 에러/우회 패치 감지 시 정밀 로깅 추가
+        if code == "INFO-700":
+            logger.error(
+                f"🚨 [INFO-700 디버깅] API 호출 파라미터 오류 또는 실시간 우회로 차단 의심! "
+                f"서비스: {service_id}, 코드: {code}, 메시지: {msg}, 키: {api_key[:6]}***"
+            )
+        else:
+            logger.error(f"[API 파라미터/기타 오류] {code}: {msg}")
+            
         return res
 
     @classmethod
