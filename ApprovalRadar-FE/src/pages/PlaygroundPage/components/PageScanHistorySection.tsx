@@ -5,6 +5,17 @@ interface PageScanHistorySectionProps {
   pageScan: { total_pages: number; scanned_pages: number; entries: PageScanEntry[] } | null;
 }
 
+function formatRelativeTime(isoString: string): string {
+  const scannedMs = new Date(isoString).getTime();
+  const diffMs = Date.now() - scannedMs;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return '방금';
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}시간 전`;
+  return `${Math.floor(diffH / 24)}일 전`;
+}
+
 export function PageScanHistorySection({ pageScan }: PageScanHistorySectionProps) {
   return (
     <div className="bg-surface border border-border-standard rounded-xl p-5">
@@ -14,23 +25,24 @@ export function PageScanHistorySection({ pageScan }: PageScanHistorySectionProps
       </h2>
       {pageScan ? (
         <div>
+          {/* 진행률 바 */}
           <div className="flex items-center gap-4 mb-4">
             <span className="text-sm text-text-secondary">
               전체 {pageScan.total_pages}p 중 <span className="text-brand font-semibold">{pageScan.scanned_pages}p</span> 스캔 완료
             </span>
-            <div className="flex-1 h-2 bg-border-subtle rounded-full overflow-hidden">
+            <div className="flex-1 h-1.5 bg-border-subtle rounded-full overflow-hidden">
               <div
-                className="h-full bg-brand rounded-full transition-all"
+                className="h-full bg-brand rounded-full transition-all duration-500"
                 style={{ width: `${pageScan.total_pages > 0 ? (pageScan.scanned_pages / pageScan.total_pages * 100) : 0}%` }}
               />
             </div>
             <span className="text-sm text-text-muted font-mono">
-              {pageScan.total_pages > 0 ? (pageScan.scanned_pages / pageScan.total_pages * 100).toFixed(1) : 0}%
+              {pageScan.total_pages > 0 ? (pageScan.scanned_pages / pageScan.total_pages * 100).toFixed(0) : 0}%
             </span>
           </div>
 
-          {/* Heatmap-style page grid */}
-          <div className="flex flex-wrap gap-[2px]">
+          {/* 페이지 카드 그리드 */}
+          <div className="grid grid-cols-5 gap-2">
             {(() => {
               const nowMs = Date.now();
               const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -38,54 +50,82 @@ export function PageScanHistorySection({ pageScan }: PageScanHistorySectionProps
 
               return pageScan.entries.map((e) => {
                 const hasTime = !!e.last_scanned;
-                const hasFP = !!e.fingerprint;
 
-                let colorClass: string;
-                if (!hasFP) {
-                  colorClass = 'bg-border-subtle hover:bg-border-standard';
-                } else if (!hasTime) {
-                  colorClass = 'bg-zinc-600/50 hover:bg-zinc-500/60';
+                let borderColor: string;
+                let bgColor: string;
+                let statusLabel: string;
+                let statusColor: string;
+
+                if (!hasTime) {
+                  borderColor = 'border-border-subtle';
+                  bgColor = 'bg-background';
+                  statusLabel = '미스캔';
+                  statusColor = 'text-text-muted';
                 } else {
                   const scannedDate = e.last_scanned!.slice(0, 10);
                   const scannedMs = new Date(e.last_scanned!).getTime();
                   const ageMs = nowMs - scannedMs;
 
                   if (scannedDate < todayStr) {
-                    colorClass = 'bg-zinc-600/50 hover:bg-zinc-500/60';
+                    borderColor = 'border-zinc-600/40';
+                    bgColor = 'bg-zinc-800/20';
+                    statusLabel = formatRelativeTime(e.last_scanned!);
+                    statusColor = 'text-zinc-500';
                   } else if (ageMs < ONE_HOUR_MS) {
-                    colorClass = 'bg-emerald-500 hover:bg-emerald-400';
+                    borderColor = 'border-emerald-500/50';
+                    bgColor = 'bg-emerald-500/10';
+                    statusLabel = formatRelativeTime(e.last_scanned!);
+                    statusColor = 'text-emerald-400';
                   } else {
-                    colorClass = 'bg-emerald-800/70 hover:bg-emerald-700/80';
+                    borderColor = 'border-emerald-800/40';
+                    bgColor = 'bg-emerald-900/10';
+                    statusLabel = formatRelativeTime(e.last_scanned!);
+                    statusColor = 'text-emerald-700';
                   }
                 }
-
-                const labelText = e.label ? ` 대역: [${e.label}]` : '';
 
                 return (
                   <div
                     key={e.page_number}
-                    className={`w-3 h-3 rounded-[2px] transition-colors cursor-pointer ${colorClass}`}
-                    title={`P${e.page_number} (${e.page_start.toLocaleString()}~)${labelText}\n${hasFP ? `FP: ${e.fingerprint}` : '미스캔'}${hasTime ? `\n최종 스캔: ${e.last_scanned}` : ''}`}
-                  />
+                    className={`flex flex-col items-center justify-between border rounded-lg p-2.5 transition-all ${borderColor} ${bgColor}`}
+                    title={`P${e.page_number} (${e.page_start.toLocaleString()}~)${hasTime ? `\n최종 스캔: ${e.last_scanned}` : '\n미스캔'}`}
+                  >
+                    {/* 페이지 번호 */}
+                    <span className="text-[11px] font-bold text-text-muted font-mono">
+                      P{e.page_number}
+                    </span>
+
+                    {/* 상호명 대역 (가~나) */}
+                    <span className="text-base font-bold text-text-primary leading-tight my-1">
+                      {e.label ?? '—'}
+                    </span>
+
+                    {/* 스캔 시간 */}
+                    <span className={`text-[10px] font-medium ${statusColor} leading-tight`}>
+                      {statusLabel}
+                    </span>
+                  </div>
                 );
               });
             })()}
           </div>
+
+          {/* 범례 */}
           <div className="flex items-center gap-4 mt-3 text-xs text-text-muted">
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-[2px] bg-emerald-500" />
-              오늘 스캔 (1h 미만)
+              <div className="w-2.5 h-2.5 rounded border border-emerald-500/50 bg-emerald-500/10" />
+              1시간 미만
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-[2px] bg-emerald-800/70" />
-              오늘 스캔 (1h 이상)
+              <div className="w-2.5 h-2.5 rounded border border-emerald-800/40 bg-emerald-900/10" />
+              1시간 이상
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-[2px] bg-zinc-600/50" />
-              오늘 이전 스캔
+              <div className="w-2.5 h-2.5 rounded border border-zinc-600/40 bg-zinc-800/20" />
+              오늘 이전
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-[2px] bg-border-subtle" />
+              <div className="w-2.5 h-2.5 rounded border border-border-subtle bg-background" />
               미스캔
             </div>
           </div>
