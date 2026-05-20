@@ -50,6 +50,12 @@ async def tail_ping_all_services():
 
     state_repo = StateRepository()
     service_ids = getattr(settings, "SERVICES", ["I2861"])
+    
+    # I2861만 활성화된 경우 Tail Ping 및 Sentinel 감지를 완전히 스킵하여 불필요한 루프 및 로그 낭비 방지
+    active_ping_services = [s for s in service_ids if s != "I2861"]
+    if not active_ping_services:
+        return
+
     detected_any = False
 
     # tail_history 기록 (일별 스냅샷)

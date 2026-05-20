@@ -59,11 +59,13 @@ export function PageScanHistorySection({ pageScan }: PageScanHistorySectionProps
                   }
                 }
 
+                const labelText = e.label ? ` 대역: [${e.label}]` : '';
+
                 return (
                   <div
                     key={e.page_number}
                     className={`w-3 h-3 rounded-[2px] transition-colors cursor-pointer ${colorClass}`}
-                    title={`P${e.page_number} (${e.page_start.toLocaleString()}~)\n${hasFP ? `FP: ${e.fingerprint}` : '미스캔'}${hasTime ? `\n최종 스캔: ${e.last_scanned}` : ''}`}
+                    title={`P${e.page_number} (${e.page_start.toLocaleString()}~)${labelText}\n${hasFP ? `FP: ${e.fingerprint}` : '미스캔'}${hasTime ? `\n최종 스캔: ${e.last_scanned}` : ''}`}
                   />
                 );
               });

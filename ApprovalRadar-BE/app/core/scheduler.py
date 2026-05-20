@@ -80,6 +80,10 @@ def _daily_bootstrap_job():
         service_ids = getattr(settings, "SERVICES", ["I2859", "I2861"])
         async with ApiClient() as api_client:
             for svc_id in service_ids:
+                # I2861 서비스는 피벗을 사용하지 않는 Oldest First Scan 구조이므로 Bootstrap 스킵 (API 호출 절약)
+                if svc_id == "I2861":
+                    logger.info(f"[일일 Bootstrap] {svc_id} 서비스는 Oldest First Scan 구조이므로 Bootstrap 스킵")
+                    continue
                 try:
                     crawler = DiffCrawlerEngine(api_client=api_client, service_id=svc_id)
                     state = await crawler.bootstrap()
@@ -107,14 +111,16 @@ def start_scheduler():
     # 10분마다 소진 키 회복 체크 → 회복 시 즉시 크롤링 재가동
     scheduler.add_job(_check_api_key_recovery, 'interval', minutes=10, id="key_recovery_job")
 
-    # ✅ 독립 Tail Ping (5분 간격, 크롤링 주기와 무관)
-    # API 1회 호출로 Tail 변동 감지 → 변동 시 즉시 Scraper 트리거
-    # 감지 지연: 30분 → 5분으로 단축 (API 비용: ~288회/일)
+    # ✅ 독립 Tail Ping (5분 간격, 크롤링 주기와 무관) - I2861 이외 활성 서비스가 있을 때만 등록
     from app.services.tail_ping_job import run_tail_ping, TAIL_PING_INTERVAL_MINUTES
-    scheduler.add_job(run_tail_ping, 'interval',
-                      minutes=TAIL_PING_INTERVAL_MINUTES,
-                      id="tail_ping_job")
-    logger.info(f"독립 Tail Ping 잡 등록: {TAIL_PING_INTERVAL_MINUTES}분 간격")
+    active_ping_services = [s for s in _s.SERVICES if s != "I2861"]
+    if active_ping_services:
+        scheduler.add_job(run_tail_ping, 'interval',
+                          minutes=TAIL_PING_INTERVAL_MINUTES,
+                          id="tail_ping_job")
+        logger.info(f"독립 Tail Ping 잡 등록: {TAIL_PING_INTERVAL_MINUTES}분 간격")
+    else:
+        logger.info("독립 Tail Ping 잡 비활성화 (I2861 서비스 단독 구동 환경)")
 
     # ✅ 세부업종(industry_type) 백필 6시간 주기 - Key 소진/네트워크 오류로 중단 시 자동 재시도
     scheduler.add_job(_backfill_job, 'interval', hours=6, id="backfill_job")

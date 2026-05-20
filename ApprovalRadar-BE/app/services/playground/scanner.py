@@ -54,21 +54,44 @@ def get_page_scan_history_data(service_id: str) -> dict:
     total_count = state.get("last_total_count", 0)
     fingerprints = state.get("page_fingerprints", {})
     scan_times = state.get("page_scan_times", {})
+    
+    # I2861 전용 extra_state 라벨 및 타임스탬프 로드
+    extra = state.get("extra_state", {})
+    page_labels = extra.get("page_labels", {})
+    page_timestamps = extra.get("page_timestamps", {})
+
     total_pages = (total_count + 999) // 1000 if total_count > 0 else 0
 
     entries = []
     for p in range(total_pages):
         page_start = p * 1000 + 1
         fp = fingerprints.get(str(page_start))
-        ts = scan_times.get(str(page_start))
+        
+        if service_id == "I2861":
+            ts_val = page_timestamps.get(str(p + 1))
+            # UI가 Date 포맷 파싱을 수행할 수 있도록 ISO 포맷 문자열로 변환
+            if ts_val:
+                import datetime
+                ts = datetime.datetime.fromtimestamp(ts_val).isoformat()
+            else:
+                ts = None
+        else:
+            ts = scan_times.get(str(page_start))
+
+        label = page_labels.get(str(p + 1))
+
         entries.append({
             "page_number": p + 1,
             "page_start": page_start,
-            "fingerprint": fp[:12] if fp else None,
+            "fingerprint": fp[:12] if fp else (None if service_id != "I2861" else "LIVE-SCAN"),
             "last_scanned": ts,
+            "label": label,
         })
 
-    scanned = sum(1 for e in entries if e["fingerprint"] is not None)
+    if service_id == "I2861":
+        scanned = sum(1 for e in entries if e["last_scanned"] is not None)
+    else:
+        scanned = sum(1 for e in entries if e["fingerprint"] is not None)
 
     return {
         "total_pages": total_pages,

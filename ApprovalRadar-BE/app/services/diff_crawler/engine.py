@@ -108,6 +108,9 @@ class DiffCrawlerEngine:
             target_pages = [rolling_candidates[0][0]]
             logger.info(f"[{svc}] 🎯 평시 롤링 스캔 페이지 선정: P{target_pages[0]}")
 
+        # 상호명 대역 저장용 딕셔너리
+        page_labels = extra.setdefault("page_labels", {})
+
         new_data_rows = []
         scanned_success_pages = []
         
@@ -120,6 +123,13 @@ class DiffCrawlerEngine:
                 rows = await self._fetch_page(start_idx, end_idx)
                 if rows:
                     new_data_rows.extend(rows)
+                    # 첫 번째 및 마지막 레코드의 상호명 첫 글자 추출
+                    first_nm = rows[0].get("BSSH_NM", "").strip()
+                    last_nm = rows[-1].get("BSSH_NM", "").strip()
+                    first_char = first_nm[0] if first_nm else ""
+                    last_char = last_nm[0] if last_nm else ""
+                    if first_char and last_char:
+                        page_labels[str(page)] = f"{first_char}~{last_char}"
                 scanned_success_pages.append(page)
             except Exception as e:
                 logger.error(f"[{svc}] ❌ 페이지 {page} Fetch 오류: {e}")

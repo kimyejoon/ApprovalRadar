@@ -38,6 +38,7 @@ export interface PageScanEntry {
   page_start: number;
   fingerprint: string | null;
   last_scanned: string | null;
+  label?: string | null;
 }
 
 export interface SmartSweepLogEntry {
