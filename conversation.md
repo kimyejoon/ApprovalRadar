@@ -72,3 +72,4 @@
 - 2026-05-13: 프론트엔드의 요청에 따라 SSE 응답 데이터를 단순 문자열(Raw Text)에서 파싱하기 쉬운 JSON 포맷(`{"type": "...", "message": "..."}`)으로 변경함.
 - 2026-05-20: 프로젝트 리팩토링을 위한 전반적인 분석 수행 및 LOC 300 이상 파일 목록/역할 도출
 - 2026-05-20: diff_crawler.py 모듈 리팩토링 및 클래스 분리 작업을 완료함. 기존 917줄의 단일 파일을 TailExplorer, PivotAnalyzer, DiffBootstrapper 3개의 헬퍼 클래스로 분리 및 Facade 패턴을 적용하여 가독성과 유지보수성을 대폭 향상시킴.
+- 2026-05-20: rolling_scanner.py 모듈 리팩토링 및 클래스 분리 작업을 완료함. 기존 815줄의 단일 파일을 rolling_scan_utils.py, rolling_scan_ops.py 로 분리하여 순수 유틸리티 함수와 DB 스캔 오퍼레이션을 캡슐화함으로써 가독성과 유지보수성을 대폭 향상시키고 LOC를 262줄로 줄임.
