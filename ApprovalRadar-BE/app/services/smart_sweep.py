@@ -1,11 +1,13 @@
 """
-SmartSweep 서비스 — 복합 변경 감지 (Playground 실험용)
+SmartSweep 서비스 — first_CHNG 기반 HOT 변경 감지 (Playground 실험용)
 
 전략:
   1. Stratified Probe  — 전체 인덱스 공간을 N구간으로 균등 분할, 각 구간 탐침
-  2. first_CHNG 필터  — 첫 행 CHNG_DT가 어제/오늘이면 HOT 세그먼트
-  3. total_count 델타 — 캐시 대비 total 변화 세그먼트는 DELTA 분류
-  4. 수집              — HOT/DELTA 세그먼트만 rows 조회 → CHNG_DT 필터 → DB write
+  2. first_CHNG 필터  — 첫 행 CHNG_DT가 오늘이면 HOT, 어제/그제면 WARM 세그먼트
+  3. 수집              — HOT 세그먼트만 rows 조회 → CHNG_DT 필터 → DB write
+
+[total_count delta 전략 폐기]
+  분석 결과: 1000-LCNS 구간당 total_count ≈1307로 균일 수렴 → delta 신호 신뢰 불가
 
 기존 메인 로직(RollingScanner, DiffCrawler) 무수정.
 """
@@ -22,10 +24,9 @@ SVC_ID = "I2861"
 SEG_SIZE = 1000           # 세그먼트당 인덱스 범위
 PROBE_STRATA = 10         # stratified 탐침 구간 수
 MAX_INDEX = 1_000_000     # 탐침 대상 최대 인덱스
-# first_CHNG 임계값: 이 이상이면 WARM/HOT 판단 (보수적 2일 여유)
-WARM_DAYS_AGO = 2
+WARM_DAYS_AGO = 2         # WARM 판단 기준: N일 이내
 
-SegClass = Literal["HOT", "WARM", "DELTA", "COLD"]
+SegClass = Literal["HOT", "WARM", "COLD"]
 
 
 class SweepResult:
@@ -34,7 +35,6 @@ class SweepResult:
         self.probe_calls: int = 0
         self.segments: list[dict] = []      # 탐침 결과 전체
         self.hot_segs: list[dict] = []      # HOT 세그먼트
-        self.delta_segs: list[dict] = []    # DELTA 세그먼트
         self.collected: int = 0
         self.elapsed_sec: float = 0.0
         self.run_at: str = datetime.now().isoformat()
@@ -45,13 +45,12 @@ class SweepResult:
             "strategy": self.strategy,
             "probe_calls": self.probe_calls,
             "hot_segs": len(self.hot_segs),
-            "delta_segs": len(self.delta_segs),
+            "delta_segs": 0,  # 폐기됨 (total_count delta 불신뢰)
             "collected": self.collected,
             "elapsed_sec": round(self.elapsed_sec, 2),
             "detail_json": json.dumps(
                 [{"seg": f"{s['seg_start']}/{s['seg_end']}", "class": s["cls"],
-                  "total": s.get("total"), "first_chng": s.get("first_chng"),
-                  "delta": s.get("delta")}
+                  "first_chng": s.get("first_chng")}
                  for s in self.segments if s.get("cls") != "COLD"],
                 ensure_ascii=False
             ),
@@ -76,8 +75,8 @@ class SmartSweepService:
 
     # ── 분류 로직 ─────────────────────────────────────────────────────────────
 
-    def classify(self, total: int, first_chng: str, cached_total: int | None) -> SegClass:
-        """세그먼트를 HOT/WARM/DELTA/COLD로 분류."""
+    def classify(self, first_chng: str) -> SegClass:
+        """first_CHNG 기준으로 HOT/WARM/COLD 분류. (total_count delta 폐기)"""
         today = datetime.now().strftime("%Y%m%d")
         warm_threshold = (datetime.now() - timedelta(days=WARM_DAYS_AGO)).strftime("%Y%m%d")
 
@@ -85,8 +84,6 @@ class SmartSweepService:
             return "HOT"
         if first_chng and first_chng >= warm_threshold:
             return "WARM"
-        if cached_total is not None and total != cached_total:
-            return "DELTA"
         return "COLD"
 
     # ── API 조회 (비동기) ─────────────────────────────────────────────────────
@@ -148,7 +145,8 @@ class SmartSweepService:
             return
         now = datetime.now().isoformat()
         rows = [
-            (e["seg_start"], e["seg_end"], e["total"], e["first_chng"], now, label)
+            (e["seg_start"], e["seg_end"], 0, e.get("first_chng", ""), now, label)
+            # total_count=0 고정 (delta 전략 폐기로 total 캐싱 불필요)
             for e in entries
         ]
         with get_db() as conn:
@@ -209,38 +207,31 @@ class SmartSweepService:
                 logger.info(f"[SmartSweep] ⚠ {seg_start:,}~{seg_end:,} 스킵 (타임아웃/오류)")
                 continue
 
-            total = seg_data["total"]
             first_chng = seg_data["first_chng"]
-            cached_total = cache.get((seg_start, seg_end))
-            delta = (total - cached_total) if cached_total is not None else None
-            cls = self.classify(total, first_chng, cached_total)
+            cls = self.classify(first_chng)
 
             seg_info = {
                 "seg_start": seg_start, "seg_end": seg_end,
-                "total": total, "first_chng": first_chng,
-                "cached_total": cached_total, "delta": delta, "cls": cls,
+                "first_chng": first_chng, "cls": cls,
                 "rows": seg_data.get("rows", []),
             }
             result.segments.append(seg_info)
-            # ← _save_cache 개별 호출 제거 (배치로 대체)
 
-            label = {"HOT": "🎯", "WARM": "📅", "DELTA": "📈", "COLD": "❄️"}.get(cls, "")
+            label = {"HOT": "🎯", "WARM": "📅", "COLD": "❄️"}.get(cls, "")
             logger.info(
                 f"[SmartSweep] {label} [{cls}] {seg_start:,}~{seg_end:,} | "
-                f"total={total} first_CHNG={first_chng} delta={delta}"
+                f"first_CHNG={first_chng}"
             )
 
             if cls == "HOT":
                 result.hot_segs.append(seg_info)
-            elif cls == "DELTA":
-                result.delta_segs.append(seg_info)
 
         # 루프 완료 후 1회 배치 저장 (10 write → 1 write, WAL 누적 방지)
         self._batch_save_cache(result.segments, "stratified")
 
-        # HOT/DELTA 세그먼트 collect (메인 스캐너 유휴 시에만)
+        # HOT 세그먼트 collect (메인 스캐너 유휴 시에만)
         if not _scraper_lock.locked():
-            for seg in result.hot_segs + result.delta_segs:
+            for seg in result.hot_segs:
                 n = await self._collect_segment(seg, today, yesterday)
                 result.collected += n
                 result.probe_calls += 1
@@ -250,7 +241,7 @@ class SmartSweepService:
 
         logger.info(
             f"[SmartSweep] ✅ Micro Probe 완료: "
-            f"{result.probe_calls}calls | HOT:{len(result.hot_segs)} DELTA:{len(result.delta_segs)} "
+            f"{result.probe_calls}calls | HOT:{len(result.hot_segs)} "
             f"수집:{result.collected}건 | {result.elapsed_sec:.1f}초"
         )
         return result
@@ -289,28 +280,23 @@ class SmartSweepService:
                 continue
 
             consecutive_empty = 0
-            total = seg_data["total"]
             first_chng = seg_data["first_chng"]
-            cached_total = cache.get((seg_start, seg_end))
-            delta = (total - cached_total) if cached_total is not None else None
-            cls = self.classify(total, first_chng, cached_total)
+            cls = self.classify(first_chng)
 
             seg_info = {
                 "seg_start": seg_start, "seg_end": seg_end,
-                "total": total, "first_chng": first_chng,
-                "cached_total": cached_total, "delta": delta, "cls": cls,
+                "first_chng": first_chng, "cls": cls,
                 "rows": seg_data.get("rows", []),
             }
             result.segments.append(seg_info)
-            # ← _save_cache 개별 호출 제거 (배치로 대체)
 
-            if cls in ("HOT", "WARM", "DELTA"):
-                label = {"HOT": "🎯", "WARM": "📅", "DELTA": "📈"}.get(cls, "")
+            if cls in ("HOT", "WARM"):
+                label = {"HOT": "🎯", "WARM": "📅"}.get(cls, "")
                 logger.info(
                     f"[SmartSweep] {label} [{cls}] {seg_start:,}~{seg_end:,} | "
-                    f"first_CHNG={first_chng} delta={delta}"
+                    f"first_CHNG={first_chng}"
                 )
-                if cls in ("HOT", "DELTA"):
+                if cls == "HOT":
                     result.hot_segs.append(seg_info)
                     n = await self._collect_segment(seg_info, today, yesterday)
                     result.collected += n

@@ -52,10 +52,9 @@ interface SmartSweepLogEntry {
   strategy: string;
   probe_calls: number;
   hot_segs: number;
-  delta_segs: number;
   collected: number;
   elapsed_sec: number;
-  detail: { seg: string; class: string; total: number; first_chng: string; delta: number | null }[];
+  detail: { seg: string; class: string; first_chng: string }[];
 }
 
 interface SmartSweepCache {
@@ -591,26 +590,21 @@ export function PlaygroundPage() {
                 <span className={entry.hot_segs > 0 ? 'text-red-400 font-semibold' : 'text-zinc-500'}>
                   HOT {entry.hot_segs}
                 </span>
-                <span className={entry.delta_segs > 0 ? 'text-amber-400' : 'text-zinc-500'}>
-                  DELTA {entry.delta_segs}
-                </span>
                 <span className={entry.collected > 0 ? 'text-emerald-400 font-semibold' : 'text-zinc-600'}>
                   수집 {entry.collected}건
                 </span>
                 <span className="text-zinc-600 ml-auto">{entry.elapsed_sec.toFixed(1)}초</span>
               </div>
             ))}
-            {/* HOT/DELTA 세그먼트 상세 */}
             {sweepLog[0]?.detail.length > 0 && (
               <div className="mt-3 p-2 bg-surface-2 rounded-lg">
                 <div className="text-xs text-text-muted mb-1.5">최근 실행 주목 세그먼트</div>
                 {sweepLog[0].detail.map((d, i) => (
                   <div key={i} className="flex gap-2 text-xs py-0.5">
-                    <span className={d.class === 'HOT' ? 'text-red-400' : d.class === 'DELTA' ? 'text-amber-400' : 'text-zinc-500'}>
-                      {d.class === 'HOT' ? '🎯' : d.class === 'DELTA' ? '📈' : '📅'} {d.seg}
+                    <span className={d.class === 'HOT' ? 'text-red-400' : 'text-zinc-500'}>
+                      {d.class === 'HOT' ? '🎯' : '📅'} {d.seg}
                     </span>
                     <span className="text-zinc-500">first={d.first_chng}</span>
-                    {d.delta !== null && <span className={d.delta > 0 ? 'text-amber-300' : 'text-zinc-600'}>Δ{d.delta > 0 ? '+' : ''}{d.delta}</span>}
                   </div>
                 ))}
               </div>
