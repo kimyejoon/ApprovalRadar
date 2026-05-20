@@ -1,15 +1,13 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowClockwise } from '@phosphor-icons/react';
+import { ArrowClockwise, Warning } from '@phosphor-icons/react';
 
 import type { PlaygroundSummary } from './PlaygroundPage/types';
 import { fetchPlaygroundSummary } from './PlaygroundPage/api';
 
 // 분리한 서브 컴포넌트 임포트
-import { SchedulerSection } from './PlaygroundPage/components/SchedulerSection';
 import { ManualTriggerSection } from './PlaygroundPage/components/ManualTriggerSection';
 import { TodayDetectionSection } from './PlaygroundPage/components/TodayDetectionSection';
-import { TailHistorySection } from './PlaygroundPage/components/TailHistorySection';
 import { PageScanHistorySection } from './PlaygroundPage/components/PageScanHistorySection';
 
 export function PlaygroundPage() {
@@ -28,15 +26,11 @@ export function PlaygroundPage() {
   });
 
   const handleTriggerMsg = useCallback((msg: string) => {
-    // 트리거 후 즉시 한 번 refetch해서 빠른 피드백 제공
     setTimeout(refetch, 1000);
-    // Toast 대신 콘솔 (필요 시 토스트 스토어로 연결 가능)
     console.info('[Playground Trigger]', msg);
   }, [refetch]);
 
-  const scheduler = summary?.scheduler ?? null;
   const today = summary?.today ?? null;
-  const tailHistory = summary?.tail_history?.entries ?? [];
   const pageScan = summary?.page_scan
     ? { total_pages: summary.page_scan.total_pages, scanned_pages: summary.page_scan.scanned_pages, entries: summary.page_scan.entries }
     : null;
@@ -58,19 +52,22 @@ export function PlaygroundPage() {
         </button>
       </div>
 
-      {/* Row 1: Scheduler + Triggers */}
+      {/* 개발자 전용 경고 문구 */}
+      <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5 text-yellow-400">
+        <Warning className="w-4 h-4 mt-0.5 shrink-0" />
+        <p className="text-xs leading-relaxed">
+          개발자의 안내 없이는 플레이그라운드 기능 사용을 지양해주세요.
+          수동 트리거 등은 서버 상태에 직접적인 영향을 줌니다.
+        </p>
+      </div>
+
+      {/* Row 1: Triggers + Today Detection */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SchedulerSection scheduler={scheduler} />
         <ManualTriggerSection onTriggerMsg={handleTriggerMsg} />
-      </div>
-
-      {/* Row 2: Today Detection + Tail History Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TodayDetectionSection today={today} />
-        <TailHistorySection tailHistory={tailHistory} />
       </div>
 
-      {/* Row 3: Page Scan History */}
+      {/* Row 2: Page Scan History */}
       <PageScanHistorySection pageScan={pageScan} />
     </div>
   );

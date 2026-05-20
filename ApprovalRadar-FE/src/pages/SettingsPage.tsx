@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Key, ArrowsClockwise, CheckCircle, XCircle } from '@phosphor-icons/react';
+import { Key, ArrowsClockwise } from '@phosphor-icons/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 // 분리한 API 및 서브 컴포넌트 임포트
@@ -7,8 +7,6 @@ import { useApiKeysQuery, useToggleApiKeyMutation, useDeleteApiKeyMutation } fro
 import { KeyRow } from './SettingsPage/components/KeyRow';
 import { AddKeyForm } from './SettingsPage/components/AddKeyForm';
 import { NotificationSection } from './SettingsPage/components/NotificationSection';
-import { CrawlIntervalSection } from './SettingsPage/components/CrawlIntervalSection';
-import { RollingScanSection } from './SettingsPage/components/RollingScanSection';
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
@@ -21,9 +19,6 @@ export function SettingsPage() {
     deleteMutation.mutate(id);
   };
 
-  const activeCount = data?.keys.filter((k) => k.is_active && !k.is_exhausted).length ?? 0;
-  const exhaustedCount = data?.keys.filter((k) => k.is_exhausted).length ?? 0;
-
   return (
     <div className="flex flex-col gap-6">
       {/* 페이지 헤더 */}
@@ -31,40 +26,6 @@ export function SettingsPage() {
         <p className="text-sm text-text-muted mt-1">
           식품안전나라 API 키를 DB에서 관리합니다. 변경 사항은 서버 재시작 없이 즉시 반영됩니다.
         </p>
-      </div>
-
-      {/* 요약 카드 */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="border-border-standard bg-surface">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-sm font-medium text-text-muted flex items-center gap-2">
-              <Key className="w-4 h-4" />전체 키
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-medium text-text-primary">{data?.total ?? '-'}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-border-standard bg-surface">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-sm font-medium text-text-muted flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-brand" />활성 키
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-medium text-brand">{activeCount}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-border-standard bg-surface">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-sm font-medium text-text-muted flex items-center gap-2">
-              <XCircle className="w-4 h-4 text-yellow-400" />소진 키
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-medium text-yellow-400">{exhaustedCount}</div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* API 키 관리 카드 */}
@@ -139,12 +100,6 @@ export function SettingsPage() {
 
       {/* 알림 설정 카드 */}
       <NotificationSection />
-
-      {/* 크롤링 주기 설정 카드 */}
-      <CrawlIntervalSection />
-
-      {/* Rolling Scan 스캔 속도 설정 카드 */}
-      <RollingScanSection />
     </div>
   );
 }
