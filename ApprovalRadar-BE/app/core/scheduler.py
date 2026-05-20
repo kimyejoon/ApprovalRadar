@@ -131,10 +131,25 @@ def start_scheduler():
     # 매일 업무 시작 전 피벗 재생성으로 당일 변동 감지 정확도 보장
     scheduler.add_job(_daily_bootstrap_job, 'cron', hour=9, minute=0, id="daily_bootstrap_job")
 
-    # [전략C 제거] I2500 CHNG_DT Poller → I2500은 세부업종 백필 전용으로만 사용
-    # 이유: I2500은 비타겟 업종(집단급식소 등)까지 유입시키며,
-    #       Rolling Scan + Tail Ping이 I2861 변동 감지를 충분히 커버함
+    # ── SmartSweep 실험 잡 (Playground 전용, 5분 간격) ──────────────────────
+    # 기존 메인 로직 무수정. 읽기 전용 탐침 + HOT 세그먼트만 수집.
+    # 로그 기반으로 승격 여부 추후 결정.
+    def _smart_sweep_micro():
+        async def _run():
+            from app.clients.foodsafety_api import ApiClient
+            from app.services.smart_sweep import SmartSweepService
+            async with ApiClient() as api_client:
+                svc = SmartSweepService(api_client)
+                await svc.run_micro_probe()
+        asyncio.run(_run())
 
+    scheduler.add_job(
+        _smart_sweep_micro, 'interval', minutes=5,
+        id="smart_sweep_micro",
+        max_instances=1,   # 동시 실행 방지
+        coalesce=True,     # 밀린 실행은 1회로 합산
+    )
+    logger.info("SmartSweep Micro Probe 잡 등록: 5분 간격")
 
     # 앱 시작 시 즉시 1회 실행 (blocking 방지를 위해 스케줄러에 위임)
     logger.info("Adding initial catch-up scraper job to background...")

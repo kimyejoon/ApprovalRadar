@@ -269,6 +269,25 @@ async def trigger_job(job_type: str):
             asyncio.create_task(_run_poller())
             return TriggerResponse(success=True, message="📡 I2500 CHNG_DT Poller 즉시 실행 시작")
 
+        elif job_type == "smart_sweep_micro":
+            async def _run_sweep():
+                from app.clients.foodsafety_api import ApiClient
+                from app.services.smart_sweep import SmartSweepService
+                async with ApiClient() as api_client:
+                    svc = SmartSweepService(api_client)
+                    await svc.run_micro_probe()
+            asyncio.create_task(_run_sweep())
+            return TriggerResponse(success=True, message="🔍 SmartSweep Micro Probe 즉시 실행 시작")
+
+        elif job_type == "smart_sweep_full":
+            async def _run_full_sweep():
+                from app.clients.foodsafety_api import ApiClient
+                from app.services.smart_sweep import SmartSweepService
+                async with ApiClient() as api_client:
+                    svc = SmartSweepService(api_client)
+                    await svc.run_full_sweep(max_segs=200)
+            asyncio.create_task(_run_full_sweep())
+            return TriggerResponse(success=True, message="🔄 SmartSweep Full Sweep 즉시 실행 시작 (200seg)")
 
         else:
             raise HTTPException(status_code=400, detail=f"알 수 없는 잡 타입: {job_type}")
@@ -488,4 +507,79 @@ async def get_chng_dt_trend():
         "yesterday_entries": [e.model_dump() for e in yesterday_entries],
         "today_date": today_str,
         "today_entries": [e.model_dump() for e in today_entries],
+    }
+
+
+# ─── SmartSweep 모니터링 ──────────────────────────────────────────────────────
+
+@router.get("/smart-sweep/status")
+async def get_smart_sweep_status():
+    """SmartSweep 최근 10회 실행 이력 반환."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT run_at, strategy, probe_calls, hot_segs, delta_segs,
+                      collected, elapsed_sec, detail_json
+               FROM smart_sweep_log
+               ORDER BY id DESC LIMIT 10"""
+        ).fetchall()
+
+    entries = []
+    for r in rows:
+        detail = []
+        try:
+            detail = json.loads(r["detail_json"]) if r["detail_json"] else []
+        except Exception:
+            pass
+        entries.append({
+            "run_at": r["run_at"],
+            "strategy": r["strategy"],
+            "probe_calls": r["probe_calls"],
+            "hot_segs": r["hot_segs"],
+            "delta_segs": r["delta_segs"],
+            "collected": r["collected"],
+            "elapsed_sec": r["elapsed_sec"],
+            "detail": detail,
+        })
+
+    return {"entries": entries, "count": len(entries)}
+
+
+@router.get("/smart-sweep/cache")
+async def get_smart_sweep_cache():
+    """SmartSweep 세그먼트 캐시 현황 반환 (최근 탐침 결과)."""
+    today = datetime.now().strftime("%Y%m%d")
+    yesterday = (datetime.now() - __import__('datetime').timedelta(days=1)).strftime("%Y%m%d")
+
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT seg_start, seg_end, total_count, first_chng, probed_at, probe_label
+               FROM smart_sweep_cache
+               ORDER BY seg_start ASC"""
+        ).fetchall()
+
+    result = []
+    for r in rows:
+        first_chng = r["first_chng"] or ""
+        cls = "COLD"
+        if first_chng >= today:
+            cls = "HOT"
+        elif first_chng >= yesterday:
+            cls = "WARM"
+        result.append({
+            "seg": f"{r['seg_start']:,}~{r['seg_end']:,}",
+            "total_count": r["total_count"],
+            "first_chng": first_chng,
+            "cls": cls,
+            "probed_at": r["probed_at"],
+            "label": r["probe_label"],
+        })
+
+    hot = sum(1 for x in result if x["cls"] == "HOT")
+    warm = sum(1 for x in result if x["cls"] == "WARM")
+    return {
+        "total_cached": len(result),
+        "hot": hot,
+        "warm": warm,
+        "cold": len(result) - hot - warm,
+        "segments": result,
     }

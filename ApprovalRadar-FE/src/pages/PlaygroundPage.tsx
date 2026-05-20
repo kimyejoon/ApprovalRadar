@@ -47,6 +47,24 @@ interface PageScanEntry {
   last_scanned: string | null;
 }
 
+interface SmartSweepLogEntry {
+  run_at: string;
+  strategy: string;
+  probe_calls: number;
+  hot_segs: number;
+  delta_segs: number;
+  collected: number;
+  elapsed_sec: number;
+  detail: { seg: string; class: string; total: number; first_chng: string; delta: number | null }[];
+}
+
+interface SmartSweepCache {
+  total_cached: number;
+  hot: number;
+  warm: number;
+  cold: number;
+  segments: { seg: string; total_count: number; first_chng: string; cls: string; probed_at: string }[];
+}
 
 
 // ─── API Helpers ────────────────────────────────────────────────────────────
@@ -92,6 +110,17 @@ async function fetchPageScanHistory(): Promise<{ total_pages: number; scanned_pa
   return res.json();
 }
 
+async function fetchSmartSweepStatus(): Promise<{ entries: SmartSweepLogEntry[]; count: number }> {
+  const res = await fetch(`${BASE}/smart-sweep/status`);
+  if (!res.ok) return { entries: [], count: 0 };
+  return res.json();
+}
+
+async function fetchSmartSweepCache(): Promise<SmartSweepCache> {
+  const res = await fetch(`${BASE}/smart-sweep/cache`);
+  if (!res.ok) return { total_cached: 0, hot: 0, warm: 0, cold: 0, segments: [] };
+  return res.json();
+}
 
 
 // ─── Helper Components ──────────────────────────────────────────────────────
@@ -127,6 +156,8 @@ export function PlaygroundPage() {
   const [today, setToday] = useState<TodayDetection | null>(null);
   const [tailHistory, setTailHistory] = useState<TailHistoryEntry[]>([]);
   const [pageScan, setPageScan] = useState<{ total_pages: number; scanned_pages: number; entries: PageScanEntry[] } | null>(null);
+  const [sweepLog, setSweepLog] = useState<SmartSweepLogEntry[]>([]);
+  const [sweepCache, setSweepCache] = useState<SmartSweepCache | null>(null);
 
   const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -135,16 +166,20 @@ export function PlaygroundPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const [sched, det, tail, pages] = await Promise.all([
+      const [sched, det, tail, pages, swLog, swCache] = await Promise.all([
         fetchSchedulerStatus(),
         fetchTodayDetection(),
         fetchTailHistory(),
         fetchPageScanHistory(),
+        fetchSmartSweepStatus(),
+        fetchSmartSweepCache(),
       ]);
       setScheduler(sched);
       setToday(det);
       setTailHistory(tail);
       setPageScan(pages);
+      setSweepLog(swLog.entries);
+      setSweepCache(swCache);
     } catch (e) {
       console.error('Playground refresh failed:', e);
     }
@@ -502,6 +537,87 @@ export function PlaygroundPage() {
           </div>
         ) : (
           <div className="text-sm text-text-muted">로딩 중...</div>
+        )}
+      </Card>
+
+      {/* SmartSweep 모니터 카드 */}
+      <Card>
+        <SectionTitle icon={<MagnifyingGlass size={18} className="text-violet-400" />} title="🔬 SmartSweep 실험 모니터" />
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => handleTrigger('smart_sweep_micro')}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 text-xs font-medium transition-colors border border-violet-600/30 disabled:opacity-40"
+          >
+            <Lightning size={13} /> Micro Probe (10탐침)
+          </button>
+          <button
+            onClick={() => handleTrigger('smart_sweep_full')}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-medium transition-colors border border-indigo-600/30 disabled:opacity-40"
+          >
+            <ArrowClockwise size={13} /> Full Sweep (200seg)
+          </button>
+        </div>
+
+        {/* 캐시 요약 */}
+        {sweepCache && sweepCache.total_cached > 0 && (
+          <div className="flex gap-3 mb-4">
+            {[
+              { label: '탐침 세그먼트', val: sweepCache.total_cached, color: 'text-zinc-300' },
+              { label: '🎯 HOT', val: sweepCache.hot, color: 'text-red-400' },
+              { label: '📅 WARM', val: sweepCache.warm, color: 'text-amber-400' },
+              { label: '❄️ COLD', val: sweepCache.cold, color: 'text-zinc-500' },
+            ].map(({ label, val, color }) => (
+              <div key={label} className="bg-surface-2 rounded-lg px-3 py-2 text-center min-w-[70px]">
+                <div className={`text-lg font-bold ${color}`}>{val}</div>
+                <div className="text-[10px] text-text-muted mt-0.5">{label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 실행 이력 */}
+        {sweepLog.length > 0 ? (
+          <div className="space-y-2">
+            <div className="text-xs text-text-muted mb-2">최근 {sweepLog.length}회 실행 이력</div>
+            {sweepLog.slice(0, 5).map((entry, idx) => (
+              <div key={idx} className="bg-surface-2 rounded-lg px-3 py-2.5 flex items-center gap-4 text-xs">
+                <span className="text-text-muted shrink-0 w-[72px]">
+                  {entry.run_at.slice(11, 19)}
+                </span>
+                <span className="text-zinc-400 w-[90px] shrink-0">{entry.strategy}</span>
+                <span className="text-violet-300">탐침 {entry.probe_calls}회</span>
+                <span className={entry.hot_segs > 0 ? 'text-red-400 font-semibold' : 'text-zinc-500'}>
+                  HOT {entry.hot_segs}
+                </span>
+                <span className={entry.delta_segs > 0 ? 'text-amber-400' : 'text-zinc-500'}>
+                  DELTA {entry.delta_segs}
+                </span>
+                <span className={entry.collected > 0 ? 'text-emerald-400 font-semibold' : 'text-zinc-600'}>
+                  수집 {entry.collected}건
+                </span>
+                <span className="text-zinc-600 ml-auto">{entry.elapsed_sec.toFixed(1)}초</span>
+              </div>
+            ))}
+            {/* HOT/DELTA 세그먼트 상세 */}
+            {sweepLog[0]?.detail.length > 0 && (
+              <div className="mt-3 p-2 bg-surface-2 rounded-lg">
+                <div className="text-xs text-text-muted mb-1.5">최근 실행 주목 세그먼트</div>
+                {sweepLog[0].detail.map((d, i) => (
+                  <div key={i} className="flex gap-2 text-xs py-0.5">
+                    <span className={d.class === 'HOT' ? 'text-red-400' : d.class === 'DELTA' ? 'text-amber-400' : 'text-zinc-500'}>
+                      {d.class === 'HOT' ? '🎯' : d.class === 'DELTA' ? '📈' : '📅'} {d.seg}
+                    </span>
+                    <span className="text-zinc-500">first={d.first_chng}</span>
+                    {d.delta !== null && <span className={d.delta > 0 ? 'text-amber-300' : 'text-zinc-600'}>Δ{d.delta > 0 ? '+' : ''}{d.delta}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm text-text-muted">아직 실행 이력 없음 — Micro Probe를 실행해보세요</div>
         )}
       </Card>
     </div>

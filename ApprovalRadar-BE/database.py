@@ -311,6 +311,45 @@ def init_db():
         )
     ''')
 
+    # Tail(total_count) 일별 변화 추적 테이블
+    cursor.execute('''\
+        CREATE TABLE IF NOT EXISTS tail_history (
+            service_id  TEXT NOT NULL,
+            record_date TEXT NOT NULL,
+            total_count INTEGER NOT NULL,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (service_id, record_date)
+        )
+    ''')
+
+    # SmartSweep 캐시: 세그먼트별 마지막 상태 (total_count delta + first_chng 필터)
+    cursor.execute('''\
+        CREATE TABLE IF NOT EXISTS smart_sweep_cache (
+            seg_start   INTEGER NOT NULL,
+            seg_end     INTEGER NOT NULL,
+            total_count INTEGER,
+            first_chng  TEXT,
+            probed_at   TEXT,
+            probe_label TEXT DEFAULT "stratified",
+            PRIMARY KEY (seg_start, seg_end)
+        )
+    ''')
+
+    # SmartSweep 실행 이력: Playground 모니터링용
+    cursor.execute('''\
+        CREATE TABLE IF NOT EXISTS smart_sweep_log (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_at      TEXT NOT NULL,
+            strategy    TEXT NOT NULL,
+            probe_calls INTEGER DEFAULT 0,
+            hot_segs    INTEGER DEFAULT 0,
+            delta_segs  INTEGER DEFAULT 0,
+            collected   INTEGER DEFAULT 0,
+            elapsed_sec REAL DEFAULT 0.0,
+            detail_json TEXT
+        )
+    ''')
+
     # 서비스 ID별 API 호출 횟수 추적 테이블 (I2859/I2861/I2500 구분)
     cursor.execute('''\
         CREATE TABLE IF NOT EXISTS api_key_usage_by_service (
