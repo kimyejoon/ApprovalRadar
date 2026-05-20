@@ -203,8 +203,9 @@ class DiffCrawlerEngine:
                     "est_remaining_min": est_remaining_min,
                 }
 
+                captured_label = page_labels.get(str(page), '—')
                 logger.info(
-                    f"[{svc}] ✅ P{page}/{total_pages} 완료 | "
+                    f"[{svc}] ✅ P{page}/{total_pages} [{captured_label}] 완료 | "
                     f"조회 {row_count:,}건 | "
                     f"오늘 {page_stats['today']}건 · 어제 {page_stats['yesterday']}건 · "
                     f"신규 {page_stats['new_indexed']}건 · 중복 {page_stats['skipped_dup']}건 | "
