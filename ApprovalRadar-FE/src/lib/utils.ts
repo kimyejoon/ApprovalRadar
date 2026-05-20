@@ -35,7 +35,10 @@ export function formatApprovalDate(dateStr: string) {
 
 export function formatIndexedAt(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
-  const date = new Date(dateStr);
+  // SQLite CURRENT_TIMESTAMP는 UTC로 저장되지만 타임존 표기(Z/+09:00)가 없음
+  // JS는 타임존 없는 문자열을 로컬 시간으로 해석하므로, UTC임을 명시하기 위해 'Z' 추가
+  const normalized = /[Zz]|[+-]\d{2}:?\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z';
+  const date = new Date(normalized);
   if (isNaN(date.getTime())) return '';
 
   const y = date.getFullYear();
