@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from app.clients.foodsafety_api import ApiClient
 from app.services.diff_crawler import DiffCrawlerEngine
 
+
 def check_keys():
     print("API 키 상태를 점검합니다...")
     async def _run():
@@ -19,79 +20,33 @@ def check_keys():
             await client.check_keys_status()
     asyncio.run(_run())
 
+
 def test_tail():
-    import time
-    print("현재 데이터의 꼬리(Tail) 지점을 조회합니다...")
-    print("(DB 저장값과 API 실시간값을 비교합니다)\n")
+    print("현재 데이터의 꼬리(Tail) 지점을 조회합니다...\n")
 
     async def _run():
         from app.repositories.state_repository import StateRepository
         from app.core.config import settings as _s
         state_repo = StateRepository()
 
-        async with ApiClient() as client:
-            services = getattr(_s, "SERVICES", ["I2861"])
-            svc_names = {"I2859": "식품업소", "I2861": "음식점업소"}
+        services = getattr(_s, "SERVICES", ["I2861"])
+        svc_names = {"I2861": "음식점업소"}
 
-            for i, service_id in enumerate(services):
-                if i > 0:
-                    print(f"\n  (다음 서비스 전 3초 대기 - WAF 방지)")
-                    await asyncio.sleep(3)
+        for service_id in services:
+            svc_name = svc_names.get(service_id, service_id)
+            print(f"\n{'─' * 50}")
+            print(f"📡 [{service_id}] {svc_name}")
+            print(f"{'─' * 50}")
 
-                svc_name = svc_names.get(service_id, service_id)
-                print(f"\n{'─' * 50}")
-                print(f"📡 [{service_id}] {svc_name}")
-                print(f"{'─' * 50}")
-
-                # DB 저장된 tail
-                state = state_repo.load_state(service_id)
-                db_tail = state.get("last_total_count", 0)
-                pivot_count = len(state.get("pivots", {}))
-                print(f"  📋 DB 저장 tail: {db_tail:,}건 (피벗 {pivot_count}개)")
-
-                if db_tail == 0:
-                    print(f"  ⚠️  부트스트랩 미완료 → 처음부터 탐색합니다.")
-
-                # 역방향 검증: DB tail 근방에 데이터 있는지 (범위 체크 — Gap 오탐 방지)
-                if db_tail > 0:
-                    range_start = max(1, db_tail - 999)
-                    print(f"  🔍 역방향 검증: [{range_start:,}~{db_tail:,}] 범위 데이터 확인...", end=" ")
-                    try:
-                        res = await client.fetch_data(service_id, range_start, db_tail, timeout=10)
-                        block = res.get(service_id, {}) if res else {}
-                        code = block.get("RESULT", {}).get("CODE", "")
-                        if code == "INFO-000" and block.get("row"):
-                            row_count = len(block["row"])
-                            print(f"✅ 유효 ({row_count}건)")
-                        else:
-                            print(f"❌ 데이터 없음 (CODE={code})")
-                            print(f"  ⚠️  실제 tail 축소/재정렬 감지!")
-                    except Exception as e:
-                        print(f"⚠️ 오류: {e}")
-                    await asyncio.sleep(2)
-
-                # 실시간 tail 탐색
-                print(f"  🔍 실시간 tail 이진탐색 시작...")
-                start_time = time.time()
-                crawler = DiffCrawlerEngine(api_client=client, service_id=service_id)
-                actual_tail = await crawler.find_true_tail(known_tail=0)
-                elapsed = time.time() - start_time
-
-                print(f"  📊 실시간 tail: {actual_tail:,}건 ({elapsed:.1f}초)")
-
-                # 비교
-                if db_tail > 0:
-                    diff = actual_tail - db_tail
-                    if diff > 0:
-                        print(f"  📈 차이: +{diff:,}건 (신규 데이터 추가)")
-                    elif diff < 0:
-                        print(f"  📉 차이: {diff:,}건 (API 재정렬로 축소)")
-                    else:
-                        print(f"  ✅ 일치: DB tail == 실시간 tail")
+            state = state_repo.load_state(service_id)
+            db_tail = state.get("last_total_count", 0)
+            print(f"  📋 DB 저장 tail: {db_tail:,}건")
+            print("  💡 (이진탐색/Tail Ping 최적화 제거로 실시간 이진탐색은 지원하지 않습니다)")
 
     asyncio.run(_run())
     print(f"\n{'─' * 50}")
     print("✅ 조회 완료")
+
 
 def run_sync():
     print("수동으로 차분 동기화(Delta Sync)를 1회 실행합니다...")
@@ -103,6 +58,7 @@ def run_backfill():
     print("DB에 누락된 세부업종 데이터를 단건 조회를 통해 채워넣습니다(Backfill)...")
     from app.services.industry_filler import fill_missing_industry_types
     fill_missing_industry_types()
+
 
 def test_stream_update():
     print("가상의 SSE 업데이트 이벤트를 트리거합니다...")
@@ -117,16 +73,13 @@ def test_stream_update():
         print(f"❌ 요청 중 오류 발생: {e}\n(서버가 http://localhost:8000 에서 켜져있는지 확인해주세요)")
 
 
-# ─── Full-Scan Init ────────────────────────────────────────────────────────────
-
 def reset_state(services: list | None = None):
     """crawler_state 테이블만 리셋합니다. businesses 데이터는 보존합니다."""
     from database import DB_FILE, init_db
     init_db()
-    services = services or ["I2859", "I2861"]
+    services = services or ["I2861"]
 
     conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
     try:
         for svc in services:
             conn.execute(
@@ -140,18 +93,17 @@ def reset_state(services: list | None = None):
         conn.close()
 
 
-def full_scan_init(no_backup: bool = False, services: list | None = None, resume: bool = False):
+def full_scan_init(no_backup: bool = False, services: list | None = None):
     """
-    DB를 완전 초기화하고 전체 bootstrap을 재실행합니다.
+    DB를 완전 초기화하고 전체 스캔을 재준비합니다.
     - businesses, api_raw_data, crawler_state 초기화
-    - 서비스별 find_true_tail + bootstrap 순차 실행
-    - API 호출 횟수 실측 보고
+    - I2861 최적화 초기화 세팅
     """
     from database import DB_FILE, init_db
     init_db()
 
-    services = services or ["I2859", "I2861"]
-    svc_names = {"I2859": "식품업소 인허가변경", "I2861": "음식점업소 인허가변경"}
+    services = services or ["I2861"]
+    svc_names = {"I2861": "음식점업소 인허가변경"}
 
     # ① 확인 프롬프트
     print("\n" + "=" * 60)
@@ -184,11 +136,9 @@ def full_scan_init(no_backup: bool = False, services: list | None = None, resume
     print("\n🗑  DB 초기화 중...")
     conn = sqlite3.connect(DB_FILE)
     try:
-        # 특정 서비스만 리셋하는 경우는 businesses 전체 삭제 없이 state만
-        if set(services) == {"I2859", "I2861"}:
-            conn.execute("DELETE FROM businesses")
-            conn.execute("DELETE FROM api_raw_data")
-            print("   ✓ businesses, api_raw_data 초기화")
+        conn.execute("DELETE FROM businesses")
+        conn.execute("DELETE FROM api_raw_data")
+        print("   ✓ businesses, api_raw_data 초기화")
         for svc in services:
             conn.execute("DELETE FROM crawler_state WHERE service_id = ?", (svc,))
         conn.commit()
@@ -196,7 +146,7 @@ def full_scan_init(no_backup: bool = False, services: list | None = None, resume
     finally:
         conn.close()
 
-    # VACUUM은 트랜잭션 외부(autocommit 모드)에서만 실행 가능
+    # VACUUM
     vacuum_conn = sqlite3.connect(DB_FILE, isolation_level=None)
     try:
         vacuum_conn.execute("VACUUM")
@@ -204,86 +154,59 @@ def full_scan_init(no_backup: bool = False, services: list | None = None, resume
     finally:
         vacuum_conn.close()
 
-    # ④ 서비스별 bootstrap 실행
+    # ④ 서비스별 초기화 실행
     total_start = datetime.datetime.now()
     summary = []
 
-    async def _run_bootstrap():
-        async with ApiClient() as client:
-            for i, svc in enumerate(services):
-                # --resume: 이미 초기화된 서비스는 스킵
-                if resume:
-                    from app.repositories.state_repository import StateRepository
-                    existing = StateRepository().load_state(svc)
-                    if existing.get("last_total_count", 0) > 0 and len(existing.get("pivots", {})) > 0:
-                        tail_e = existing['last_total_count']
-                        pivots_e = len(existing['pivots'])
-                        print(f"[{svc}] ✅ 이미 초기화됨 (tail={tail_e:,}건, 피벗 {pivots_e}개) → 스킵")
-                        summary.append((svc, tail_e, pivots_e, 0))
-                        continue
+    async def _run_init():
+        for i, svc in enumerate(services):
+            if i > 0:
+                await asyncio.sleep(2)
 
-                if i > 0 or (resume and i == 0):
-                    print(f"\n   (다음 서비스 전 5초 대기 - WAF 방지)")
-                    await asyncio.sleep(5)
+            sep = "─" * 50
+            print(f"\n{sep}")
+            print(f"🚀 [{svc}] {svc_names.get(svc, svc)} 초기 꼬리 상태 세팅 시작...")
+            print(sep)
 
-                sep = "\u2500" * 50
-                print(f"\n{sep}")
-                print(f"\ud83d\ude80 [{svc}] {svc_names.get(svc, svc)} Bootstrap \uc2dc\uc791...")
-                print(sep)
+            state = {
+                "last_total_count": 4800,
+                "extra_state": {
+                    "page_timestamps": {},
+                    "page_labels": {}
+                }
+            }
+            from app.repositories.state_repository import StateRepository
+            StateRepository().save_state(svc, state)
 
-                call_count_before = client.get_total_call_count()
+            summary.append((svc, 4800, 0))
+            print(f"✅ [{svc}] 완료: tail=4,800건으로 베이스라인 수립")
 
-                crawler = DiffCrawlerEngine(api_client=client, service_id=svc)
-                state = await crawler.bootstrap()
+    asyncio.run(_run_init())
 
-                call_count_after = client.get_total_call_count()
-                calls_used = call_count_after - call_count_before
-
-                pivot_count = len(state.get("pivots", {}))
-                tail = state.get("last_total_count", 0)
-                summary.append((svc, tail, pivot_count, calls_used))
-
-                print(f"✅ [{svc}] 완료: tail={tail:,}건 / 피벗 {pivot_count}개 / API {calls_used}회 호출")
-
-    asyncio.run(_run_bootstrap())
-
-    # ⑤ 완료 보고
     elapsed = (datetime.datetime.now() - total_start).total_seconds()
-    total_calls = sum(s[3] for s in summary)
-
     print(f"\n{'=' * 60}")
     print("✅ Full-Scan Init 완료!")
     print(f"{'=' * 60}")
-    for svc, tail, pivots, calls in summary:
-        print(f"  [{svc}] tail={tail:,}건 / 피벗 {pivots}개 / API {calls}회")
-    print(f"\n  총 API 호출: {total_calls}회 / 5,000회 한도 ({total_calls / 50:.1f}% 사용)")
+    for svc, tail, calls in summary:
+        print(f"  [{svc}] tail={tail:,}건 / API {calls}회")
     print(f"  소요 시간: {elapsed:.1f}초")
     print()
     print("이제 정상적인 차분 동기화를 시작하세요:")
     print("  python cli.py --run-sync    # 수동 1회 실행")
-    print("  uvicorn main:app ...        # 자동 30분 주기 크롤링 시작")
-    print()
-    print("풍부한 과거 이력 데이터를 비즈니스 테이블에 채우려면:")
-    print("  python cli.py --mirror      # 전체 API 데이터 미러링 (일회성, ~1,200회 호출)")
+    print("  uvicorn main:app ...        # 자동 주기 크롤링 시작")
 
-
-# ─── Full Mirror ──────────────────────────────────────────────────────────────
 
 def full_mirror(services: list | None = None, from_index: int = 1, force: bool = False):
     """
     전체 API 데이터를 businesses 테이블에 미러링합니다. (일회성 운영 작업)
-    - 기본값: OR IGNORE (기존 레코드 보존, 중복 스킵)
-    - --force: OR REPLACE (기존 레코드를 API 최신값으로 덮어씀)
-    - --from-index N 으로 중단된 지점부터 이어서 실행 가능
-    - API 호출: I2859 ~238회 + I2861 ~953회 = ~1,191회 (한도 23.8%)
     """
     from database import init_db, get_db
     from app.repositories.state_repository import StateRepository
     from scraper import _map_row_fields, _parse_datetime_fields
 
     init_db()
-    services = services or ["I2859", "I2861"]
-    svc_names = {"I2859": "식품업소 인허가변경", "I2861": "음식점업소 인허가변경"}
+    services = services or ["I2861"]
+    svc_names = {"I2861": "음식점업소 인허가변경"}
     PAGE_SIZE = 1000
 
     print("\n" + "=" * 60)
@@ -292,12 +215,10 @@ def full_mirror(services: list | None = None, from_index: int = 1, force: bool =
     svc_label = ", ".join(f"{s}({svc_names.get(s, s)})" for s in services)
     print(f"  대상: {svc_label}")
     print(f"  시작 인덱스: {from_index:,}")
-    print(f"  예상 API 호출: ~1,191회 (23.8% 한도)")
     if force:
         print("\n  🔄  --force 모드: 기존 레코드를 API 최신값으로 덮어씁니다. (OR REPLACE)")
     else:
         print("\n  ⚠️  기존 businesses 데이터는 덮어쓰지 않고 OR IGNORE로 작동합니다.")
-        print("      재실행으로 기존 레코드를 갱신하려면 --force를 사용하세요.")
     print()
 
     yn = input("계속하시겠습니까? (yes/no): ").strip().lower()
@@ -392,7 +313,7 @@ def full_mirror(services: list | None = None, from_index: int = 1, force: bool =
                 calls_used = client.get_total_call_count() - call_before
                 grand_total_calls += calls_used
                 grand_total_saved += svc_saved
-                print()  # \r 덮어쓰기 종료
+                print()
                 print(f"  ✅ [{svc}] 완료: 신규 {svc_saved:,}건 저장 / {svc_skipped:,}건 중복 스킵 / API {calls_used}회")
 
     asyncio.run(_run_mirror())
@@ -402,23 +323,21 @@ def full_mirror(services: list | None = None, from_index: int = 1, force: bool =
     print("✅ Full Mirror 완료!")
     print(f"{'=' * 60}")
     print(f"  신규 저장: {grand_total_saved:,}건")
-    print(f"  사용 API 호출: {grand_total_calls}회 / 5,000회 한도 ({grand_total_calls / 50:.1f}%)")
+    print(f"  사용 API 호출: {grand_total_calls}회")
     print(f"  소요 시간: {elapsed:.1f}초")
 
-
-# ─── CLI Entry Point ──────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ApprovalRadar Backend CLI Tools")
     parser.add_argument("--check-keys", action="store_true", help="등록된 API 키들의 유효성 및 한도 초과 여부를 점검합니다.")
-    parser.add_argument("--test-tail", action="store_true", help="현재 외부 API 데이터의 총 건수(Tail) 위치를 이진 탐색으로 확인합니다.")
+    parser.add_argument("--test-tail", action="store_true", help="현재 외부 API 데이터의 총 건수(Tail) 위치를 확인합니다.")
     parser.add_argument("--run-sync", action="store_true", help="수동으로 1회 크롤링(차분 동기화)을 실행하여 DB에 반영합니다.")
     parser.add_argument("--backfill", action="store_true", help="누락된 세부업종(industry_type) 데이터를 공공API 단건 조회를 통해 채웁니다.")
     parser.add_argument("--test-stream-update", action="store_true", help="로컬 서버에 가상의 업데이트 신호를 발생시켜 SSE 이벤트를 테스트합니다.")
     parser.add_argument(
         "--full-scan-init",
         action="store_true",
-        help="⚠️ DB를 완전 초기화하고 전체 bootstrap을 재실행합니다. (확인 프롬프트 포함)"
+        help="⚠️ DB를 완전 초기화하고 전체 스캔을 재준비합니다. (확인 프롬프트 포함)"
     )
     parser.add_argument(
         "--reset-state",
@@ -434,28 +353,26 @@ if __name__ == "__main__":
         "--service",
         type=str,
         default=None,
-        help="특정 서비스 ID만 대상으로 합니다. (예: --service I2859)"
+        help="특정 서비스 ID만 대상으로 합니다. (예: --service I2861)"
     )
     parser.add_argument(
         "--mirror",
         action="store_true",
-        help="전체 API 데이터를 businesses 테이블에 미러링합니다. (일회성, ~1,191회 API 호출)"
+        help="전체 API 데이터를 businesses 테이블에 미러링합니다. (일회성, API 호출)"
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="--mirror 시 기존 레코드를 API 최신값으로 덮어씁니다. (OR REPLACE, 필드 오류 수정 시 사용)"
+        help="--mirror 시 기존 레코드를 API 최신값으로 덮어씁니다. (OR REPLACE)"
     )
     parser.add_argument(
         "--from-index",
         type=int,
         default=1,
-        help="--mirror 시 시작할 API 인덱스를 지정합니다. 중단 후 이어서 실행 가능. (default=1)"
+        help="--mirror 시 시작할 API 인덱스를 지정합니다. (default=1)"
     )
 
     args = parser.parse_args()
-
-    # --service 파싱
     target_services = [args.service] if args.service else None
 
     if args.check_keys:
@@ -469,7 +386,7 @@ if __name__ == "__main__":
     elif args.test_stream_update:
         test_stream_update()
     elif args.full_scan_init:
-        full_scan_init(no_backup=args.no_backup, services=target_services, resume=args.resume)
+        full_scan_init(no_backup=args.no_backup, services=target_services)
     elif args.reset_state:
         reset_state(services=target_services)
     elif args.mirror:

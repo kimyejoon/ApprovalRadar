@@ -10,7 +10,7 @@ from app.core.logger import logger
 scheduler = BackgroundScheduler()
 
 # ─── 재진입 방지 Lock ─────────────────────────────────────────────────────────
-# Scraper(DiffCrawler + RollingScanner)는 장시간 실행될 수 있으므로
+# Scraper(DiffCrawler)는 장시간 실행될 수 있으므로
 # 이전 실행이 끝나기 전에 새 주기가 시작되면 WAF burst + 키 소진이 발생.
 # threading.Lock(blocking=False)로 이미 실행 중이면 즉시 스킵.
 _scraper_lock = threading.Lock()
@@ -69,37 +69,6 @@ def _check_api_key_recovery():
     asyncio.run(_run())
 
 
-def _daily_bootstrap_job():
-    """매일 09:00 실행: 모든 서비스의 피벗을 재생성하여 당일 변동 감지 준비."""
-    from app.core.config import settings
-    from app.clients.foodsafety_api import ApiClient
-    from app.services.diff_crawler import DiffCrawlerEngine
-
-    async def _run():
-        logger.info("[일일 Bootstrap] 09:00 피벗 재생성 시작 — 전날 밤 API 재정렬 반영")
-        service_ids = getattr(settings, "SERVICES", ["I2859", "I2861"])
-        async with ApiClient() as api_client:
-            for svc_id in service_ids:
-                # I2861 서비스는 피벗을 사용하지 않는 Oldest First Scan 구조이므로 Bootstrap 스킵 (API 호출 절약)
-                if svc_id == "I2861":
-                    logger.info(f"[일일 Bootstrap] {svc_id} 서비스는 Oldest First Scan 구조이므로 Bootstrap 스킵")
-                    continue
-                try:
-                    crawler = DiffCrawlerEngine(api_client=api_client, service_id=svc_id)
-                    state = await crawler.bootstrap()
-                    logger.info(
-                        f"[일일 Bootstrap] {svc_id} 피벗 재생성 완료 — "
-                        f"{len(state.get('pivots', {}))}개 피벗, "
-                        f"Tail={state.get('last_total_count', 0):,}건"
-                    )
-                except Exception as e:
-                    logger.error(f"[일일 Bootstrap] {svc_id} 실패: {e}")
-        logger.info("[일일 Bootstrap] 전체 완료 — 오늘 하루 변동 감지 준비됨")
-
-    asyncio.run(_run())
-
-
-
 def start_scheduler():
     logger.info("Configuring APScheduler jobs...")
 
@@ -111,17 +80,6 @@ def start_scheduler():
     # 10분마다 소진 키 회복 체크 → 회복 시 즉시 크롤링 재가동
     scheduler.add_job(_check_api_key_recovery, 'interval', minutes=10, id="key_recovery_job")
 
-    # ✅ 독립 Tail Ping (5분 간격, 크롤링 주기와 무관) - I2861 이외 활성 서비스가 있을 때만 등록
-    from app.services.tail_ping_job import run_tail_ping, TAIL_PING_INTERVAL_MINUTES
-    active_ping_services = [s for s in _s.SERVICES if s != "I2861"]
-    if active_ping_services:
-        scheduler.add_job(run_tail_ping, 'interval',
-                          minutes=TAIL_PING_INTERVAL_MINUTES,
-                          id="tail_ping_job")
-        logger.info(f"독립 Tail Ping 잡 등록: {TAIL_PING_INTERVAL_MINUTES}분 간격")
-    else:
-        logger.info("독립 Tail Ping 잡 비활성화 (I2861 서비스 단독 구동 환경)")
-
     # ✅ 세부업종(industry_type) 백필 6시간 주기 - Key 소진/네트워크 오류로 중단 시 자동 재시도
     scheduler.add_job(_backfill_job, 'interval', hours=6, id="backfill_job")
 
@@ -132,36 +90,9 @@ def start_scheduler():
     # DB 백업 (매일 새벽 4시)
     scheduler.add_job(backup_db, 'cron', hour=4, minute=0, id="backup_job")
 
-    # ✅ 매일 09:00 fresh bootstrap — 야간 API 재정렬 후 피벗 재생성
-    # 이유: API는 가나다순 재정렬이 수시로 발생 → 전날 피벗이 당일 아침이면 stale
-    # 매일 업무 시작 전 피벗 재생성으로 당일 변동 감지 정확도 보장
-    scheduler.add_job(_daily_bootstrap_job, 'cron', hour=9, minute=0, id="daily_bootstrap_job")
-
-    # ── SmartSweep 실험 잡 (Playground 전용, 5분 간격) ──────────────────────
-    # 기존 메인 로직 무수정. 읽기 전용 탐침 + HOT 세그먼트만 수집.
-    # 로그 기반으로 승격 여부 추후 결정.
-    def _smart_sweep_micro():
-        async def _run():
-            from app.clients.foodsafety_api import ApiClient
-            from app.services.smart_sweep import SmartSweepService
-            async with ApiClient() as api_client:
-                svc = SmartSweepService(api_client)
-                await svc.run_micro_probe()
-        asyncio.run(_run())
-
-    scheduler.add_job(
-        _smart_sweep_micro, 'interval', minutes=5,
-        id="smart_sweep_micro",
-        max_instances=1,   # 동시 실행 방지
-        coalesce=True,     # 밀린 실행은 1회로 합산
-    )
-    logger.info("SmartSweep Micro Probe 잡 등록: 5분 간격")
-
     # 앱 시작 시 즉시 1회 실행 (blocking 방지를 위해 스케줄러에 위임)
     logger.info("Adding initial catch-up scraper job to background...")
     scheduler.add_job(_scraper_job, 'date', run_date=datetime.now(), id="initial_scraper_job")
-
-
 
     scheduler.start()
     logger.info("APScheduler started successfully.")
@@ -172,16 +103,14 @@ def shutdown_scheduler():
     scheduler.shutdown(wait=False)
 
 
-
 def trigger_immediate_scrape():
-    """Tail Ping 변동 감지 시 Scraper를 즉시 실행.
-    Scraper가 이미 실행 중이면 lock 설정된 후 스킵에서 처리됨.
+    """즉시 Scraper를 실행하도록 예약. (소진 키 복구 등에 활용)
     """
     import time
     ts = int(time.time())
 
     if _scraper_lock.locked():
-        logger.info("[Tail Ping 즉발] Scraper 실행 중 → 이번 즉발 스킵 (lock 보유 중)")
+        logger.info("[즉발] Scraper 실행 중 → 이번 즉발 스킵 (lock 보유 중)")
         return
 
     try:
@@ -191,9 +120,9 @@ def trigger_immediate_scrape():
             run_date=datetime.now(),
             id=f"immediate_scrape_{ts}",
         )
-        logger.info("[Tail Ping 즉발] Scraper 즉시 실행 등록")
+        logger.info("[즉발] Scraper 즉시 실행 등록")
     except Exception as e:
-        logger.error(f"[Tail Ping 즉발] Scraper 등록 실패: {e}")
+        logger.error(f"[즉발] Scraper 등록 실패: {e}")
 
 
 def reschedule_scraper_job(new_interval_minutes: int) -> None:
@@ -212,7 +141,3 @@ def reschedule_scraper_job(new_interval_minutes: int) -> None:
     except Exception as e:
         logger.error(f"[스케줄러] 크롤링 주기 변경 실패: {e}")
         raise
-
-
-
-
