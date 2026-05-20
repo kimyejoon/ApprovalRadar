@@ -199,7 +199,43 @@ async def trigger_job(job_type: str):
             trigger_immediate_scrape()
             return TriggerResponse(success=True, message="Scraper + Boost Scan 트리거 완료")
 
+        elif job_type == "oldest_first_scan":
+            """Oldest-First Rolling Scan 즉발: 연식 1h 이상 페이지 우선 전수 스캔."""
+            def _run_oldest_first():
+                import asyncio as _asyncio
+                from app.core.config import settings as _s
+                from app.clients.foodsafety_api import ApiClient
+                from app.repositories.state_repository import StateRepository
+                from app.services.rolling_scanner import RollingScanner
+
+                async def _inner():
+                    svc_ids = getattr(_s, "SERVICES", ["I2861"])
+                    async with ApiClient() as api_client:
+                        for svc_id in svc_ids:
+                            state_repo = StateRepository()
+                            scanner = RollingScanner(api_client, svc_id, state_repo)
+
+                            async def flush_cb(rows):
+                                from scraper import run_scraper_for_service_with_rows
+                                await run_scraper_for_service_with_rows(
+                                    svc_id, rows, collected_by="oldest_first_manual"
+                                )
+
+                            await scanner._scan_oldest_first(flush_callback=flush_cb)
+
+                _asyncio.run(_inner())
+
+            import time
+            from app.core.scheduler import scheduler
+            scheduler.add_job(
+                _run_oldest_first, 'date',
+                run_date=datetime.now(),
+                id=f"manual_oldest_first_{int(time.time())}",
+            )
+            return TriggerResponse(success=True, message="\ud83d\udd04 Oldest-First Scan \uc989\uc2dc \uc2e4\ud589 \ub4f1\ub85d (\uc5f0\uc2dd 1h\u2191 \uc6b0\uc120)")
+
         elif job_type == "rolling_scan":
+            # \ub808\uac70\uc2dc \ud638\ud658: DiffCrawler Scraper \uc2e4\ud589
             from app.core.scheduler import scheduler, _scraper_job
             import time
             scheduler.add_job(
@@ -207,7 +243,7 @@ async def trigger_job(job_type: str):
                 run_date=datetime.now(),
                 id=f"manual_rolling_{int(time.time())}",
             )
-            return TriggerResponse(success=True, message="Rolling Scan 즉시 실행 등록")
+            return TriggerResponse(success=True, message="Scraper (DiffCrawler) \uc989\uc2dc \uc2e4\ud589 \ub4f1\ub85d")
 
         elif job_type == "tail_ping":
             from app.services.tail_ping_job import run_tail_ping
@@ -218,7 +254,7 @@ async def trigger_job(job_type: str):
                 run_date=datetime.now(),
                 id=f"manual_tail_ping_{int(time.time())}",
             )
-            return TriggerResponse(success=True, message="Tail Ping 즉시 실행 등록")
+            return TriggerResponse(success=True, message="Tail Ping \uc989\uc2dc \uc2e4\ud589 \ub4f1\ub85d")
 
         elif job_type == "boost_scan":
             from app.core.scheduler import scheduler, _boosted_rolling_scan_job
@@ -228,7 +264,7 @@ async def trigger_job(job_type: str):
                 run_date=datetime.now(),
                 id=f"manual_boost_{int(time.time())}",
             )
-            return TriggerResponse(success=True, message="🚀 Boost Scan (Random 50%) 즉시 실행 등록")
+            return TriggerResponse(success=True, message="\ud83d\ude80 Boost Scan (Random 50%) \uc989\uc2dc \uc2e4\ud589 \ub4f1\ub85d")
 
         elif job_type == "chng_dt_poll":
             # I2500 CHNG_DT Poller 즉시 실행

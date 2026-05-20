@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowClockwise, Play, RocketLaunch, Broadcast, MagnifyingGlass, Lightning } from '@phosphor-icons/react';
+import { ArrowClockwise, Play, RocketLaunch, Broadcast, MagnifyingGlass, Lightning, ClockCounterClockwise } from '@phosphor-icons/react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -256,14 +256,16 @@ export function PlaygroundPage() {
           <SectionTitle icon={<Lightning className="w-5 h-5 text-yellow-500" />} title="수동 트리거" />
           <p className="text-xs text-text-muted mb-4">사이클 사이 Term에서 즉시 실행합니다.</p>
           <div className="grid grid-cols-2 gap-3">
+            {/* Oldest-First Scan — 연식 1h↑ 우선 전수 스캔 (핵심 버튼) */}
             <button
-              onClick={() => handleTrigger('rolling_scan')}
+              onClick={() => handleTrigger('oldest_first_scan')}
               disabled={loading}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-border-standard bg-background hover:bg-surface transition-all text-sm font-medium text-text-primary disabled:opacity-50"
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-green-500/30 bg-green-500/5 hover:bg-green-500/10 transition-all text-sm font-medium text-green-400 disabled:opacity-50 col-span-2"
             >
-              <ArrowClockwise className="w-4 h-4 text-blue-400" />
-              Rolling Scan
+              <ClockCounterClockwise className="w-4 h-4" />
+              Oldest-First Scan <span className="text-xs text-text-muted ml-1">(연식 1h↑ 페이지 전수 스캔)</span>
             </button>
+            {/* Boost Scan — Random Probe 50%, Tail Ping 변동 감지 후 보조 스캔 */}
             <button
               onClick={() => handleTrigger('boost_scan')}
               disabled={loading}
@@ -288,7 +290,6 @@ export function PlaygroundPage() {
               <MagnifyingGlass className="w-4 h-4 text-orange-400" />
               Scraper
             </button>
-
           </div>
 
           {/* Range Scan */}
@@ -445,31 +446,62 @@ export function PlaygroundPage() {
 
             {/* Heatmap-style page grid */}
             <div className="flex flex-wrap gap-[2px]">
-              {pageScan.entries.map((e) => {
-                const hasTime = !!e.last_scanned;
-                const hasFP = !!e.fingerprint;
-                const colorClass = hasFP && hasTime
-                  ? 'bg-brand hover:bg-brand/80'        // 이번 세션 스캔
-                  : hasFP
-                  ? 'bg-brand/30 hover:bg-brand/50'     // 이전 FP만
-                  : 'bg-border-subtle hover:bg-border-standard'; // 미스캔
-                return (
-                  <div
-                    key={e.page_number}
-                    className={`w-3 h-3 rounded-[2px] transition-colors cursor-pointer ${colorClass}`}
-                    title={`P${e.page_number} (${e.page_start.toLocaleString()}~)\n${hasFP ? `FP: ${e.fingerprint}` : '미스캔'}${hasTime ? `\n최종 스캔: ${e.last_scanned}` : ''}`}
-                  />
-                );
-              })}
+              {(() => {
+                const nowMs = Date.now();
+                const ONE_HOUR_MS = 60 * 60 * 1000;
+                const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+                return pageScan.entries.map((e) => {
+                  const hasTime = !!e.last_scanned;
+                  const hasFP = !!e.fingerprint;
+
+                  let colorClass: string;
+                  if (!hasFP) {
+                    // 미스캔: 회색
+                    colorClass = 'bg-border-subtle hover:bg-border-standard';
+                  } else if (!hasTime) {
+                    // FP만 있고 스캔 시각 없음 → 오늘 이전 취급: 회색
+                    colorClass = 'bg-zinc-600/50 hover:bg-zinc-500/60';
+                  } else {
+                    // 스캔 시각 파싱
+                    const scannedDate = e.last_scanned!.slice(0, 10); // YYYY-MM-DD
+                    const scannedMs = new Date(e.last_scanned!).getTime();
+                    const ageMs = nowMs - scannedMs;
+
+                    if (scannedDate < todayStr) {
+                      // 오늘 이전 스캔: 회색
+                      colorClass = 'bg-zinc-600/50 hover:bg-zinc-500/60';
+                    } else if (ageMs < ONE_HOUR_MS) {
+                      // 1h 미만: 진한 초록
+                      colorClass = 'bg-emerald-500 hover:bg-emerald-400';
+                    } else {
+                      // 1h 이상: 연한 초록
+                      colorClass = 'bg-emerald-800/70 hover:bg-emerald-700/80';
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={e.page_number}
+                      className={`w-3 h-3 rounded-[2px] transition-colors cursor-pointer ${colorClass}`}
+                      title={`P${e.page_number} (${e.page_start.toLocaleString()}~)\n${hasFP ? `FP: ${e.fingerprint}` : '미스캔'}${hasTime ? `\n최종 스캔: ${e.last_scanned}` : ''}`}
+                    />
+                  );
+                });
+              })()}
             </div>
             <div className="flex items-center gap-4 mt-3 text-xs text-text-muted">
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-[2px] bg-brand" />
-                이번 세션 스캔
+                <div className="w-3 h-3 rounded-[2px] bg-emerald-500" />
+                오늘 스캔 (1h 미만)
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-[2px] bg-brand/30" />
-                이전 FP
+                <div className="w-3 h-3 rounded-[2px] bg-emerald-800/70" />
+                오늘 스캔 (1h 이상)
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-[2px] bg-zinc-600/50" />
+                오늘 이전 스캔
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-[2px] bg-border-subtle" />

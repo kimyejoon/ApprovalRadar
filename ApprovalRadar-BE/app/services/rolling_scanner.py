@@ -78,8 +78,17 @@ class RollingScanner:
         if migrated > 0:
             logger.info(f"[{svc}] 🔧 scan_times 마이그레이션: {migrated}건 HH:MM:SS → ISO 변환")
 
-        # 순수 Oldest-First: min_age 제약 없이 가장 오래된 N개 선택
-        oldest_pages = self._select_oldest_pages(scan_times, total_pages, pages_per_cycle, min_age_sec=0)
+        # ── 연식 1h 이상 페이지: pages_per_cycle 제한 없이 전부 포함 ──
+        # 1h 이상이면 해당 주기에 반드시 스캔해야 하는 고우선 페이지
+        STALE_AGE_SEC = 3600  # 1시간
+        stale_pages = self._select_oldest_pages(scan_times, total_pages, total_pages, min_age_sec=STALE_AGE_SEC)
+        fresh_budget = max(0, pages_per_cycle - len(stale_pages))
+        # 1h 미만 페이지: 남은 예산만큼만 추가 (Oldest-First 순)
+        fresh_pages = self._select_oldest_pages(scan_times, total_pages, fresh_budget, min_age_sec=0)
+        # stale 중복 제거
+        stale_set = set(stale_pages)
+        fresh_pages = [p for p in fresh_pages if p not in stale_set]
+        oldest_pages = stale_pages + fresh_pages
 
         if oldest_pages:
             max_age = self._get_page_age(scan_times, oldest_pages[0])
@@ -91,7 +100,7 @@ class RollingScanner:
 
         logger.info(
             f"[{svc}] 🔄 Oldest-First Scan: "
-            f"{len(oldest_pages)}p (미스캔 {unscanned}p, "
+            f"{len(oldest_pages)}p (1h↑:{len(stale_pages)}p 포함, 미스캔 {unscanned}p, "
             f"최고연식 {max_age:.1f}h, 최저 {min_age:.1f}h) | "
             f"전체={total_pages}p ({total_count:,}건)"
         )
@@ -99,8 +108,14 @@ class RollingScanner:
         new_rows_total = []
         total_scanned = 0
         mismatched_pages = 0
+        matched_pages = 0
+        new_fp_pages = 0
         flushed_count = 0
+        today_found_total = 0
+        yesterday_found_total = 0
         scan_start = datetime.now()
+        today_str = datetime.now().strftime("%Y%m%d")
+        yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
 
         for page_start in oldest_pages:
             if shutdown_event.is_set():
@@ -110,13 +125,34 @@ class RollingScanner:
             )
             total_scanned += scanned
             mismatched_pages += mismatch
+            if scanned > 0:
+                fp_key = str(page_start)
+                # 신규FP vs 일치 분류 (scan 후 fingerprints 이미 갱신됨)
+                if mismatch:
+                    pass  # mismatched_pages 이미 집계
+                else:
+                    # 기존 FP 있고 일치 → matched
+                    # 신규 FP (첫 스캔) → new_fp
+                    if fp_key in fingerprints and fp_key in scan_times:
+                        matched_pages += 1
+                    else:
+                        new_fp_pages += 1
+
+            # 오늘/어제 건수 집계
+            for row in new_rows:
+                chng = row.get("CHNG_DT", "")
+                if chng == today_str:
+                    today_found_total += 1
+                elif chng == yesterday_str:
+                    yesterday_found_total += 1
+
             if new_rows and flush_callback:
                 await flush_callback(new_rows)
                 flushed_count += len(new_rows)
             elif new_rows:
                 new_rows_total.extend(new_rows)
 
-            # 매 25p마다 진행률 로그
+            # 매 25p마다 진행률 로그 (상세 통계 포함)
             if total_scanned > 0 and total_scanned % 25 == 0:
                 elapsed = (datetime.now() - scan_start).total_seconds()
                 pace = elapsed / total_scanned  # 초/페이지
@@ -124,7 +160,9 @@ class RollingScanner:
                 logger.info(
                     f"[{svc}] 📊 스캔 진행: {total_scanned}/{len(oldest_pages)}p "
                     f"({total_scanned/len(oldest_pages)*100:.0f}%) | "
-                    f"불일치:{mismatched_pages} 수집:{flushed_count + len(new_rows_total)} | "
+                    f"일치:{matched_pages} 불일치:{mismatched_pages} 신규FP:{new_fp_pages} "
+                    f"오늘:{today_found_total} 어제:{yesterday_found_total} "
+                    f"수집:{flushed_count + len(new_rows_total)} | "
                     f"경과:{elapsed:.0f}초 잔여:{remaining:.0f}초"
                 )
 
@@ -137,17 +175,34 @@ class RollingScanner:
         coverage_pct = round(scanned_page_count / total_pages * 100, 1) if total_pages > 0 else 0
         elapsed_total = (datetime.now() - scan_start).total_seconds()
 
-        # 다음 예상 최고연식 계산
-        next_max_age = self._get_page_age(scan_times, oldest_pages[-1]) if oldest_pages else 0
         all_ages = sorted([self._get_page_age(scan_times, p*PAGE_SIZE+1) for p in range(total_pages)], reverse=True)
         worst_age = all_ages[0] if all_ages else 0
 
+        # 다음 주기 예정 시간 조회
+        next_run_str = "미등록"
+        try:
+            from app.core.scheduler import scheduler
+            job = scheduler.get_job("scraper_job")
+            if job and job.next_run_time:
+                next_run_str = job.next_run_time.strftime("%H:%M:%S")
+        except Exception:
+            pass
+
+        # API 호출 횟수 조회
+        api_calls = 0
+        try:
+            api_calls = self.api_client._call_count
+        except Exception:
+            pass
+
+        total_collected = flushed_count + len(new_rows_total)
         logger.info(
             f"[{svc}] ✅ Oldest-First 완료: {total_scanned}p "
             f"({elapsed_total:.0f}초 소요) | "
-            f"불일치:{mismatched_pages} 수집:{flushed_count + len(new_rows_total)}건 | "
+            f"일치:{matched_pages} 불일치:{mismatched_pages} 신규FP:{new_fp_pages} "
+            f"오늘:{today_found_total} 어제:{yesterday_found_total} 수집:{total_collected}건 | "
             f"커버리지: {scanned_page_count}/{total_pages}p ({coverage_pct}%) | "
-            f"현재 최대연식: {worst_age:.1f}h"
+            f"최대연식: {worst_age:.1f}h | 다음주기: {next_run_str} | API호출: {api_calls}회"
         )
         return new_rows_total
 
