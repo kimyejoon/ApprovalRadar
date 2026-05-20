@@ -1,5 +1,6 @@
 # pyrefly: ignore [missing-import]
 import asyncio
+import threading
 # pyrefly: ignore [missing-import]
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
@@ -8,11 +9,30 @@ from app.core.logger import logger
 
 scheduler = BackgroundScheduler()
 
+# ─── 재진입 방지 Lock ─────────────────────────────────────────────────────────
+# Scraper(DiffCrawler + RollingScanner)는 장시간 실행될 수 있으므로
+# 이전 실행이 끝나기 전에 새 주기가 시작되면 WAF burst + 키 소진이 발생.
+# threading.Lock(blocking=False)로 이미 실행 중이면 즉시 스킵.
+_scraper_lock = threading.Lock()
+
 
 def _scraper_job():
-    """스케줄러 동기 래퍼: 별도 스레드에서 새 이벤트 루프를 생성하여 비동기 스크래퍼 실행."""
-    from scraper import run_all_scrapers
-    asyncio.run(run_all_scrapers())
+    """스케줄러 동기 래퍼: 별도 스레드에서 새 이벤트 루프를 생성하여 비동기 스크래퍼 실행.
+    
+    [재진입 방지] 이전 주기가 아직 실행 중이면(Oldest-First 스캔 등이 주기를 초과할 경우)
+    이번 주기를 스킵하여 WAF burst와 API 키 소진 가속을 방지.
+    """
+    if not _scraper_lock.acquire(blocking=False):
+        logger.warning(
+            "[스케줄러] ⏭️ 이전 Scraper 실행 중 → 이번 주기 스킵 "
+            "(Oldest-First Scan이 주기를 초과했습니다)"
+        )
+        return
+    try:
+        from scraper import run_all_scrapers
+        asyncio.run(run_all_scrapers())
+    finally:
+        _scraper_lock.release()
 
 
 def _backfill_job():
@@ -126,42 +146,60 @@ def shutdown_scheduler():
 
 
 def _boosted_rolling_scan_job():
-    """Tail Ping 변동 감지 → 부스트 Rolling Scan (Random Probe 50%) 즉시 실행."""
-    from app.core.config import settings
-    from app.clients.foodsafety_api import ApiClient
-    from app.services.rolling_scanner import RollingScanner
-    from app.services.diff_crawler import StateRepository
-    from scraper import run_scraper_for_service_with_rows
+    """Tail Ping 변동 감지 → 부스트 Rolling Scan (Random Probe 50%) 즉시 실행.
+    
+    [재진입 방지] Scraper가 실행 중이면 Boost Scan도 스킵 (동시 API 콜 burst 방지).
+    """
+    if not _scraper_lock.acquire(blocking=False):
+        logger.warning("[스케줄러] ⏭️ Scraper 실행 중 → Boost Scan 스킵")
+        return
+    try:
+        from app.core.config import settings
+        from app.clients.foodsafety_api import ApiClient
+        from app.services.rolling_scanner import RollingScanner
+        from app.services.diff_crawler import StateRepository
+        from scraper import run_scraper_for_service_with_rows
 
-    async def _run():
-        service_ids = getattr(settings, "SERVICES", ["I2861"])
-        state_repo = StateRepository()
+        async def _run():
+            service_ids = getattr(settings, "SERVICES", ["I2861"])
+            state_repo = StateRepository()
 
-        async with ApiClient() as api_client:
-            for svc_id in service_ids:
-                try:
-                    scanner = RollingScanner(api_client, svc_id, state_repo)
+            async with ApiClient() as api_client:
+                for svc_id in service_ids:
+                    try:
+                        scanner = RollingScanner(api_client, svc_id, state_repo)
 
-                    async def flush_cb(rows):
-                        await run_scraper_for_service_with_rows(svc_id, rows, collected_by="tail_ping")
+                        async def flush_cb(rows):
+                            await run_scraper_for_service_with_rows(svc_id, rows, collected_by="tail_ping")
 
-                    await scanner.scan_cycle(
-                        flush_callback=flush_cb,
-                        boosted=True,  # Random Probe 50%
-                    )
-                except Exception as e:
-                    logger.error(f"[Boost Scan] {svc_id} 실패: {e}")
+                        await scanner.scan_cycle(
+                            flush_callback=flush_cb,
+                            boosted=True,  # Random Probe 50%
+                        )
+                    except Exception as e:
+                        logger.error(f"[Boost Scan] {svc_id} 실패: {e}")
 
-    asyncio.run(_run())
+        asyncio.run(_run())
+    finally:
+        _scraper_lock.release()
 
 
 def trigger_immediate_scrape():
     """Tail Ping 변동 감지 시 즉시 실행:
     1) 기존 Scraper (tail 수집)
     2) 부스트 Rolling Scan (Random Probe 50% — 오늘 변동분 빠른 감지)
-    APScheduler 'date' 잡으로 등록하여 별도 스레드에서 비동기로 안전 실행."""
+    APScheduler 'date' 잌으로 등록하여 별도 스레드에서 비동기로 안전 실행.
+    
+    [재진입 방지] Scraper가 이미 실행 중이면 동시 실행 없이 로그만 남김.
+    """
     import time
     ts = int(time.time())
+
+    if not _scraper_lock.locked():
+        # 스크레퍼 유휴 상태 → 정상 등록
+        pass
+    else:
+        logger.info("[Tail Ping 즉발] Scraper 실행 중 → 즉발그끼 등록 (lock 해제 후 실행됨)")
 
     # 1) 기존 scraper (tail 영역 수집)
     try:
