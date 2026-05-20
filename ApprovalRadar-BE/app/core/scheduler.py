@@ -42,7 +42,9 @@ def _backfill_job():
 
 
 def _check_api_key_recovery():
-    """10분마다 소진된 API 키 회복 여부를 자동 체크. 회복 시 즉시 크롤링 잡 재가동."""
+    """10분마다 소진된 API 키 회복 여부를 자동 체크.
+    회복 시 Scraper가 유휴 상태이면 즉시 재가동, 실행 중이면 스킵.
+    """
     from app.clients.foodsafety_api import ApiClient
     from app.core.config import settings
 
@@ -53,6 +55,10 @@ def _check_api_key_recovery():
             settings.DATA_TYPE,
         )
         if recovered:
+            # Scraper 실행 중이면 재가동 불필요 (이미 돌아가고 있음)
+            if _scraper_lock.locked():
+                logger.info("[키 회복] Scraper 실행 중 → 재가동 스킵 (이미 실행중)")
+                return
             logger.info("[키 회복] 스크래퍼 즉시 재가동 트리거...")
             try:
                 from scraper import run_all_scrapers
@@ -145,63 +151,18 @@ def shutdown_scheduler():
     scheduler.shutdown(wait=False)
 
 
-def _boosted_rolling_scan_job():
-    """Tail Ping 변동 감지 → 부스트 Rolling Scan (Random Probe 50%) 즉시 실행.
-    
-    [재진입 방지] Scraper가 실행 중이면 Boost Scan도 스킵 (동시 API 콜 burst 방지).
-    """
-    if not _scraper_lock.acquire(blocking=False):
-        logger.warning("[스케줄러] ⏭️ Scraper 실행 중 → Boost Scan 스킵")
-        return
-    try:
-        from app.core.config import settings
-        from app.clients.foodsafety_api import ApiClient
-        from app.services.rolling_scanner import RollingScanner
-        from app.services.diff_crawler import StateRepository
-        from scraper import run_scraper_for_service_with_rows
-
-        async def _run():
-            service_ids = getattr(settings, "SERVICES", ["I2861"])
-            state_repo = StateRepository()
-
-            async with ApiClient() as api_client:
-                for svc_id in service_ids:
-                    try:
-                        scanner = RollingScanner(api_client, svc_id, state_repo)
-
-                        async def flush_cb(rows):
-                            await run_scraper_for_service_with_rows(svc_id, rows, collected_by="tail_ping")
-
-                        await scanner.scan_cycle(
-                            flush_callback=flush_cb,
-                            boosted=True,  # Random Probe 50%
-                        )
-                    except Exception as e:
-                        logger.error(f"[Boost Scan] {svc_id} 실패: {e}")
-
-        asyncio.run(_run())
-    finally:
-        _scraper_lock.release()
-
 
 def trigger_immediate_scrape():
-    """Tail Ping 변동 감지 시 즉시 실행:
-    1) 기존 Scraper (tail 수집)
-    2) 부스트 Rolling Scan (Random Probe 50% — 오늘 변동분 빠른 감지)
-    APScheduler 'date' 잌으로 등록하여 별도 스레드에서 비동기로 안전 실행.
-    
-    [재진입 방지] Scraper가 이미 실행 중이면 동시 실행 없이 로그만 남김.
+    """Tail Ping 변동 감지 시 Scraper를 즉시 실행.
+    Scraper가 이미 실행 중이면 lock 설정된 후 스킵에서 처리됨.
     """
     import time
     ts = int(time.time())
 
-    if not _scraper_lock.locked():
-        # 스크레퍼 유휴 상태 → 정상 등록
-        pass
-    else:
-        logger.info("[Tail Ping 즉발] Scraper 실행 중 → 즉발그끼 등록 (lock 해제 후 실행됨)")
+    if _scraper_lock.locked():
+        logger.info("[Tail Ping 즉발] Scraper 실행 중 → 이번 즉발 스킵 (lock 보유 중)")
+        return
 
-    # 1) 기존 scraper (tail 영역 수집)
     try:
         scheduler.add_job(
             _scraper_job,
@@ -209,21 +170,9 @@ def trigger_immediate_scrape():
             run_date=datetime.now(),
             id=f"immediate_scrape_{ts}",
         )
-        logger.info(f"[즉시 재가동] Scraper 즉시 실행 등록")
+        logger.info("[Tail Ping 즉발] Scraper 즉시 실행 등록")
     except Exception as e:
-        logger.error(f"[즉시 재가동] Scraper 등록 실패: {e}")
-
-    # 2) 부스트 Rolling Scan (Random Probe 비중 증가)
-    try:
-        scheduler.add_job(
-            _boosted_rolling_scan_job,
-            'date',
-            run_date=datetime.now(),
-            id=f"boost_rolling_{ts}",
-        )
-        logger.info(f"[즉시 재가동] 🚀 부스트 Rolling Scan 등록 (Random 50%)")
-    except Exception as e:
-        logger.error(f"[즉시 재가동] 부스트 Rolling 등록 실패: {e}")
+        logger.error(f"[Tail Ping 즉발] Scraper 등록 실패: {e}")
 
 
 def reschedule_scraper_job(new_interval_minutes: int) -> None:

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowClockwise, Play, RocketLaunch, Broadcast, MagnifyingGlass, Lightning, ClockCounterClockwise } from '@phosphor-icons/react';
+import { ArrowClockwise, Play, Broadcast, MagnifyingGlass, Lightning, ClockCounterClockwise } from '@phosphor-icons/react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -264,15 +264,6 @@ export function PlaygroundPage() {
             >
               <ClockCounterClockwise className="w-4 h-4" />
               Oldest-First Scan <span className="text-xs text-text-muted ml-1">(연식 1h↑ 페이지 전수 스캔)</span>
-            </button>
-            {/* Boost Scan — Random Probe 50%, Tail Ping 변동 감지 후 보조 스캔 */}
-            <button
-              onClick={() => handleTrigger('boost_scan')}
-              disabled={loading}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-brand/30 bg-brand/5 hover:bg-brand/10 transition-all text-sm font-medium text-brand disabled:opacity-50"
-            >
-              <RocketLaunch className="w-4 h-4" />
-              Boost Scan
             </button>
             <button
               onClick={() => handleTrigger('tail_ping')}

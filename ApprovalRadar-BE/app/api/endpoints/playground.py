@@ -256,16 +256,6 @@ async def trigger_job(job_type: str):
             )
             return TriggerResponse(success=True, message="Tail Ping \uc989\uc2dc \uc2e4\ud589 \ub4f1\ub85d")
 
-        elif job_type == "boost_scan":
-            from app.core.scheduler import scheduler, _boosted_rolling_scan_job
-            import time
-            scheduler.add_job(
-                _boosted_rolling_scan_job, 'date',
-                run_date=datetime.now(),
-                id=f"manual_boost_{int(time.time())}",
-            )
-            return TriggerResponse(success=True, message="\ud83d\ude80 Boost Scan (Random 50%) \uc989\uc2dc \uc2e4\ud589 \ub4f1\ub85d")
-
         elif job_type == "chng_dt_poll":
             # I2500 CHNG_DT Poller 즉시 실행
             async def _run_poller():
@@ -278,6 +268,7 @@ async def trigger_job(job_type: str):
 
             asyncio.create_task(_run_poller())
             return TriggerResponse(success=True, message="📡 I2500 CHNG_DT Poller 즉시 실행 시작")
+
 
         else:
             raise HTTPException(status_code=400, detail=f"알 수 없는 잡 타입: {job_type}")
