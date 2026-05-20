@@ -52,6 +52,10 @@ def in_memory_db(monkeypatch):
             infer_update_detail TEXT,
             last_event_time TEXT,
             license_time TEXT,
+            change_reason TEXT,
+            change_before TEXT,
+            change_after TEXT,
+            collected_by TEXT,
             is_read INTEGER DEFAULT 0,
             read_at TEXT
         );

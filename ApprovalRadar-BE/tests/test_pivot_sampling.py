@@ -68,21 +68,21 @@ class TestPivotSamplingLogic:
         mock_client = MagicMock()
         mock_client.fetch_data = AsyncMock(return_value={})
         result = await pivot_manager.sample_check({}, mock_client, "I2859")
-        assert result is False, "빈 pivots에서 True 반환 → 오탐 가능성"
+        assert result[0] is False, "빈 pivots에서 True 반환 → 오탐 가능성"
 
     @pytest.mark.asyncio
     async def test_matching_pivot_returns_false(self):
         """피벗 LCNS_NO가 API 응답과 일치하면 False(정상)"""
         from app.services import pivot_manager
         api_response = {
-            "I2859": {"RESULT": {"CODE": "INFO-000"}, "row": [{"LCNS_NO": "ABC-123"}]}
+            "I2859": {"RESULT": {"CODE": "INFO-000"}, "row": [{"LCNS_NO": "ABC-123", "CHNG_DT": "20250101"}]}
         }
         mock_client = MagicMock()
         mock_client.fetch_data = AsyncMock(return_value=api_response)
         pivots = {"100": {"LCNS_NO": "ABC-123", "CHNG_DT": "20250101", "BSSH_NM": "테스트업소"}}
 
         result = await pivot_manager.sample_check(pivots, mock_client, "I2859")
-        assert result is False, "피벗 일치인데 True 반환 → 오탐"
+        assert result[0] is False, "피벗 일치인데 True 반환 → 오탐"
 
     @pytest.mark.asyncio
     async def test_mismatched_pivot_returns_true(self):
@@ -96,7 +96,7 @@ class TestPivotSamplingLogic:
         pivots = {"100": {"LCNS_NO": "ABC-123", "CHNG_DT": "20250101", "BSSH_NM": "서로다른업소"}}
 
         result = await pivot_manager.sample_check(pivots, mock_client, "I2859")
-        assert result is True, "피벗 불일치인데 False 반환 → Delete 감지 실패"
+        assert result[0] is True, "피벗 불일치인데 False 반환 → Delete 감지 실패"
 
     @pytest.mark.asyncio
     async def test_api_error_does_not_raise(self):
@@ -108,7 +108,7 @@ class TestPivotSamplingLogic:
 
         # 예외 없이 실행되어야 함
         result = await pivot_manager.sample_check(pivots, mock_client, "I2859")
-        assert result is False, "API 오류 시 False를 반환해야 함 (방어적 처리)"
+        assert result[0] is False, "API 오류 시 False를 반환해야 함 (방어적 처리)"
 
     @pytest.mark.asyncio
     async def test_sampling_uses_subset_of_pivots(self):
@@ -142,7 +142,7 @@ class TestPivotSamplingLogic:
         pivots = {"100": {"LCNS_NO": "ABC-123", "CHNG_DT": "20250101", "BSSH_NM": ""}}
 
         result = await pivot_manager.sample_check(pivots, mock_client, "I2859")
-        assert result is False, "빈 row에서 오탐 발생"
+        assert result[0] is False, "빈 row에서 오탐 발생"
 
 
 class TestDeleteConcealmentIntegration:
@@ -169,7 +169,7 @@ class TestDeleteConcealmentIntegration:
             await engine.scan_for_updates()
 
         # state_repo.save_state가 호출되었고, last_total_count가 999(=1000-1)여야 함
-        engine.state_repo.save_state.assert_called_once()
-        saved_state = engine.state_repo.save_state.call_args[0][1]
+        assert engine.state_repo.save_state.call_count >= 1
+        saved_state = engine.state_repo.save_state.call_args_list[-1][0][1]
         assert saved_state["last_total_count"] == 999, \
             f"기대값 999, 실제값 {saved_state['last_total_count']}"

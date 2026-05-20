@@ -128,6 +128,20 @@ class DiffCrawlerEngine:
                 flush_callback=_flush_rolling_rows
             )
 
+            # Delete 은폐 감지: Tail이 동일해도 중간 레코드의 Insert+Delete가 동시 발생 가능성
+            from app.services import pivot_manager
+            changed, _ = await pivot_manager.sample_check(
+                state.get("pivots", {}), self.api_client, svc,
+                sample_ratio=0.2
+            )
+            if changed:
+                logger.warning(
+                    f"[{svc}] ⚠️ [Delete 은폐 감지] Tail 변동 없으나 피벗 불일치! "
+                    f"Insert+Delete 동시 발생 가능성. 다음 주기에 Tail 재탐색 예정."
+                )
+                state["last_total_count"] = max(0, old_tail - 1)
+                self.state_repo.save_state(svc, state)
+
             if rolling_new_rows:
                 logger.info(f"[{svc}] 📥 Rolling Scan 신규 {len(rolling_new_rows)}건 발견 → 파이프라인 반환")
                 return rolling_new_rows

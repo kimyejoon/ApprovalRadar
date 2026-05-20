@@ -26,7 +26,7 @@ class Settings:
     GAP_MIN = 0.5       # Jitter 최솟값(초) - WAF 차단 시 키 전환으로 우회
     GAP_MAX = 1.5       # Jitter 최댓값(초) - 축소하여 스캔 속도 향상
     # 탐색 최소주기 - .env의 SCRAPER_INTERVAL_MINUTES 로 오버라이드 가능 (기본값 15분)
-    SCRAPER_INTERVAL_MINUTES: int = 15
+    SCRAPER_INTERVAL_MINUTES: int = 30
     
     # 모니터링 최적화 설정
     PIVOT_INTERVAL = 5000  # 희소 색인(Sparse Index) 피벗 간격
@@ -61,7 +61,7 @@ class Settings:
                 self.API_KEYS = [row[0] for row in rows if row[0]]
         except Exception:
             pass  # DB 미초기화 상태면 env fallback으로 진행
-
+ 
         # 2차 fallback: env에서 로드 (DB 키가 없을 때)
         if not self.API_KEYS:
             for i in range(1, 10):
@@ -75,14 +75,14 @@ class Settings:
                     self.API_KEYS.append(fallback_key)
                 else:
                     raise ValueError("DB 및 환경변수에 등록된 API 키가 없습니다. api_keys 테이블 또는 FOOD_SAFETY_API_KEY_1 을 설정해주세요.")
-
+ 
         # SCRAPER_INTERVAL_MINUTES: env 오버라이드 (.env에서 SCRAPER_INTERVAL_MINUTES=10 식으로 변경 가능)
         interval = os.getenv("SCRAPER_INTERVAL_MINUTES")
         if interval is not None:
             try:
                 self.SCRAPER_INTERVAL_MINUTES = int(interval)
             except ValueError:
-                pass  # 잘못된 값이면 기본값(30) 유지
+                self.SCRAPER_INTERVAL_MINUTES = 30  # 잘못된 값이면 기본값(30) 유지
 
         # Rolling Scan pages도 env 오버라이드 가능
         rsp = os.getenv("ROLLING_SCAN_PAGES_PER_CYCLE")
