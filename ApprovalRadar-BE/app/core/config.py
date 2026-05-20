@@ -34,7 +34,7 @@ class Settings:
     
     # Rolling Scan 설정: 매 주기 스캔할 API 페이지 총 수 (전 서비스 합계)
     # 서비스별 비례 배분됨 → compute_optimal_defaults() 참조
-    # 12키 기반: 15분 주기 × 150p = ~1.5시간에 1회전
+    # 34키 기반: Oldest-First Scan은 별도 제한 없이 만료 페이지 전부 스캔
     ROLLING_SCAN_PAGES_PER_CYCLE: int = 150
     
     # API Keys
@@ -64,7 +64,7 @@ class Settings:
  
         # 2차 fallback: env에서 로드 (DB 키가 없을 때)
         if not self.API_KEYS:
-            for i in range(1, 10):
+            for i in range(1, 51):  # 최대 50개 키 지원 (env fallback)
                 key = os.getenv(f"FOOD_SAFETY_API_KEY_{i}")
                 if key:
                     self.API_KEYS.append(key)
