@@ -91,13 +91,13 @@ async def run_scraper_for_service_with_rows(service_id: str, rows: list, collect
             "message": "No valid mapped rows",
         }
 
-    actually_changed, skipped_dup, today_changed = persist_batch_crawl(
-        service_id, mapped_rows, collected_by
-    )
+    stats = persist_batch_crawl(service_id, mapped_rows, collected_by)
 
     return {
         "success": True,
-        "inserted": len(rows),
-        "changed": actually_changed,
-        "today_changed": today_changed,
+        "total_fetched": len(rows),
+        "new_indexed": stats["new_indexed"],
+        "skipped_dup": stats["skipped_dup"],
+        "today": stats["today"],
+        "yesterday": stats["yesterday"],
     }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '@/store/useToastStore';
+import { useScanProgressStore } from '@/store/useScanProgressStore';
 import { playNotificationSound } from '@/lib/audio';
 import { fetchApprovals } from '@/lib/api';
 import { CATEGORY_NAMES } from '@/lib/constants';
@@ -113,8 +114,17 @@ export function useSSE() {
             const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;
             await handleUpdateEvent(count);
           } else if (data.type === 'PLAYGROUND_UPDATE') {
-            // Oldest-First Scan 또는 Range Scan 완료 → 플레이그라운드 캐시 무효화 (제로 폴링)
+            // Oldest-First Scan 페이지 완료 → 플레이그라운드 캐시 무효화 + 실시간 진행 스토어 업데이트
             queryClient.invalidateQueries({ queryKey: ['playgroundSummary'] });
+            if (data.page && data.stats && data.cycle) {
+              useScanProgressStore.getState().updatePage({
+                page: data.page,
+                label: data.page_label ?? null,
+                stats: data.stats,
+                cycle: data.cycle,
+                scanned_at: new Date().toISOString(),
+              });
+            }
           } else if (data.type === 'WARN' || data.type === 'ALERT') {
             emitSystemAlert(data.type as SystemAlertType, data.message || '시스템 알림');
           }

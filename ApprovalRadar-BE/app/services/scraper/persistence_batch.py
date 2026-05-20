@@ -10,19 +10,29 @@ from app.services.scraper.persistence_notifier import trigger_sse_broadcast, tri
 business_repo = BusinessRepository()
 raw_repo = RawDataRepository()
 
-def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -> tuple[int, int, int]:
+def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -> dict:
     """
     배치 크롤링 결과를 최적화된 batch SELECT 및 bulk INSERT로 DB에 반영합니다.
-    Returns: (실제 변경건수, 중복 스킵건수, 오늘 변동건수)
+
+    Returns: {
+        "total_fetched": 조회 건수,
+        "new_indexed": 신규 색인 건수,
+        "skipped_dup": 미색인(중복 스킵) 건수,
+        "today": 오늘 변동 건수,
+        "yesterday": 어제 변동 건수,
+    }
     """
     now = datetime.datetime.now().isoformat()
+    today_str = datetime.datetime.now().strftime("%Y%m%d")
+    yesterday_str = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y%m%d")
+
     all_lcns = [m["fields"]["lcns_no"] for m in mapped_rows]
     unique_lcns = list(set(all_lcns))
 
-    actually_changed = 0
+    new_indexed = 0
     skipped_dup = 0
-    today_str = datetime.datetime.now().strftime("%Y%m%d")
-    today_changed = 0
+    today_count = 0
+    yesterday_count = 0
     inserted_lcns_list = []
 
     with get_db() as conn:
@@ -86,19 +96,27 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
             }
             business_repo.insert_business(record, conn=conn)
             raw_repo.insert_raw_data(lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now, conn=conn)
-            actually_changed += 1
+            new_indexed += 1
             inserted_lcns_list.append(lcns_no)
             if event_date == today_str:
-                today_changed += 1
+                today_count += 1
+            elif event_date == yesterday_str:
+                yesterday_count += 1
             existing_pairs.add(pair)
 
         conn.commit()
 
-    if today_changed > 0:
-        trigger_sse_broadcast(today_changed, service_id)
+    if today_count > 0:
+        trigger_sse_broadcast(today_count, service_id)
 
     if inserted_lcns_list:
         unique_inserted = list(dict.fromkeys(inserted_lcns_list))
         trigger_backfill_thread(unique_inserted, service_id, f"flush-{service_id}")
 
-    return actually_changed, skipped_dup, today_changed
+    return {
+        "total_fetched": len(mapped_rows),
+        "new_indexed": new_indexed,
+        "skipped_dup": skipped_dup,
+        "today": today_count,
+        "yesterday": yesterday_count,
+    }

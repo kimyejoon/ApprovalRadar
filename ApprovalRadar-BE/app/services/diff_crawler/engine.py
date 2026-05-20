@@ -2,6 +2,7 @@ import asyncio
 import random
 import time
 import json
+import datetime
 from app.core.config import settings
 from app.clients.foodsafety_api import ApiClient
 from app.repositories.state_repository import StateRepository
@@ -42,10 +43,9 @@ class DiffCrawlerEngine:
     async def _run_i2861_oldest_first_scan(self, state: dict, start_time: float) -> list:
         """
         I2861 전용 Oldest First Scan:
-        1. 전체 5개 페이지(총 ~4,800여건)에 대하여 각 페이지의 last_scanned_at 타임스탬프를 관리.
-        2. 임계치(1시간) 이상 지났거나 기록이 없는 페이지는 모두 즉시 스캔.
-        3. 1시간 초과 페이지가 없으면 가장 오래된 1개 페이지를 순차 롤링.
-        4. 스캔 완료 즉시 페이지 단위로 타임스탬프 갱신 + scraper 파이프라인 위임 + SSE 발행.
+        1. 전체 5개 페이지의 last_scanned_at 타임스탬프를 점검하여 1시간 초과 페이지를 모두 스캔.
+        2. 1시간 초과 페이지가 없으면 가장 오래된 1개 페이지를 순차 롤링.
+        3. 페이지 완료 즉시: scraper 파이프라인 위임 → 상태 저장 → 상세 SSE 발행.
         """
         svc = self.service_id
         extra = state.setdefault("extra_state", {})
@@ -53,11 +53,11 @@ class DiffCrawlerEngine:
         page_labels = extra.setdefault("page_labels", {})
 
         now_ts = int(time.time())
-        total_pages = 5  # I2861 라이브 데이터 기준 약 4,800건이므로 5페이지
+        total_pages = 5
 
-        # ── 전체 페이지 상태 분류 ──────────────────────────────────────────
-        oldest_pages = []   # 1시간 초과
-        fresh_pages = []    # 1시간 이내
+        # ── 전체 페이지 상태 점검 ──────────────────────────────────────────
+        oldest_pages = []
+        fresh_pages = []
 
         for p in range(1, total_pages + 1):
             last_ts = page_timestamps.get(str(p), 0)
@@ -75,7 +75,7 @@ class DiffCrawlerEngine:
 
             logger.info(f"[{svc}]   P{p} [{label}] {status}")
 
-        # ── 스캔 대상 결정 ────────────────────────────────────────────────
+        # ── 스캔 대상 결정 ─────────────────────────────────────────────────
         oldest_pages.sort(key=lambda x: x[1], reverse=True)
 
         if oldest_pages:
@@ -85,7 +85,6 @@ class DiffCrawlerEngine:
                 f"{[f'P{p}' for p in target_pages]}"
             )
         else:
-            # 1시간 초과 없음 → 가장 오래된 1개 롤링
             rolling_candidates = sorted(
                 [(p, page_timestamps.get(str(p), 0)) for p in range(1, total_pages + 1)],
                 key=lambda x: x[1]
@@ -96,57 +95,104 @@ class DiffCrawlerEngine:
                 f"가장 오래된 P{target_pages[0]} 선정"
             )
 
-        # ── 페이지 순차 스캔 ──────────────────────────────────────────────
         from app.core.events import broadcaster
+        from scraper import run_scraper_for_service_with_rows
 
         all_rows = []
         scanned_success_pages = []
+        cycle_api_calls = 0
+        page_elapsed_times: list[float] = []
 
-        for page in target_pages:
+        for idx, page in enumerate(target_pages):
             start_idx = (page - 1) * PAGE_SIZE + 1
             end_idx = page * PAGE_SIZE
+            pages_total = len(target_pages)
+            pages_done = idx  # 이 페이지 완료 전
 
             logger.info(f"[{svc}] 📥 P{page} 조회 중: {start_idx:,} ~ {end_idx:,}")
+            page_fetch_start = time.time()
+
             try:
                 rows = await self._fetch_page(start_idx, end_idx)
+                cycle_api_calls += 1
+                page_elapsed_times.append(time.time() - page_fetch_start)
                 row_count = len(rows)
 
+                # 상호명 대역 추출
                 if rows:
-                    all_rows.extend(rows)
-                    # 상호명 대역 추출
                     first_char = rows[0].get("BSSH_NM", "").strip()[:1]
                     last_char = rows[-1].get("BSSH_NM", "").strip()[:1]
                     if first_char and last_char:
                         page_labels[str(page)] = f"{first_char}~{last_char}"
 
-                    # 즉시 scraper 파이프라인 위임
-                    from scraper import run_scraper_for_service_with_rows
-                    await run_scraper_for_service_with_rows(svc, rows, collected_by="oldest_first_scan")
+                # ── scraper 파이프라인 즉시 위임 ────────────────────────────
+                page_stats = {
+                    "total_fetched": row_count,
+                    "new_indexed": 0,
+                    "skipped_dup": 0,
+                    "today": 0,
+                    "yesterday": 0,
+                }
+                if rows:
+                    result = await run_scraper_for_service_with_rows(
+                        svc, rows, collected_by="oldest_first_scan"
+                    )
+                    page_stats.update({
+                        "new_indexed": result.get("new_indexed", 0),
+                        "skipped_dup": result.get("skipped_dup", 0),
+                        "today": result.get("today", 0),
+                        "yesterday": result.get("yesterday", 0),
+                    })
+                    all_rows.extend(rows)
 
-                # 타임스탬프 즉시 갱신 + 상태 저장
+                # ── 타임스탬프 즉시 저장 ──────────────────────────────────────
                 page_timestamps[str(page)] = int(time.time())
                 state["last_total_count"] = max(state.get("last_total_count", 0), 4800)
                 self.state_repo.save_state(svc, state)
-
                 scanned_success_pages.append(page)
+
+                # ── 사이클 메타 계산 ──────────────────────────────────────────
+                pages_done_now = idx + 1
+                pages_remaining = pages_total - pages_done_now
+                elapsed_so_far = time.time() - start_time
+                avg_sec = sum(page_elapsed_times) / len(page_elapsed_times)
+                est_remaining_sec = pages_remaining * avg_sec
+                est_remaining_min = round(est_remaining_sec / 60, 1)
+
+                cycle_info = {
+                    "elapsed_sec": round(elapsed_so_far, 1),
+                    "api_calls": cycle_api_calls,
+                    "pages_done": pages_done_now,
+                    "pages_total": pages_total,
+                    "est_remaining_min": est_remaining_min,
+                }
+
                 logger.info(
-                    f"[{svc}] ✅ P{page} 완료: 조회 {row_count:,}건 → 저장 완료, PLAYGROUND_UPDATE 발행"
+                    f"[{svc}] ✅ P{page} 완료 | "
+                    f"조회 {row_count:,}건 | "
+                    f"오늘 {page_stats['today']}건 · 어제 {page_stats['yesterday']}건 · "
+                    f"신규색인 {page_stats['new_indexed']}건 · 미색인 {page_stats['skipped_dup']}건 | "
+                    f"소요 {elapsed_so_far:.1f}초 · API {cycle_api_calls}회 · 잔여 ~{est_remaining_min}분"
                 )
 
-                # 페이지 단위 즉시 SSE 브로드캐스트
-                broadcaster.broadcast_sync(
-                    json.dumps({"type": "PLAYGROUND_UPDATE"}, ensure_ascii=False)
-                )
+                # ── 페이지 단위 풍부한 PLAYGROUND_UPDATE SSE 발행 ─────────────
+                broadcaster.broadcast_sync(json.dumps({
+                    "type": "PLAYGROUND_UPDATE",
+                    "page": page,
+                    "page_label": page_labels.get(str(page)),
+                    "stats": page_stats,
+                    "cycle": cycle_info,
+                }, ensure_ascii=False))
 
             except Exception as e:
+                cycle_api_calls += 1  # 실패해도 호출은 카운트
                 logger.error(f"[{svc}] ❌ P{page} Fetch 오류: {e}")
 
         elapsed_sec = time.time() - start_time
         logger.info(
             f"[{svc}] ✔️ Oldest First Scan 완료 | "
             f"스캔: {[f'P{p}' for p in scanned_success_pages]} | "
-            f"총 조회: {len(all_rows):,}건 | "
-            f"소요: {elapsed_sec:.1f}초"
+            f"총 조회: {len(all_rows):,}건 · API {cycle_api_calls}회 · 소요: {elapsed_sec:.1f}초"
         )
         return all_rows
 
