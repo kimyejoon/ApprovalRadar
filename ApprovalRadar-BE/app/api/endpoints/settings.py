@@ -5,8 +5,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 
-from database import get_db
 from app.core.logger import logger
+from app.repositories.api_key_repository import ApiKeyRepository
 from app.services.settings_service import (
     _reload_settings_keys,
     _recalculate_optimal_settings,
@@ -14,6 +14,7 @@ from app.services.settings_service import (
 )
 
 router = APIRouter()
+repo = ApiKeyRepository()
 
 
 # ─── 응답 스키마 ─────────────────────────────────────────────────────────────
@@ -44,12 +45,6 @@ class ApiKeyUpdateRequest(BaseModel):
     is_active: Optional[bool] = None
 
 
-# ─── 내부 유틸 ───────────────────────────────────────────────────────────────
-
-def _mask_key(key: str) -> str:
-    return f"{key[:5]}***{key[-3:]}" if len(key) > 8 else "***"
-
-
 # ─── 키 목록 조회 ────────────────────────────────────────────────────────────
 
 @router.get(
@@ -63,19 +58,12 @@ async def list_api_keys():
     items: List[ApiKeyItem] = []
 
     try:
-        with get_db() as conn:
-            keys = conn.execute(
-                "SELECT id, key_value, memo, is_active, created_at FROM api_keys ORDER BY id"
-            ).fetchall()
-
-            usage_rows = conn.execute(
-                "SELECT key_masked, call_count, exhausted FROM api_key_usage WHERE usage_date = ?",
-                (today,)
-            ).fetchall()
-            usage_map = {r["key_masked"]: r for r in usage_rows}
+        keys = repo.get_all_keys()
+        usage_rows = repo.get_key_usages(today)
+        usage_map = {r["key_masked"]: r for r in usage_rows}
 
         for key_row in keys:
-            masked = _mask_key(key_row["key_value"])
+            masked = repo.mask_key(key_row["key_value"])
             usage = usage_map.get(masked)
             items.append(ApiKeyItem(
                 id=key_row["id"],
@@ -107,20 +95,12 @@ async def create_api_key(body: ApiKeyCreateRequest):
         raise HTTPException(status_code=400, detail="키 값이 비어있습니다.")
 
     try:
-        with get_db() as conn:
-            try:
-                conn.execute(
-                    "INSERT INTO api_keys (key_value, memo, is_active) VALUES (?, ?, 1)",
-                    (key_value, body.memo)
-                )
-                conn.commit()
-            except Exception:
-                raise HTTPException(status_code=409, detail="이미 등록된 키입니다.")
+        try:
+            repo.insert_key(key_value, body.memo)
+        except Exception:
+            raise HTTPException(status_code=409, detail="이미 등록된 키입니다.")
 
-            row = conn.execute(
-                "SELECT id, key_value, memo, is_active, created_at FROM api_keys WHERE key_value = ?",
-                (key_value,)
-            ).fetchone()
+        row = repo.get_key_by_value(key_value)
     except HTTPException:
         raise
     except Exception as e:
@@ -129,14 +109,14 @@ async def create_api_key(body: ApiKeyCreateRequest):
 
     _reload_settings_keys()
     _recalculate_optimal_settings()
-    logger.info(f"[settings] API 키 추가: {_mask_key(key_value)} | 메모: {body.memo}")
+    logger.info(f"[settings] API 키 추가: {repo.mask_key(key_value)} | 메모: {body.memo}")
 
     # 소진 검증 및 크롤링 복구 비즈니스 로직 위임
     crawl_resumed = validate_and_recover_key(key_value)
 
     return ApiKeyItem(
         id=row["id"],
-        key_masked=_mask_key(row["key_value"]),
+        key_masked=repo.mask_key(row["key_value"]),
         memo=row["memo"],
         is_active=bool(row["is_active"]),
         created_at=row["created_at"] or "",
@@ -156,29 +136,18 @@ async def create_api_key(body: ApiKeyCreateRequest):
 )
 async def update_api_key(key_id: int, body: ApiKeyUpdateRequest):
     try:
-        with get_db() as conn:
-            row = conn.execute(
-                "SELECT id, key_value, memo, is_active, created_at FROM api_keys WHERE id = ?",
-                (key_id,)
-            ).fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="키를 찾을 수 없습니다.")
+        row = repo.get_key_by_id(key_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="키를 찾을 수 없습니다.")
 
-            new_memo = body.memo if body.memo is not None else row["memo"]
-            new_active = int(body.is_active) if body.is_active is not None else row["is_active"]
+        new_memo = body.memo if body.memo is not None else row["memo"]
+        new_active = int(body.is_active) if body.is_active is not None else row["is_active"]
 
-            conn.execute(
-                "UPDATE api_keys SET memo = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (new_memo, new_active, key_id)
-            )
-            conn.commit()
+        repo.update_key(key_id, new_memo, new_active)
 
-            today = datetime.date.today().isoformat()
-            masked = _mask_key(row["key_value"])
-            usage = conn.execute(
-                "SELECT call_count, exhausted FROM api_key_usage WHERE key_masked = ? AND usage_date = ?",
-                (masked, today)
-            ).fetchone()
+        today = datetime.date.today().isoformat()
+        masked = repo.mask_key(row["key_value"])
+        usage = repo.get_usage_by_masked_and_date(masked, today)
     except HTTPException:
         raise
     except Exception as e:
@@ -187,11 +156,11 @@ async def update_api_key(key_id: int, body: ApiKeyUpdateRequest):
 
     _reload_settings_keys()
     _recalculate_optimal_settings()
-    logger.info(f"[settings] API 키 수정: {_mask_key(row['key_value'])} | active={new_active}")
+    logger.info(f"[settings] API 키 수정: {repo.mask_key(row['key_value'])} | active={new_active}")
 
     return ApiKeyItem(
         id=key_id,
-        key_masked=_mask_key(row["key_value"]),
+        key_masked=repo.mask_key(row["key_value"]),
         memo=new_memo,
         is_active=bool(new_active),
         created_at=row["created_at"] or "",
@@ -209,16 +178,12 @@ async def update_api_key(key_id: int, body: ApiKeyUpdateRequest):
 )
 async def delete_api_key(key_id: int):
     try:
-        with get_db() as conn:
-            row = conn.execute(
-                "SELECT key_value FROM api_keys WHERE id = ?", (key_id,)
-            ).fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="키를 찾을 수 없습니다.")
+        row = repo.get_key_by_id(key_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="키를 찾을 수 없습니다.")
 
-            masked = _mask_key(row["key_value"])
-            conn.execute("DELETE FROM api_keys WHERE id = ?", (key_id,))
-            conn.commit()
+        masked = repo.mask_key(row["key_value"])
+        repo.delete_key(key_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -309,3 +274,4 @@ async def update_rolling_scan_rate(body: RollingScanRateUpdateRequest):
         logger.error(f"[settings] Rolling Scan 스캔 속도 변경 오류: {e}")
         raise HTTPException(status_code=500, detail="Rolling Scan 설정 변경 실패")
     return RollingScanRateResponse(pages_per_cycle=body.pages_per_cycle)
+
