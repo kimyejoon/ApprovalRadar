@@ -120,7 +120,7 @@ class RollingScanner:
         for page_start in oldest_pages:
             if shutdown_event.is_set():
                 break
-            scanned, new_rows, mismatch = await self._scan_single_page(
+            scanned, new_rows, mismatch, api_rows = await self._scan_single_page(
                 svc, page_start, total_count, fingerprints, scan_times
             )
             total_scanned += scanned
@@ -138,8 +138,8 @@ class RollingScanner:
                     else:
                         new_fp_pages += 1
 
-            # 오늘/어제 건수 집계
-            for row in new_rows:
+            # 오늘/어제 건수 집계 — API 응답 전체 rows 기준 (fingerprint 일치 여부 무관)
+            for row in api_rows:
                 chng = row.get("CHNG_DT", "")
                 if chng == today_str:
                     today_found_total += 1
@@ -161,8 +161,8 @@ class RollingScanner:
                     f"[{svc}] 📊 스캔 진행: {total_scanned}/{len(oldest_pages)}p "
                     f"({total_scanned/len(oldest_pages)*100:.0f}%) | "
                     f"일치:{matched_pages} 불일치:{mismatched_pages} 신규FP:{new_fp_pages} "
-                    f"오늘:{today_found_total} 어제:{yesterday_found_total} "
-                    f"수집:{flushed_count + len(new_rows_total)} | "
+                    f"오늘:{today_found_total}(API) 어제:{yesterday_found_total}(API) "
+                    f"수집:{flushed_count + len(new_rows_total)}(write) |"
                     f"경과:{elapsed:.0f}초 잔여:{remaining:.0f}초"
                 )
 
@@ -200,7 +200,7 @@ class RollingScanner:
             f"[{svc}] ✅ Oldest-First 완료: {total_scanned}p "
             f"({elapsed_total:.0f}초 소요) | "
             f"일치:{matched_pages} 불일치:{mismatched_pages} 신규FP:{new_fp_pages} "
-            f"오늘:{today_found_total} 어제:{yesterday_found_total} 수집:{total_collected}건 | "
+            f"오늘:{today_found_total}(API) 어제:{yesterday_found_total}(API) 수집:{total_collected}(write) | "
             f"커버리지: {scanned_page_count}/{total_pages}p ({coverage_pct}%) | "
             f"최대연식: {worst_age:.1f}h | 다음주기: {next_run_str} | API호출: {api_calls}회"
         )
@@ -417,7 +417,7 @@ class RollingScanner:
                     if (lcns, chng_dt) not in existing_set:
                         new_rows.append(row)
 
-        return (1, new_rows, mismatch)
+        return (1, new_rows, mismatch, rows)  # rows = API 응답 전체 (CHNG_DT 집계용)
 
     async def _scan_range(
         self, svc: str, cursor: int,
