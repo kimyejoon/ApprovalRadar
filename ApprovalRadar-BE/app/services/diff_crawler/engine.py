@@ -9,7 +9,10 @@ from app.repositories.state_repository import StateRepository
 from app.core.logger import logger
 
 PAGE_SIZE = 1000
-STALE_THRESHOLD_SEC = 3600  # 1시간
+STALE_THRESHOLD_SEC = 3600   # 1시간
+# 한 사이클에서 스캔할 최대 페이지 수 (API 비용 제어)
+# 30분 주기, 페이지당 ~2.5초 → 720초 / 2.5 ≈ 288p → 여유있게 200p 제한
+MAX_PAGES_PER_CYCLE = 200
 
 
 class DiffCrawlerEngine:
@@ -43,63 +46,75 @@ class DiffCrawlerEngine:
     async def _run_i2861_oldest_first_scan(self, state: dict, start_time: float) -> list:
         """
         I2861 전용 Oldest First Scan:
-        1. 전체 5개 페이지의 last_scanned_at 타임스탬프를 점검하여 1시간 초과 페이지를 모두 스캔.
-        2. 1시간 초과 페이지가 없으면 가장 오래된 1개 페이지를 순차 롤링.
-        3. 페이지 완료 즉시: scraper 파이프라인 위임 → 상태 저장 → 상세 SSE 발행.
+        1. state["last_total_count"]에서 전체 페이지 수(현재 ~953p)를 동적으로 계산.
+        2. page_timestamps에서 각 페이지의 마지막 스캔 시각을 관리.
+        3. 1시간 초과 페이지를 오래된 순서로 최대 MAX_PAGES_PER_CYCLE개 스캔.
+        4. 1시간 초과 없으면 가장 오래된 1개 페이지를 롤링 스캔.
+        5. 페이지 완료 즉시: scraper 위임 → 상태 저장 → 풍부한 SSE 발행.
         """
         svc = self.service_id
         extra = state.setdefault("extra_state", {})
         page_timestamps = extra.setdefault("page_timestamps", {})
         page_labels = extra.setdefault("page_labels", {})
 
-        now_ts = int(time.time())
-        total_pages = 5
+        # ── 실제 총 페이지 수 동적 계산 ──────────────────────────────────────
+        last_total_count = state.get("last_total_count", 0)
+        if last_total_count <= 0:
+            logger.warning(f"[{svc}] last_total_count 미확인 → 스캔 스킵 (다음 사이클 재시도)")
+            return []
 
-        # ── 전체 페이지 상태 점검 ──────────────────────────────────────────
-        oldest_pages = []
-        fresh_pages = []
+        total_pages = (last_total_count + PAGE_SIZE - 1) // PAGE_SIZE
+        now_ts = int(time.time())
+
+        # ── 전체 페이지 상태 분류 ──────────────────────────────────────────
+        oldest_pages: list[tuple[int, int]] = []   # (page, elapsed_sec)
+        fresh_count = 0
+        never_scanned = 0
 
         for p in range(1, total_pages + 1):
             last_ts = page_timestamps.get(str(p), 0)
             elapsed = now_ts - last_ts
-            elapsed_min = elapsed // 60
-            label = page_labels.get(str(p), "—")
-
-            if elapsed >= STALE_THRESHOLD_SEC:
+            if last_ts == 0:
+                never_scanned += 1
                 oldest_pages.append((p, elapsed))
-                status = f"🔴 {elapsed_min}분 경과"
+            elif elapsed >= STALE_THRESHOLD_SEC:
+                oldest_pages.append((p, elapsed))
             else:
-                remaining = (STALE_THRESHOLD_SEC - elapsed) // 60
-                fresh_pages.append(p)
-                status = f"🟢 {elapsed_min}분 경과 ({remaining}분 후 만료)"
+                fresh_count += 1
 
-            logger.info(f"[{svc}]   P{p} [{label}] {status}")
-
-        # ── 스캔 대상 결정 ─────────────────────────────────────────────────
         oldest_pages.sort(key=lambda x: x[1], reverse=True)
 
+        # ── 스캔 대상 결정 ─────────────────────────────────────────────────
         if oldest_pages:
-            target_pages = [p for p, _ in oldest_pages]
+            # 1시간 초과 페이지들 중 이번 사이클 처리 가능한 최대치까지
+            target_pages = [p for p, _ in oldest_pages[:MAX_PAGES_PER_CYCLE]]
             logger.info(
-                f"[{svc}] 🚀 Oldest First Scan — 1시간 초과 {len(target_pages)}개 페이지 전체 스캔: "
-                f"{[f'P{p}' for p in target_pages]}"
+                f"[{svc}] 🚀 Oldest First Scan 시작 | 전체 {total_pages}p 중 "
+                f"🔴 만료 {len(oldest_pages)}p (미스캔 {never_scanned}p 포함) "
+                f"· 🟢 신선 {fresh_count}p"
+            )
+            logger.info(
+                f"[{svc}] → 이번 사이클 스캔 대상: {len(target_pages)}p "
+                f"(P{target_pages[0]}~P{target_pages[-1]}, 최대 {MAX_PAGES_PER_CYCLE}p 제한)"
             )
         else:
-            rolling_candidates = sorted(
+            # 전부 신선 → 가장 오래된 1개 롤링
+            rolling = sorted(
                 [(p, page_timestamps.get(str(p), 0)) for p in range(1, total_pages + 1)],
                 key=lambda x: x[1]
             )
-            target_pages = [rolling_candidates[0][0]]
+            target_pages = [rolling[0][0]]
+            elapsed_min = (now_ts - rolling[0][1]) // 60
             logger.info(
-                f"[{svc}] 🔄 평시 롤링 — 전체 페이지 1시간 이내, "
-                f"가장 오래된 P{target_pages[0]} 선정"
+                f"[{svc}] 🔄 평시 롤링 | 전체 {total_pages}p 모두 1시간 이내 신선 "
+                f"→ 가장 오래된 P{target_pages[0]} 선정 ({elapsed_min}분 경과)"
             )
 
         from app.core.events import broadcaster
         from scraper import run_scraper_for_service_with_rows
 
-        all_rows = []
-        scanned_success_pages = []
+        all_rows: list = []
+        scanned_success_pages: list[int] = []
         cycle_api_calls = 0
         page_elapsed_times: list[float] = []
 
@@ -107,9 +122,8 @@ class DiffCrawlerEngine:
             start_idx = (page - 1) * PAGE_SIZE + 1
             end_idx = page * PAGE_SIZE
             pages_total = len(target_pages)
-            pages_done = idx  # 이 페이지 완료 전
 
-            logger.info(f"[{svc}] 📥 P{page} 조회 중: {start_idx:,} ~ {end_idx:,}")
+            logger.info(f"[{svc}] 📥 P{page}/{total_pages} 조회 중: {start_idx:,} ~ {end_idx:,}")
             page_fetch_start = time.time()
 
             try:
@@ -125,7 +139,7 @@ class DiffCrawlerEngine:
                     if first_char and last_char:
                         page_labels[str(page)] = f"{first_char}~{last_char}"
 
-                # ── scraper 파이프라인 즉시 위임 ────────────────────────────
+                # ── scraper 파이프라인 즉시 위임 ──────────────────────────────
                 page_stats = {
                     "total_fetched": row_count,
                     "new_indexed": 0,
@@ -147,7 +161,6 @@ class DiffCrawlerEngine:
 
                 # ── 타임스탬프 즉시 저장 ──────────────────────────────────────
                 page_timestamps[str(page)] = int(time.time())
-                state["last_total_count"] = max(state.get("last_total_count", 0), 4800)
                 self.state_repo.save_state(svc, state)
                 scanned_success_pages.append(page)
 
@@ -156,8 +169,7 @@ class DiffCrawlerEngine:
                 pages_remaining = pages_total - pages_done_now
                 elapsed_so_far = time.time() - start_time
                 avg_sec = sum(page_elapsed_times) / len(page_elapsed_times)
-                est_remaining_sec = pages_remaining * avg_sec
-                est_remaining_min = round(est_remaining_sec / 60, 1)
+                est_remaining_min = round((pages_remaining * avg_sec) / 60, 1)
 
                 cycle_info = {
                     "elapsed_sec": round(elapsed_so_far, 1),
@@ -168,14 +180,14 @@ class DiffCrawlerEngine:
                 }
 
                 logger.info(
-                    f"[{svc}] ✅ P{page} 완료 | "
+                    f"[{svc}] ✅ P{page}/{total_pages} 완료 | "
                     f"조회 {row_count:,}건 | "
                     f"오늘 {page_stats['today']}건 · 어제 {page_stats['yesterday']}건 · "
-                    f"신규색인 {page_stats['new_indexed']}건 · 미색인 {page_stats['skipped_dup']}건 | "
+                    f"신규 {page_stats['new_indexed']}건 · 중복 {page_stats['skipped_dup']}건 | "
                     f"소요 {elapsed_so_far:.1f}초 · API {cycle_api_calls}회 · 잔여 ~{est_remaining_min}분"
                 )
 
-                # ── 페이지 단위 풍부한 PLAYGROUND_UPDATE SSE 발행 ─────────────
+                # ── 페이지 단위 풍부한 PLAYGROUND_UPDATE SSE 발행 ────────────
                 broadcaster.broadcast_sync(json.dumps({
                     "type": "PLAYGROUND_UPDATE",
                     "page": page,
@@ -185,14 +197,15 @@ class DiffCrawlerEngine:
                 }, ensure_ascii=False))
 
             except Exception as e:
-                cycle_api_calls += 1  # 실패해도 호출은 카운트
+                cycle_api_calls += 1
                 logger.error(f"[{svc}] ❌ P{page} Fetch 오류: {e}")
 
         elapsed_sec = time.time() - start_time
+        remaining_stale = len(oldest_pages) - len(target_pages)
         logger.info(
             f"[{svc}] ✔️ Oldest First Scan 완료 | "
-            f"스캔: {[f'P{p}' for p in scanned_success_pages]} | "
-            f"총 조회: {len(all_rows):,}건 · API {cycle_api_calls}회 · 소요: {elapsed_sec:.1f}초"
+            f"이번 사이클: {len(scanned_success_pages)}p 스캔 · API {cycle_api_calls}회 · 소요 {elapsed_sec:.1f}초"
+            + (f" | 잔여 만료: {remaining_stale}p → 다음 사이클에 계속" if remaining_stale > 0 else "")
         )
         return all_rows
 
@@ -200,6 +213,6 @@ class DiffCrawlerEngine:
         """주기적으로 실행되어 Oldest-First Scan을 수행합니다."""
         svc = self.service_id
         start_time = time.time()
-        logger.info(f"[{svc}] 🚀 Oldest First Scan 시작 — 전체 페이지 상태 점검")
+        logger.info(f"[{svc}] 🚀 Oldest First Scan 사이클 시작")
         state = self.state_repo.load_state(svc)
         return await self._run_i2861_oldest_first_scan(state, start_time)
