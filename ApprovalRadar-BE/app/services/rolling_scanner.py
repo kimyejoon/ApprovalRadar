@@ -255,7 +255,7 @@ class RollingScanner:
         for page_start in oldest_pages:
             if shutdown_event.is_set():
                 break
-            scanned, new_rows, mismatch = await self._scan_single_page(
+            scanned, new_rows, mismatch, api_rows = await self._scan_single_page(
                 svc, page_start, total_count, fingerprints, scan_times
             )
             total_scanned += scanned
@@ -372,15 +372,15 @@ class RollingScanner:
                 self.service_id, page_start, page_end
             )
         except Exception as e:
-            logger.debug(f"[{svc}] 페이지 {page_start} API 실패: {e}")
-            return (0, [], 0)
+            logger.warning(f"[{svc}] ⚠ 페이지 {page_start:,} API 실패 → skip 후 계속: {e}")
+            return (0, [], 0, [])  # 실패해도 크래시 없이 다음 페이지로
 
         if not data or self.service_id not in data:
-            return (1, [], 0)
+            return (1, [], 0, [])  # 빈 응답도 scan 카운트는 +1 (시도는 했음)
 
         rows = data[self.service_id].get("row", [])
         if not rows:
-            return (1, [], 0)
+            return (1, [], 0, [])
 
         # Fingerprint 비교
         new_fp = compute_page_fingerprint(rows)
