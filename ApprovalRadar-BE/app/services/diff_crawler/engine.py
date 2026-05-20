@@ -10,8 +10,6 @@ from app.core.logger import logger
 
 PAGE_SIZE = 1000
 STALE_THRESHOLD_SEC = 3600   # 1시간
-# 한 사이클에서 스캔할 최대 페이지 수 (API 비용 제어)
-MAX_PAGES_PER_CYCLE = 200
 # 알려진 마지막 페이지 이후 추가 조회할 Tail Probe 페이지 수 (신규 데이터 유입 감지)
 TAIL_PROBE_EXTRA = 3
 
@@ -87,16 +85,15 @@ class DiffCrawlerEngine:
 
         # ── 스캔 대상 결정 ─────────────────────────────────────────────────
         if oldest_pages:
-            # 1시간 초과 페이지들 중 이번 사이클 처리 가능한 최대치까지
-            target_pages = [p for p, _ in oldest_pages[:MAX_PAGES_PER_CYCLE]]
+            # 1시간 초과 페이지 전체를 이번 사이클에 스캔 (제한 없음 — API 키 10개 이상)
+            target_pages = [p for p, _ in oldest_pages]
             logger.info(
                 f"[{svc}] 🚀 Oldest First Scan 시작 | 전체 {total_pages}p 중 "
                 f"🔴 만료 {len(oldest_pages)}p (미스캔 {never_scanned}p 포함) "
                 f"· 🟢 신선 {fresh_count}p"
             )
             logger.info(
-                f"[{svc}] → 이번 사이클 스캔 대상: {len(target_pages)}p "
-                f"(P{target_pages[0]}~P{target_pages[-1]}, 최대 {MAX_PAGES_PER_CYCLE}p 제한)"
+                f"[{svc}] → 이번 사이클 스캔 대상: 만료 {len(target_pages)}p 전체"
             )
         else:
             # 전부 신선 → 가장 오래된 1개 롤링
