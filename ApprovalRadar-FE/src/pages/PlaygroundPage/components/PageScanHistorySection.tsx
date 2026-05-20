@@ -48,9 +48,9 @@ export function PageScanHistorySection({ pageScan }: PageScanHistorySectionProps
       {pageScan ? (
         <div>
           {/* 진행률 바 */}
-          <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center gap-3 mb-4">
             <span className="text-sm text-text-secondary whitespace-nowrap">
-              {pageScan.total_pages}p 중 <span className="text-brand font-semibold">{pageScan.scanned_pages}p</span>
+              {pageScan.total_pages}p 중 <span className="text-brand font-semibold">{pageScan.scanned_pages}p</span> 완료
             </span>
             <div className="flex-1 h-1.5 bg-border-subtle rounded-full overflow-hidden">
               <div
@@ -63,70 +63,99 @@ export function PageScanHistorySection({ pageScan }: PageScanHistorySectionProps
             </span>
           </div>
 
-          {/* 953p 히트맵 */}
-          <div className="flex flex-wrap gap-[2px]">
-            {(() => {
-              const nowMs = Date.now();
-              const ONE_HOUR_MS = 60 * 60 * 1000;
-              const todayStr = new Date().toISOString().slice(0, 10);
+          {/* 페이지 카드 그리드 (스크롤) */}
+          <div className="max-h-64 overflow-y-auto pr-1">
+            <div className="flex flex-wrap gap-[3px]">
+              {(() => {
+                const nowMs = Date.now();
+                const ONE_HOUR_MS = 60 * 60 * 1000;
+                const todayStr = new Date().toISOString().slice(0, 10);
 
-              return pageScan.entries.map((e) => {
-                const hasTime = !!e.last_scanned;
-                const live = livePages[e.page_number];
-                const label = e.label ?? '—';
+                return pageScan.entries.map((e) => {
+                  const hasTime = !!e.last_scanned;
+                  const live = livePages[e.page_number];
+                  const label = e.label ?? '—';
 
-                let colorClass: string;
-                let tooltip: string;
+                  let borderColor: string;
+                  let bgColor: string;
+                  let statusText: string;
+                  let statusColor: string;
 
-                if (!hasTime) {
-                  colorClass = 'bg-border-subtle hover:bg-zinc-600/40';
-                  tooltip = `P${e.page_number} [${label}]\n(${e.page_start.toLocaleString()}~)\n미스캔`;
-                } else {
-                  const scannedDate = e.last_scanned!.slice(0, 10);
-                  const ageMs = nowMs - new Date(e.last_scanned!).getTime();
-                  const relTime = formatRelativeTime(e.last_scanned!);
-
-                  if (scannedDate < todayStr) {
-                    colorClass = 'bg-zinc-600/50 hover:bg-zinc-500/60';
-                  } else if (ageMs < ONE_HOUR_MS) {
-                    colorClass = 'bg-emerald-500 hover:bg-emerald-400';
+                  if (!hasTime) {
+                    borderColor = 'border-border-subtle';
+                    bgColor = 'bg-background';
+                    statusText = '미스캔';
+                    statusColor = 'text-text-muted';
                   } else {
-                    colorClass = 'bg-emerald-800/70 hover:bg-emerald-700/80';
+                    const scannedDate = e.last_scanned!.slice(0, 10);
+                    const ageMs = nowMs - new Date(e.last_scanned!).getTime();
+
+                    if (scannedDate < todayStr) {
+                      borderColor = 'border-zinc-600/40';
+                      bgColor = 'bg-zinc-800/20';
+                      statusText = formatRelativeTime(e.last_scanned!);
+                      statusColor = 'text-zinc-500';
+                    } else if (ageMs < ONE_HOUR_MS) {
+                      borderColor = 'border-emerald-500/50';
+                      bgColor = 'bg-emerald-500/10';
+                      statusText = formatRelativeTime(e.last_scanned!);
+                      statusColor = 'text-emerald-400';
+                    } else {
+                      borderColor = 'border-emerald-800/40';
+                      bgColor = 'bg-emerald-900/10';
+                      statusText = formatRelativeTime(e.last_scanned!);
+                      statusColor = 'text-emerald-700';
+                    }
                   }
 
-                  const liveStr = live?.stats
+                  // 툴팁에 실시간 통계 포함
+                  const liveTooltip = live?.stats
                     ? `\n오늘 ${live.stats.today}건 · 어제 ${live.stats.yesterday}건\n신규 ${live.stats.new_indexed}건 · 중복 ${live.stats.skipped_dup}건`
                     : '';
-                  tooltip = `P${e.page_number} [${label}]\n(${e.page_start.toLocaleString()}~)\n${relTime}${liveStr}`;
-                }
+                  const tooltip = `P${e.page_number} [${label}]\n(${e.page_start.toLocaleString()}~)${hasTime ? `\n${statusText}` : '\n미스캔'}${liveTooltip}`;
 
-                return (
-                  <div
-                    key={e.page_number}
-                    className={`w-2.5 h-2.5 rounded-[1px] transition-colors cursor-pointer flex-shrink-0 ${colorClass}`}
-                    title={tooltip}
-                  />
-                );
-              });
-            })()}
+                  return (
+                    <div
+                      key={e.page_number}
+                      title={tooltip}
+                      className={`flex flex-col items-center justify-between border rounded px-1.5 py-1 transition-all cursor-pointer hover:brightness-125 ${borderColor} ${bgColor}`}
+                      style={{ minWidth: '3rem' }}
+                    >
+                      {/* 페이지 번호 */}
+                      <span className="text-[9px] font-bold text-text-muted font-mono leading-tight">
+                        P{e.page_number}
+                      </span>
+                      {/* 상호명 대역 */}
+                      <span className="text-[11px] font-bold text-text-primary leading-tight">
+                        {label}
+                      </span>
+                      {/* 스캔 상태 */}
+                      <span className={`text-[9px] font-medium leading-tight ${statusColor}`}>
+                        {statusText}
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
           </div>
 
           {/* 범례 */}
           <div className="flex items-center gap-4 mt-3 text-xs text-text-muted">
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-[1px] bg-emerald-500" />
+              <div className="w-2.5 h-2.5 rounded border border-emerald-500/50 bg-emerald-500/10" />
               1시간 미만
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-[1px] bg-emerald-800/70" />
+              <div className="w-2.5 h-2.5 rounded border border-emerald-800/40 bg-emerald-900/10" />
               1시간 이상
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-[1px] bg-zinc-600/50" />
+              <div className="w-2.5 h-2.5 rounded border border-zinc-600/40 bg-zinc-800/20" />
               오늘 이전
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-[1px] bg-border-subtle" />
+              <div className="w-2.5 h-2.5 rounded border border-border-subtle bg-background" />
               미스캔
             </div>
           </div>

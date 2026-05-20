@@ -11,8 +11,9 @@ from app.core.logger import logger
 PAGE_SIZE = 1000
 STALE_THRESHOLD_SEC = 3600   # 1시간
 # 한 사이클에서 스캔할 최대 페이지 수 (API 비용 제어)
-# 30분 주기, 페이지당 ~2.5초 → 720초 / 2.5 ≈ 288p → 여유있게 200p 제한
 MAX_PAGES_PER_CYCLE = 200
+# 알려진 마지막 페이지 이후 추가 조회할 Tail Probe 페이지 수 (신규 데이터 유입 감지)
+TAIL_PROBE_EXTRA = 3
 
 
 class DiffCrawlerEngine:
@@ -110,6 +111,19 @@ class DiffCrawlerEngine:
                 f"→ 가장 오래된 P{target_pages[0]} 선정 ({elapsed_min}분 경과)"
             )
 
+        # ── Tail Probe: 알려진 마지막 페이지 이후 +N페이지 추가 조회 ──────────
+        # 매 사이클마다 신규 데이터 유입(tail 확장) 여부를 탐지하기 위해 실행
+        tail_probe_pages = [total_pages + i for i in range(1, TAIL_PROBE_EXTRA + 1)]
+        for tp in tail_probe_pages:
+            if tp not in target_pages:
+                target_pages.append(tp)
+        logger.info(
+            f"[{svc}] 🔎 Tail Probe 추가: P{tail_probe_pages[0]}~P{tail_probe_pages[-1]} "
+            f"(신규 tail 확장 감지 목적)"
+        )
+
+        known_tail_pages = set(range(1, total_pages + 1))
+
         from app.core.events import broadcaster
         from scraper import run_scraper_for_service_with_rows
 
@@ -123,7 +137,9 @@ class DiffCrawlerEngine:
             end_idx = page * PAGE_SIZE
             pages_total = len(target_pages)
 
-            logger.info(f"[{svc}] 📥 P{page}/{total_pages} 조회 중: {start_idx:,} ~ {end_idx:,}")
+            is_probe = page not in known_tail_pages
+            probe_tag = " [TAIL PROBE]" if is_probe else ""
+            logger.info(f"[{svc}] 📥 P{page}/{total_pages}{probe_tag} 조회 중: {start_idx:,} ~ {end_idx:,}")
             page_fetch_start = time.time()
 
             try:
@@ -158,6 +174,17 @@ class DiffCrawlerEngine:
                         "yesterday": result.get("yesterday", 0),
                     })
                     all_rows.extend(rows)
+
+                    # ── Tail Probe 페이지에 데이터 유입 감지 → last_total_count 확장 ────────
+                    if is_probe:
+                        new_total = page * PAGE_SIZE
+                        if new_total > state.get("last_total_count", 0):
+                            state["last_total_count"] = new_total
+                            new_total_pages = (new_total + PAGE_SIZE - 1) // PAGE_SIZE
+                            logger.info(
+                                f"[{svc}] 🆕 Tail 확장 감지! "
+                                f"last_total_count 갱신: {new_total:,}건 (P{new_total_pages})"
+                            )
 
                 # ── 타임스탬프 즉시 저장 ──────────────────────────────────────
                 page_timestamps[str(page)] = int(time.time())
