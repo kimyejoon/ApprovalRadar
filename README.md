@@ -47,10 +47,10 @@
 │                                                    │                │
 │  ┌────────────────────────┐    ┌──────────────────────────────┐    │
 │  │  SQLite (food_safety.db)│ ◄──│  DiffCrawlerEngine           │    │
-│  │  · businesses           │    │  · I2859: TailPing + Pivots  │    │
-│  │  · crawler_state        │    │  · I2861: Oldest First Scan  │    │
-│  │  · api_keys             │    │    (SYS_SYNC=LIVE 우회 강제)  │    │
-│  │  · raw_data / memos     │    │  · ChangeDetector             │    │
+│  │  · businesses           │    │  · I2861: Oldest First Scan  │    │
+│  │  · crawler_state        │    │    (SYS_SYNC=LIVE 우회 강제)  │    │
+│  │  · api_keys             │    │  · ChangeDetector             │    │
+│  │  · raw_data / memos     │    │                              │    │
 │  └────────────────────────┘    └──────────┬───────────────────┘    │
 │                                           │                        │
 │                                           ▼                        │
@@ -99,8 +99,6 @@ API 호출 비용: 실행 주기당 1~2페이지 (I2861 전체 5페이지 기준
 |---|---|
 | **API 키 한도 초과** | 다음 활성 키로 즉시 교체 (Key Rotation). 전체 소진 시 10분마다 회복 체크 |
 | **WAF 차단** | 키 전환 + 지수 백오프 재시도. Jitter(0.5~1.5초 랜덤 딜레이)로 인간적 패턴 유지 |
-| **API 재정렬 감지** | known_tail 역방향 검증 실패 시 피벗 초기화 → 백그라운드 재부트스트랩 |
-| **Circuit Breaker** | diff_count가 임계값(10,000건) 초과 시 해당 주기 중단 → ALERT SSE 발송 |
 | **크롤러 연속 실패** | 5회 연속 실패 시 관리자 ALERT. API 키 회복 시 즉시 재가동 |
 | **자정 한도 리셋** | 매일 자정 API 한도 자동 초기화, 소진 상태 클리어 |
 
@@ -178,10 +176,8 @@ ApprovalRadar/
 │   │   ├── repositories/          # DB 접근 계층 (business, state, memo, raw_data)
 │   │   ├── schemas/               # Pydantic 요청/응답 모델
 │   │   └── services/              # 핵심 비즈니스 로직
-│   │       ├── diff_crawler.py    # DiffCrawlerEngine (Tail 탐색, Bootstrap, 델타 감지)
-│   │       ├── rolling_scanner.py # Rolling Scan (Oldest-First 전략, ScanMode Enum)
-│   │       ├── tail_ping_job.py   # Tail Ping + Multi-Point Sentinel
-│   │       ├── pivot_manager.py   # 피벗 Fingerprint 관리 + Shift 진단
+│   │       ├── diff_crawler/      # DiffCrawlerEngine (I2861 Oldest-First Scan 제어)
+│   │       │   └── engine.py      # 메인 롤링 스캔 코어 엔진
 │   │       ├── change_detector.py # 변동 유형 감지 (BF/AF 기반 추론)
 │   │       └── industry_filler.py # I2500 세부업종/대표자/인허가일 Backfill
 │   └── .env                       # API 키 + 환경 설정
@@ -206,10 +202,8 @@ ApprovalRadar/
 | 잡 | 주기 | 역할 |
 |---|---|---|
 | **Scraper Job** | 5분 (기본값, 실시간 변경 가능) | DiffCrawlerEngine 실행 → I2861 Oldest First Scan 진행 (5분당 1~2개 페이지 롤링) |
-| **Tail Ping** | 5분 | 독립적 Tail 변동 감지 (I2859 전용, I2861은 정기 롤링만 수행) |
 | **Key Recovery** | 10분 | 소진된 API 키 회복 여부 체크 → 회복 시 즉시 크롤링 재개 |
 | **Industry Backfill** | 6시간 + 신규 INSERT 시 즉시 | I2500 API로 세부업종/대표자/연락처/인허가일(PRMS_DT) 보완 |
-| **Daily Bootstrap** | 매일 09:00 | 야간 API 재정렬 반영 → 피벗 재생성 (I2859 등 전용) |
 | **DB Vacuum** | 일요일 03:00 | SQLite VACUUM 최적화 |
 | **DB Backup** | 매일 04:00 | 자동 백업 |
 
@@ -218,9 +212,9 @@ ApprovalRadar/
 ## 📊 데이터 수집 파이프라인
 
 ```
-신규 변동 감지 (FP 불일치 or Tail 증가)
+신규 변동 감지 (Oldest-First Scan에 의한 격차 감지)
   ↓
-_scan_single_page: 오늘/어제 CHNG_DT & DB 미존재 레코드 필터
+_run_i2861_oldest_first_scan: 롤링 선정 페이지 Fetch 및 DB 비교
   ↓
 flush_callback → run_scraper_for_service_with_rows
   ↓
@@ -246,8 +240,8 @@ batch SELECT 중복 확인 → DB INSERT (license_no + last_event_date 복합키
 - 12개 키 기준: 일일 ~15,000회 호출로 약 95분에 전체 DB 1회전 가능
 
 ### 3. 초기 실행 시 시간 소요
-- 최초 실행 시 **Bootstrap** 과정에서 전체 데이터 구조를 파악합니다.
-- 약 95만 건 기준 10~20분 소요 → 이후부터는 변동분만 빠르게 감지
+- 최초 실행 시 **Bootstrap**이 필요하지 않으며, 단 1초 만에 베이스라인이 바로 수립됩니다.
+- 초기 로드가 완료되면 즉시 5분 주기마다 롤링하며 변동 데이터 포착을 개시합니다.
 
 ### 4. 빌드 시 주의
 - **빌드 전 반드시 ApprovalRadar.exe를 종료**해야 합니다.
