@@ -4,9 +4,10 @@ import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from database import get_db
+from app.repositories.base import AbstractMemoRepository
 
 
-class MemoRepository:
+class MemoRepository(AbstractMemoRepository):
     """인허가 변동건 메모 CRUD 레포지토리.
     
     license_date + business_name 조합을 기준으로 건당 1개의 메모를 관리합니다.

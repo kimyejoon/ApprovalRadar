@@ -5,8 +5,9 @@ import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from database import get_db
+from app.repositories.base import AbstractBusinessRepository
 
-class BusinessRepository:
+class BusinessRepository(AbstractBusinessRepository):
     def _build_where_clause(self, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]], infer_update_type: Optional[List[str]] = None, industry_type: Optional[List[str]] = None) -> Tuple[str, List[Any]]:
         query_conditions = []
         params = []
