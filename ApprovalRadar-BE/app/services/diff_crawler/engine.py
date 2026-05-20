@@ -120,7 +120,18 @@ class DiffCrawlerEngine:
             from scraper import run_scraper_for_service_with_rows
             await run_scraper_for_service_with_rows(svc, new_data_rows, collected_by="rolling_scan")
 
+        # Oldest-First Scan 1회 완료 → 플레이그라운드 상태가 변경됐으므로 SSE로 UI 갱신 트리거
+        try:
+            import json
+            from app.core.events import broadcaster
+            broadcaster.broadcast_sync(
+                json.dumps({"type": "PLAYGROUND_UPDATE"}, ensure_ascii=False)
+            )
+        except Exception as _e:
+            logger.debug(f"[{svc}] PLAYGROUND_UPDATE SSE 발행 스킵: {_e}")
+
         elapsed_sec = time.time() - start_time
+
         logger.info(
             f"[{svc}] ✔️ Oldest First Scan 완료. "
             f"성공: {[f'P{p}' for p in scanned_success_pages]} | "

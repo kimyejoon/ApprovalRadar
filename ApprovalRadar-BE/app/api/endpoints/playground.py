@@ -12,11 +12,18 @@ from app.api.schemas.playground import (
     PageScanHistoryResponse,
     TodayDetectionResponse,
     TailHistoryResponse,
-    ChngDtTrendResponse
+    ChngDtTrendResponse,
+    PlaygroundSummaryResponse
 )
 from app.services import playground_service
 
 router = APIRouter()
+
+
+@router.get("/summary", response_model=PlaygroundSummaryResponse)
+async def get_playground_summary(service_id: str = "I2861"):
+    """스케줄러 상태, 오늘 감지 이력, tail 히스토리, 페이지 스캔 상태를 포함한 통합 요약 정보를 조회합니다."""
+    return playground_service.get_playground_summary_data(service_id)
 
 
 @router.get("/scheduler-status", response_model=SchedulerStatusResponse)
@@ -81,15 +88,3 @@ async def get_chng_dt_trend():
     어제+오늘 날짜의 폴링 이력을 반환합니다.
     """
     return playground_service.get_chng_dt_trend_data()
-
-
-@router.get("/smart-sweep/status")
-async def get_smart_sweep_status():
-    """SmartSweep 최근 10회 실행 이력 반환."""
-    return playground_service.get_smart_sweep_status_data()
-
-
-@router.get("/smart-sweep/cache")
-async def get_smart_sweep_cache():
-    """SmartSweep 세그먼트 캐시 현황 반환 (최근 탐침 결과)."""
-    return playground_service.get_smart_sweep_cache_data()

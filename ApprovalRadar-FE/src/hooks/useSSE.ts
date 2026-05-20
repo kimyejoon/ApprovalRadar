@@ -112,6 +112,9 @@ export function useSSE() {
             // 백엔드 SSE 페이로드에 count 포함 → N개 팝업 생성
             const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;
             await handleUpdateEvent(count);
+          } else if (data.type === 'PLAYGROUND_UPDATE') {
+            // Oldest-First Scan 또는 Range Scan 완료 → 플레이그라운드 캐시 무효화 (제로 폴링)
+            queryClient.invalidateQueries({ queryKey: ['playgroundSummary'] });
           } else if (data.type === 'WARN' || data.type === 'ALERT') {
             emitSystemAlert(data.type as SystemAlertType, data.message || '시스템 알림');
           }
@@ -122,6 +125,7 @@ export function useSSE() {
           }
         }
       };
+
 
       eventSource.onerror = () => {
         eventSource.close();

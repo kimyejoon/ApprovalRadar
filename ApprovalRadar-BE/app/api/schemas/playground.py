@@ -71,3 +71,11 @@ class ChngDtTrendResponse(BaseModel):
     entries: List[ChngDtPollEntry]
     latest_total: int
     total_inserted: int
+
+
+class PlaygroundSummaryResponse(BaseModel):
+    scheduler: SchedulerStatusResponse
+    today: TodayDetectionResponse
+    tail_history: TailHistoryResponse
+    page_scan: PageScanHistoryResponse
+

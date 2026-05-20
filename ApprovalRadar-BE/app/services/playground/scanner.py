@@ -1,7 +1,9 @@
 import asyncio
+import datetime
 from database import get_db
 from app.core.logger import logger
 from app.repositories.state_repository import StateRepository
+
 
 def trigger_range_scan_task(start: int, end: int):
     pages = (end - start + 1000) // 1000
@@ -11,38 +13,26 @@ def trigger_range_scan_task(start: int, end: int):
 
     async def _run_range_scan():
         from app.clients.foodsafety_api import ApiClient
-        from app.repositories.state_repository import StateRepository
-        from app.services.rolling_scanner import RollingScanner
+        from app.services.diff_crawler.engine import DiffCrawlerEngine
 
         svc = "I2861"
-        api_client = ApiClient()
-        state_repo = StateRepository()
-        scanner = RollingScanner(api_client, svc, state_repo)
+        async with ApiClient() as api_client:
+            engine = DiffCrawlerEngine(api_client=api_client, service_id=svc)
+            rows = await engine._fetch_page(start, end)
 
-        state = state_repo.load_state(svc)
-        fingerprints = state.get("page_fingerprints", {})
-        scan_times = state.get("page_scan_times", {})
-
-        async def _flush(rows):
+        if rows:
             from scraper import run_scraper_for_service_with_rows
             await run_scraper_for_service_with_rows(svc, rows, collected_by="range_scan")
-
-        scanned, new_rows, mismatch, _ = await scanner._scan_range(
-            svc, start, start, end,
-            pages, fingerprints, scan_times, "RANGE"
-        )
-
-        if new_rows:
-            await _flush(new_rows)
-            logger.info(
-                f"[Playground] ✅ Range Scan 완료: {scanned}p, {len(new_rows)}건 수집"
-            )
+            logger.info(f"[Playground] ✅ Range Scan 완료: {len(rows):,}건 수집")
         else:
-            logger.info(f"[Playground] ✅ Range Scan 완료: {scanned}p, 신규 0건")
+            logger.info("[Playground] ✅ Range Scan 완료: 신규 0건")
 
-        state["page_fingerprints"] = fingerprints
-        state["page_scan_times"] = scan_times
-        state_repo.save_state(svc, state)
+        # Range Scan 완료 후 플레이그라운드 상태 갱신 이벤트 발행
+        import json
+        from app.core.events import broadcaster
+        broadcaster.broadcast_sync(
+            json.dumps({"type": "PLAYGROUND_UPDATE"}, ensure_ascii=False)
+        )
 
     asyncio.create_task(_run_range_scan())
 
@@ -54,7 +44,7 @@ def get_page_scan_history_data(service_id: str) -> dict:
     total_count = state.get("last_total_count", 0)
     fingerprints = state.get("page_fingerprints", {})
     scan_times = state.get("page_scan_times", {})
-    
+
     # I2861 전용 extra_state 라벨 및 타임스탬프 로드
     extra = state.get("extra_state", {})
     page_labels = extra.get("page_labels", {})
@@ -66,12 +56,10 @@ def get_page_scan_history_data(service_id: str) -> dict:
     for p in range(total_pages):
         page_start = p * 1000 + 1
         fp = fingerprints.get(str(page_start))
-        
+
         if service_id == "I2861":
             ts_val = page_timestamps.get(str(p + 1))
-            # UI가 Date 포맷 파싱을 수행할 수 있도록 ISO 포맷 문자열로 변환
             if ts_val:
-                import datetime
                 ts = datetime.datetime.fromtimestamp(ts_val).isoformat()
             else:
                 ts = None

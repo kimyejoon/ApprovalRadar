@@ -41,20 +41,21 @@ export interface PageScanEntry {
   label?: string | null;
 }
 
-export interface SmartSweepLogEntry {
-  run_at: string;
-  strategy: string;
-  probe_calls: number;
-  hot_segs: number;
-  collected: number;
-  elapsed_sec: number;
-  detail: { seg: string; class: string; first_chng: string }[];
+export interface PageScanHistory {
+  total_pages: number;
+  scanned_pages: number;
+  entries: PageScanEntry[];
 }
 
-export interface SmartSweepCache {
-  total_cached: number;
-  hot: number;
-  warm: number;
-  cold: number;
-  segments: { seg: string; total_count: number; first_chng: string; cls: string; probed_at: string }[];
+export interface TailHistory {
+  service_id: string;
+  entries: TailHistoryEntry[];
+}
+
+/** 플레이그라운드 대시보드 통합 상태 (GET /api/v1/playground/summary 응답) */
+export interface PlaygroundSummary {
+  scheduler: SchedulerStatus;
+  today: TodayDetection;
+  tail_history: TailHistory;
+  page_scan: PageScanHistory;
 }
