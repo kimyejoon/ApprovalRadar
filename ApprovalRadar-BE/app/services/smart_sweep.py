@@ -142,6 +142,23 @@ class SmartSweepService:
                 (seg_start, seg_end, total, first_chng, datetime.now().isoformat(), label)
             )
 
+    def _batch_save_cache(self, entries: list[dict], label: str):
+        """여러 세그먼트 캐시를 1회 트랜잭션으로 일괄 저장 (WAL 누적 방지)."""
+        if not entries:
+            return
+        now = datetime.now().isoformat()
+        rows = [
+            (e["seg_start"], e["seg_end"], e["total"], e["first_chng"], now, label)
+            for e in entries
+        ]
+        with get_db() as conn:
+            conn.executemany(
+                """INSERT OR REPLACE INTO smart_sweep_cache
+                   (seg_start, seg_end, total_count, first_chng, probed_at, probe_label)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                rows
+            )
+
     def _save_log(self, result: SweepResult):
         row = result.to_log_row()
         with get_db() as conn:
@@ -186,7 +203,7 @@ class SmartSweepService:
 
             seg_data = await self._fetch_seg(seg_start, seg_end)
             result.probe_calls += 1
-            await asyncio.sleep(1.2)  # WAF 경합 방지: 메인 스캐너와 간격 확보
+            await asyncio.sleep(1.2)  # WAF 경합 방지
 
             if seg_data is None:
                 logger.info(f"[SmartSweep] ⚠ {seg_start:,}~{seg_end:,} 스킵 (타임아웃/오류)")
@@ -205,7 +222,7 @@ class SmartSweepService:
                 "rows": seg_data.get("rows", []),
             }
             result.segments.append(seg_info)
-            self._save_cache(seg_start, seg_end, total, first_chng, "stratified")
+            # ← _save_cache 개별 호출 제거 (배치로 대체)
 
             label = {"HOT": "🎯", "WARM": "📅", "DELTA": "📈", "COLD": "❄️"}.get(cls, "")
             logger.info(
@@ -217,6 +234,9 @@ class SmartSweepService:
                 result.hot_segs.append(seg_info)
             elif cls == "DELTA":
                 result.delta_segs.append(seg_info)
+
+        # 루프 완료 후 1회 배치 저장 (10 write → 1 write, WAL 누적 방지)
+        self._batch_save_cache(result.segments, "stratified")
 
         # HOT/DELTA 세그먼트 collect (메인 스캐너 유휴 시에만)
         if not _scraper_lock.locked():
@@ -282,7 +302,7 @@ class SmartSweepService:
                 "rows": seg_data.get("rows", []),
             }
             result.segments.append(seg_info)
-            self._save_cache(seg_start, seg_end, total, first_chng, "full_sweep")
+            # ← _save_cache 개별 호출 제거 (배치로 대체)
 
             if cls in ("HOT", "WARM", "DELTA"):
                 label = {"HOT": "🎯", "WARM": "📅", "DELTA": "📈"}.get(cls, "")
@@ -295,6 +315,9 @@ class SmartSweepService:
                     n = await self._collect_segment(seg_info, today, yesterday)
                     result.collected += n
                     result.probe_calls += 1
+
+        # 루프 완료 후 1회 배치 저장
+        self._batch_save_cache(result.segments, "full_sweep")
 
         result.elapsed_sec = time.time() - t0
         self._save_log(result)
