@@ -86,13 +86,16 @@ class DiffCrawlerEngine:
         # 상호명 대역 저장용 딕셔너리
         page_labels = extra.setdefault("page_labels", {})
 
+        import json
+        from app.core.events import broadcaster
+
         new_data_rows = []
         scanned_success_pages = []
-        
+
         for page in target_pages:
             start_idx = (page - 1) * PAGE_SIZE + 1
             end_idx = page * PAGE_SIZE
-            
+
             logger.info(f"[{svc}] 📥 페이지 {page} 조회 중: {start_idx:,} ~ {end_idx:,}")
             try:
                 rows = await self._fetch_page(start_idx, end_idx)
@@ -105,33 +108,28 @@ class DiffCrawlerEngine:
                     last_char = last_nm[0] if last_nm else ""
                     if first_char and last_char:
                         page_labels[str(page)] = f"{first_char}~{last_char}"
+
+                    # ── 페이지 스캔 완료 즉시: scraper 파이프라인 → 상태 저장 → SSE 발행 ──
+                    from scraper import run_scraper_for_service_with_rows
+                    await run_scraper_for_service_with_rows(svc, rows, collected_by="rolling_scan")
+
+                # 성공 여부와 무관하게 타임스탬프 갱신 (Fetch 자체가 성공했으므로)
+                page_timestamps[str(page)] = int(time.time())
+                state["last_total_count"] = max(state.get("last_total_count", 0), 4800)
+                self.state_repo.save_state(svc, state)
+
                 scanned_success_pages.append(page)
+                logger.info(f"[{svc}] ✅ P{page} 상태 저장 완료 → PLAYGROUND_UPDATE 발행")
+
+                # 페이지 단위 즉시 SSE 브로드캐스트
+                broadcaster.broadcast_sync(
+                    json.dumps({"type": "PLAYGROUND_UPDATE"}, ensure_ascii=False)
+                )
+
             except Exception as e:
                 logger.error(f"[{svc}] ❌ 페이지 {page} Fetch 오류: {e}")
 
-        # 타임스탬프 업데이트
-        for page in scanned_success_pages:
-            page_timestamps[str(page)] = now_ts
-        
-        state["last_total_count"] = max(state.get("last_total_count", 0), 4800)
-        self.state_repo.save_state(svc, state)
-
-        if new_data_rows:
-            from scraper import run_scraper_for_service_with_rows
-            await run_scraper_for_service_with_rows(svc, new_data_rows, collected_by="rolling_scan")
-
-        # Oldest-First Scan 1회 완료 → 플레이그라운드 상태가 변경됐으므로 SSE로 UI 갱신 트리거
-        try:
-            import json
-            from app.core.events import broadcaster
-            broadcaster.broadcast_sync(
-                json.dumps({"type": "PLAYGROUND_UPDATE"}, ensure_ascii=False)
-            )
-        except Exception as _e:
-            logger.debug(f"[{svc}] PLAYGROUND_UPDATE SSE 발행 스킵: {_e}")
-
         elapsed_sec = time.time() - start_time
-
         logger.info(
             f"[{svc}] ✔️ Oldest First Scan 완료. "
             f"성공: {[f'P{p}' for p in scanned_success_pages]} | "

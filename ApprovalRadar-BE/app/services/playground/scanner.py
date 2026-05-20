@@ -60,9 +60,12 @@ def get_page_scan_history_data(service_id: str) -> dict:
         if service_id == "I2861":
             ts_val = page_timestamps.get(str(p + 1))
             if ts_val:
-                ts = datetime.datetime.fromtimestamp(ts_val).isoformat()
+                # astimezone() 으로 서버 로컬 타임존(KST)을 명시하여 JS가 UTC로 오파싱하는 것을 방지
+                import datetime as _dt
+                ts = _dt.datetime.fromtimestamp(ts_val, tz=_dt.timezone.utc).astimezone().isoformat()
             else:
                 ts = None
+
         else:
             ts = scan_times.get(str(page_start))
 
