@@ -404,7 +404,7 @@ class ApiClient:
         """이 ApiClient 세션에서 발생한 총 API 호출 횟수를 반환합니다. (CLI 보고용)"""
         return self._call_count
 
-    async def check_keys_status(self, service_id: str = "I2859"):
+    async def check_keys_status(self, service_id: str = "I2861"):
         """모든 로드된 API 키의 상태를 테스트하여 출력합니다."""
         logger.info(f"\n--- API 키 상태 점검 시작 (총 {len(self.api_keys)}개) ---")
 

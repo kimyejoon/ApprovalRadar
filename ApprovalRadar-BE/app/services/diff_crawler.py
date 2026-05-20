@@ -167,7 +167,52 @@ class DiffCrawlerEngine:
             return block['row'][0]
         return None
 
-    # ─── Tail 탐색 ────────────────────────────────────────────────────────────
+    async def _precise_tail(self, page_start: int, page_tail_upper: int) -> int:
+        """
+        [Step 5] PAGE 경계 내부를 단건(1-unit) 스캔하여 정확한 tail 확정.
+
+        page_start       : 마지막 데이터 PAGE의 시작 인덱스
+        page_tail_upper  : Step 4에서 확인된 마지막 데이터 PAGE의 끝 인덱스(추정 상한)
+
+        전략:
+          - [page_start, page_tail_upper] 범위를 처음부터 단건 순차 스캔
+          - 실제 응답이 있는 마지막 인덱스를 exact_tail로 확정
+          - 연속 EMPTY_TOLERANCE개 빈 응답 → 진짜 Tail로 판단 (Gap 오탐 방지)
+          - 안전마진: page_tail_upper 이후 SAFETY_PROBE개 추가 확인
+
+        API 비용: ≤ PAGE_SIZE + SAFETY_PROBE ≈ 최대 1,020회
+        실제: 대부분 수십~수백회 (빈 구간 건너뜀)
+        """
+        EMPTY_TOLERANCE = 10   # 연속 빈 응답 허용 개수 (Gap 처리)
+        SAFETY_PROBE = 10      # tail 후 추가 확인 (혹시 더 있는 경우 대비)
+        svc = self.service_id
+
+        logger.info(
+            f"[{svc}][Tail 정밀화] 단건 스캔 시작: {page_start:,}~{page_tail_upper:,} "
+            f"(범위 {page_tail_upper - page_start + 1}개)"
+        )
+
+        exact_tail = page_start - 1  # 아직 아무것도 없으면 직전 페이지가 tail
+        consecutive_empty = 0
+        scan_end = page_tail_upper + SAFETY_PROBE
+
+        for idx in range(page_start, scan_end + 1):
+            if shutdown_event.is_set():
+                break
+
+            row = await self._fetch_single(idx)
+            if row:
+                exact_tail = idx
+                consecutive_empty = 0
+            else:
+                consecutive_empty += 1
+                if consecutive_empty >= EMPTY_TOLERANCE and idx > page_tail_upper:
+                    # 안전마진 구간에서 연속 빈 응답 → 확정
+                    break
+
+        logger.info(f"[{svc}][Tail 정밀화] 정확한 Tail 확정: {exact_tail:,} (PAGE 경계 추정={page_tail_upper:,})")
+        return exact_tail
+
 
     async def _exponential_jump(self, start_pos: int) -> tuple[int, int]:
         """
@@ -314,20 +359,26 @@ class DiffCrawlerEngine:
             else:
                 high = mid
 
-        # Step 4: Gap 허용 선형 스캔 - 정확한 tail 확정
+        # Step 4: Gap 허용 선형 스캔 - PAGE 경계 단위 tail 확정
         # 연속 빈 PAGE가 MAX_GAP_PAGES 이상이면 실제 끝으로 판단
         MAX_GAP_PAGES = 3
-        pos, final_tail, consecutive_empty = best_start, best_start, 0
+        pos, page_tail, consecutive_empty = best_start, best_start, 0
         while not shutdown_event.is_set():
             rows = await self._fetch_page(pos, pos + PAGE_SIZE - 1)
             if rows:
-                final_tail = pos + len(rows) - 1
+                page_tail = pos + len(rows) - 1
                 consecutive_empty = 0
             else:
                 consecutive_empty += 1
                 if consecutive_empty >= MAX_GAP_PAGES:
                     break
             pos += PAGE_SIZE
+
+        # Step 5 (정밀화): PAGE 경계에서 단건(1-unit) 순차 스캔으로 ±1 정확도 달성
+        # page_tail = 마지막 데이터 PAGE의 끝 인덱스(최대값)
+        # 실제 tail은 page_tail 페이지 내 어딘가 → 정밀 탐색 필요
+        page_start = (page_tail // PAGE_SIZE) * PAGE_SIZE + 1
+        final_tail = await self._precise_tail(page_start, page_tail)
 
         logger.info(f"[{svc}][Bootstrapper] Tail 확정: {final_tail:,}")
         return final_tail
