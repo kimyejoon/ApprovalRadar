@@ -55,6 +55,7 @@ class DiffCrawlerEngine:
         extra = state.setdefault("extra_state", {})
         page_timestamps = extra.setdefault("page_timestamps", {})
         page_labels = extra.setdefault("page_labels", {})
+        page_industries = extra.setdefault("page_industries", {})
 
         # ── 실제 총 페이지 수 동적 계산 ──────────────────────────────────────
         last_total_count = state.get("last_total_count", 0)
@@ -145,12 +146,15 @@ class DiffCrawlerEngine:
                 page_elapsed_times.append(time.time() - page_fetch_start)
                 row_count = len(rows)
 
-                # 상호명 대역 추출
+                # 상호명 대역 및 업종 추출
                 if rows:
                     first_char = rows[0].get("BSSH_NM", "").strip()[:1]
                     last_char = rows[-1].get("BSSH_NM", "").strip()[:1]
+                    first_industry = rows[0].get("INDUTY_NM", "").strip()
                     if first_char and last_char:
                         page_labels[str(page)] = f"{first_char}~{last_char}"
+                    if first_industry:
+                        page_industries[str(page)] = first_industry
 
                 # ── scraper 파이프라인 즉시 위임 ──────────────────────────────
                 page_stats = {

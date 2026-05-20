@@ -39,6 +39,7 @@ export interface PageScanEntry {
   fingerprint: string | null;
   last_scanned: string | null;
   label?: string | null;
+  industry?: string | null;  // 업종 (INDUTY_NM: 일반음식점, 휴게음식점, 제과점영업, 등)
 }
 
 export interface PageScanHistory {

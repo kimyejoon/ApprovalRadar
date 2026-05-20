@@ -48,6 +48,7 @@ def get_page_scan_history_data(service_id: str) -> dict:
     # I2861 전용 extra_state 라벨 및 타임스탬프 로드
     extra = state.get("extra_state", {})
     page_labels = extra.get("page_labels", {})
+    page_industries = extra.get("page_industries", {})
     page_timestamps = extra.get("page_timestamps", {})
 
     total_pages = (total_count + 999) // 1000 if total_count > 0 else 0
@@ -70,6 +71,7 @@ def get_page_scan_history_data(service_id: str) -> dict:
             ts = scan_times.get(str(page_start))
 
         label = page_labels.get(str(p + 1))
+        industry = page_industries.get(str(p + 1))
 
         entries.append({
             "page_number": p + 1,
@@ -77,6 +79,7 @@ def get_page_scan_history_data(service_id: str) -> dict:
             "fingerprint": fp[:12] if fp else (None if service_id != "I2861" else "LIVE-SCAN"),
             "last_scanned": ts,
             "label": label,
+            "industry": industry,
         })
 
     if service_id == "I2861":

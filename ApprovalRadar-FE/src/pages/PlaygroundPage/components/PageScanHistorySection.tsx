@@ -77,6 +77,16 @@ export function PageScanHistorySection({ pageScan }: PageScanHistorySectionProps
                   // SSE로 수신한 라이브 label 우선, fallback으로 API 응답 label
                   const label = live?.label ?? e.label ?? '—';
 
+                  // 업종 단축 표기
+                  const industry = e.industry ?? null;
+                  const industryShort = industry
+                    ? industry.replace('음식점', '').replace('영업', '').replace('주점', '주점').trim()
+                    : null;
+                  const industryColor = !industry ? '' :
+                    industry.includes('일반') ? 'text-blue-400/70' :
+                    industry.includes('휴게') ? 'text-amber-400/70' :
+                    industry.includes('제과') ? 'text-pink-400/70' : 'text-text-muted';
+
                   let borderColor: string;
                   let bgColor: string;
                   let statusText: string;
@@ -113,7 +123,8 @@ export function PageScanHistorySection({ pageScan }: PageScanHistorySectionProps
                   const liveTooltip = live?.stats
                     ? `\n오늘 ${live.stats.today}건 · 어제 ${live.stats.yesterday}건\n신규 ${live.stats.new_indexed}건 · 중복 ${live.stats.skipped_dup}건`
                     : '';
-                  const tooltip = `P${e.page_number} [${label}]\n(${e.page_start.toLocaleString()}~)${hasTime ? `\n${statusText}` : '\n미스캔'}${liveTooltip}`;
+                  const industryTooltip = industry ? `\n업종: ${industry}` : '';
+                  const tooltip = `P${e.page_number} [${label}]${industryTooltip}\n(${e.page_start.toLocaleString()}~)${hasTime ? `\n${statusText}` : '\n미스캔'}${liveTooltip}`;
 
                   return (
                     <div
@@ -122,6 +133,10 @@ export function PageScanHistorySection({ pageScan }: PageScanHistorySectionProps
                       className={`flex flex-col items-center justify-between border rounded px-1.5 py-1 transition-all cursor-pointer hover:brightness-125 ${borderColor} ${bgColor}`}
                       style={{ minWidth: '3rem' }}
                     >
+                      {/* 업종 단쳙 */}
+                      <span className={`text-[8px] font-medium leading-tight ${industryColor}`}>
+                        {industryShort ?? ' '}
+                      </span>
                       {/* 페이지 번호 */}
                       <span className="text-[9px] font-bold text-text-muted font-mono leading-tight">
                         P{e.page_number}
