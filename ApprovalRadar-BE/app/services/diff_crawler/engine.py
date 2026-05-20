@@ -101,9 +101,15 @@ class DiffCrawlerEngine:
                     if not rows:
                         logger.info(f"[{svc}] 🔬 P{probe_page} 데이터 없음 → 경계 확정")
                         break
-                    first_industry = rows[0].get("INDUTY_NM", "").strip()
-                    first_char = rows[0].get("BSSH_NM", "").strip()[:1]
-                    last_char = rows[-1].get("BSSH_NM", "").strip()[:1]
+                    first_industry = rows[0].get("INDUTY_CD_NM", "").strip()  # INDUTY_NM → INDUTY_CD_NM
+                    first_char = next(
+                        (r.get("BSSH_NM", "").strip()[:1] for r in rows if r.get("BSSH_NM", "").strip()),
+                        ""
+                    )
+                    last_char = next(
+                        (r.get("BSSH_NM", "").strip()[:1] for r in reversed(rows) if r.get("BSSH_NM", "").strip()),
+                        ""
+                    )
                     if first_industry:
                         page_industries[str(probe_page)] = first_industry
                     if first_char and last_char:
@@ -249,9 +255,16 @@ class DiffCrawlerEngine:
 
                 # 상호명 대역 및 업종 추출
                 if rows:
-                    first_char = rows[0].get("BSSH_NM", "").strip()[:1]
-                    last_char = rows[-1].get("BSSH_NM", "").strip()[:1]
-                    first_industry = rows[0].get("INDUTY_NM", "").strip()
+                    # BSSH_NM이 빈 행이 있을 수 있으므로 앞/뒤에서 유효한 값 탐색
+                    first_char = next(
+                        (r.get("BSSH_NM", "").strip()[:1] for r in rows if r.get("BSSH_NM", "").strip()),
+                        ""
+                    )
+                    last_char = next(
+                        (r.get("BSSH_NM", "").strip()[:1] for r in reversed(rows) if r.get("BSSH_NM", "").strip()),
+                        ""
+                    )
+                    first_industry = rows[0].get("INDUTY_CD_NM", "").strip()  # INDUTY_NM → INDUTY_CD_NM
                     if first_char and last_char:
                         page_labels[str(page)] = f"{first_char}~{last_char}"
                     if first_industry:
