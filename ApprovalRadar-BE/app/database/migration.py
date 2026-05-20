@@ -76,7 +76,7 @@ def migrate_env_keys_to_db():
     이미 존재하는 키는 중복 삽입하지 않습니다 (IGNORE)."""
     from database import DB_FILE
     env_keys = []
-    for i in range(1, 10):
+    for i in range(1, 51):  # 최대 50개 키 지원 (config.py와 동일)
         key = os.getenv(f"FOOD_SAFETY_API_KEY_{i}")
         if key:
             env_keys.append(key)
