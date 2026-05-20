@@ -70,3 +70,5 @@
 - 2026-05-13: 프론트엔드가 실시간으로 크롤러의 업데이트를 감지할 수 있도록 `GET /api/v1/stream/updates` SSE(Server-Sent Events) 엔드포인트를 구축함. 크롤러(`APScheduler`)와 FastAPI 간의 메모리 공유를 활용하여 `asyncio.Queue`와 `call_soon_threadsafe`를 통해 동기-비동기 스레드 간 충돌 없이 신규 알림("신규 업데이트가 발생했다")을 즉각 전송하도록 브로드캐스터(Broadcaster) 아키텍처를 도입함. 또한 업데이트가 없을 시 5초마다 연결 정상 시그널("현재 정상 연결중임 (보낼 업데이트 없음)")을 보내는 Heartbeat 기능과 `cli.py --test-stream-update` 명령을 통한 가상 트리거 테스트 로직을 추가함.
 - 2026-05-13: 프론트엔드 개발자가 SSE 연동 시 참고할 수 있도록 `GET /api/v1/stream/updates` API의 Swagger 문서에 시그널의 종류(Heartbeat 핑 및 신규 업데이트 알림), 발생 조건, 데이터 포맷, 프론트엔드 측 처리 방법 등을 상세하게 명세함.
 - 2026-05-13: 프론트엔드의 요청에 따라 SSE 응답 데이터를 단순 문자열(Raw Text)에서 파싱하기 쉬운 JSON 포맷(`{"type": "...", "message": "..."}`)으로 변경함.
+- 2026-05-20: 프로젝트 리팩토링을 위한 전반적인 분석 수행 및 LOC 300 이상 파일 목록/역할 도출
+- 2026-05-20: diff_crawler.py 모듈 리팩토링 및 클래스 분리 작업을 완료함. 기존 917줄의 단일 파일을 TailExplorer, PivotAnalyzer, DiffBootstrapper 3개의 헬퍼 클래스로 분리 및 Facade 패턴을 적용하여 가독성과 유지보수성을 대폭 향상시킴.
