@@ -66,6 +66,33 @@ def run_migrations(cursor):
         cursor.execute("ALTER TABLE chng_dt_poll_history ADD COLUMN api_raw_total_count INTEGER DEFAULT 0")
         print("[DB 마이그레이션] chng_dt_poll_history: api_raw_total_count 컬럼 추가")
 
+    # ── businesses UNIQUE 키 확장: (license_no, last_event_date) → (license_no, last_event_date, change_before) ──
+    # SQLite는 UNIQUE 제약을 직접 수정할 수 없어 테이블 재생성 방식으로 처리
+    cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='businesses'")
+    biz_table_sql = cursor.fetchone()
+    if biz_table_sql:
+        biz_sql = biz_table_sql[0] or ""
+        needs_unique_migration = (
+            "UNIQUE(license_no, last_event_date)" in biz_sql
+            and "change_before" not in biz_sql.split("UNIQUE(license_no, last_event_date")[-1][:30]
+        )
+        if needs_unique_migration:
+            # 1. 중간 테이블 생성 (혹시 남아있으면 DROP 후 재생성)
+            cursor.execute("DROP TABLE IF EXISTS businesses_v2")
+            cursor.execute(ddl.CREATE_BUSINESSES_V2_TABLE)
+            # 2. 기존 데이터 이관 (ORDER BY id ASC → INSERT OR IGNORE로 중복 자동 제거)
+            cursor.execute(ddl.INSERT_FROM_BUSINESSES_V1_TO_V2)
+            migrated_count = cursor.rowcount
+            # 3. 기존 테이블 DROP → 새 테이블 rename
+            cursor.execute("DROP TABLE businesses")
+            cursor.execute("ALTER TABLE businesses_v2 RENAME TO businesses")
+            print(
+                f"[DB 마이그레이션] businesses: UNIQUE 키 확장 완료 "
+                f"(license_no, last_event_date) → (license_no, last_event_date, change_before) | "
+                f"이관 {migrated_count}건"
+            )
+
+
     if has_crawler_state:
         cursor.execute("PRAGMA table_info(crawler_state)")
         columns = [row[1] for row in cursor.fetchall()]

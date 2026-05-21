@@ -255,7 +255,7 @@ class BusinessRepository(AbstractBusinessRepository):
                 infer_update_type = ?, infer_update_detail = ?,
                 last_event_time = ?, license_time = ?,
                 updated_at = ?, is_new = 1
-            WHERE license_no = ? AND last_event_date = ?
+            WHERE license_no = ? AND last_event_date = ? AND COALESCE(change_before, '') = ?
         '''
         if conn:
             conn.executemany(query, update_list)

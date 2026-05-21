@@ -27,8 +27,73 @@ CREATE_BUSINESSES_TABLE = '''
         license_time TEXT,
         is_read INTEGER DEFAULT 0,
         read_at TEXT,
-        UNIQUE(license_no, last_event_date)
+        change_reason TEXT,
+        change_before TEXT,
+        change_after TEXT,
+        collected_by TEXT,
+        UNIQUE(license_no, last_event_date, change_before)
     )
+'''
+
+# businesses v2: change_before 포함 UNIQUE 키 (마이그레이션용)
+CREATE_BUSINESSES_V2_TABLE = '''
+    CREATE TABLE businesses_v2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        license_no TEXT NOT NULL,
+        business_name TEXT,
+        address TEXT,
+        representative_name TEXT,
+        business_status TEXT,
+        license_date TEXT,
+        phone_number TEXT,
+        industry_type TEXT,
+        representative_history TEXT DEFAULT '[]',
+        licensing_history TEXT DEFAULT '[]',
+        last_event_date TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_new INTEGER DEFAULT 1,
+        update_type TEXT,
+        prev_business_status TEXT,
+        prev_representative_name TEXT,
+        prev_business_name TEXT,
+        infer_update_type TEXT,
+        infer_update_detail TEXT,
+        last_event_time TEXT,
+        license_time TEXT,
+        is_read INTEGER DEFAULT 0,
+        read_at TEXT,
+        change_reason TEXT,
+        change_before TEXT,
+        change_after TEXT,
+        collected_by TEXT,
+        UNIQUE(license_no, last_event_date, change_before)
+    )
+'''
+
+# 기존 businesses → businesses_v2 이관 (최신 id 기준으로 중복 제거)
+INSERT_FROM_BUSINESSES_V1_TO_V2 = '''
+    INSERT OR IGNORE INTO businesses_v2 (
+        id, license_no, business_name, address, representative_name,
+        business_status, license_date, phone_number, industry_type,
+        representative_history, licensing_history, last_event_date,
+        created_at, updated_at, is_new, update_type,
+        prev_business_status, prev_representative_name, prev_business_name,
+        infer_update_type, infer_update_detail, last_event_time,
+        license_time, is_read, read_at,
+        change_reason, change_before, change_after, collected_by
+    )
+    SELECT
+        id, license_no, business_name, address, representative_name,
+        business_status, license_date, phone_number, industry_type,
+        representative_history, licensing_history, last_event_date,
+        created_at, updated_at, is_new, update_type,
+        prev_business_status, prev_representative_name, prev_business_name,
+        infer_update_type, infer_update_detail, last_event_time,
+        license_time, is_read, read_at,
+        change_reason, change_before, change_after, collected_by
+    FROM businesses
+    ORDER BY id ASC
 '''
 
 CREATE_BUSINESSES_OLD_TABLE = '''

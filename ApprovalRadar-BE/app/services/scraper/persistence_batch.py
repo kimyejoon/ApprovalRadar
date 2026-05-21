@@ -48,11 +48,11 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
             batch = unique_lcns[i:i+500]
             placeholders = ",".join(["?"] * len(batch))
             cursor = conn.execute(
-                f"SELECT id, license_no, last_event_date, business_name, address, representative_name, business_status, phone_number, industry_type, representative_history, licensing_history, infer_update_type, infer_update_detail FROM businesses WHERE license_no IN ({placeholders})",
+                f"SELECT id, license_no, last_event_date, business_name, address, representative_name, business_status, phone_number, industry_type, representative_history, licensing_history, infer_update_type, infer_update_detail, change_before FROM businesses WHERE license_no IN ({placeholders})",
                 batch
             )
             for r in cursor.fetchall():
-                existing_records[(r["license_no"], r["last_event_date"])] = dict(r)
+                existing_records[(r["license_no"], r["last_event_date"], r.get("change_before") or "")] = dict(r)
 
         logger.info(
             f"  📋 batch SELECT 완료: {len(unique_lcns)}건 LCNS 조회, "
@@ -73,7 +73,8 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
             license_date = m["license_date"]
             license_time = m["license_time"]
 
-            pair = (lcns_no, event_date)
+            change_before_val = fields.get("change_before") or ""
+            pair = (lcns_no, event_date, change_before_val)
 
             # 전체 조회 기준 오늘/어제 카운트 (신규+중복 불문)
             if event_date == today_str:
@@ -163,7 +164,7 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
                         updates.get("update_type"), updates.get("prev_business_status"), updates.get("prev_representative_name"), updates.get("prev_business_name"),
                         updates.get("infer_update_type"), updates.get("infer_update_detail"),
                         updates.get("last_event_time"), updates.get("license_time"),
-                        updates["updated_at"], lcns_no, event_date
+                        updates["updated_at"], lcns_no, event_date, change_before_val
                     ))
                     to_insert_raw.append((lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now))
                     new_indexed += 1
