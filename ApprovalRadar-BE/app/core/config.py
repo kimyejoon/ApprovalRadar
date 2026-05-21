@@ -29,6 +29,9 @@ class Settings:
     SCRAPER_INTERVAL_MINUTES: int = 5
     # 페이지 만료 임계 시간 (분) - .env의 STALE_THRESHOLD_MINUTES 로 오버라이드 가능 (기본값 15분)
     STALE_THRESHOLD_MINUTES: int = 15
+    # API 단건 fetch 타임아웃 (초) - .env의 API_FETCH_TIMEOUT_SECONDS 로 오버라이드 가능 (기본값 200초)
+    # 식품안전나라 API 서버가 최대 200초가량 응답 지연될 수 있어 넉넉하게 설정
+    API_FETCH_TIMEOUT_SECONDS: int = 200
     
     # 모니터링 최적화 설정
     PIVOT_INTERVAL = 5000  # 희소 색인(Sparse Index) 피벗 간격
@@ -114,6 +117,14 @@ class Settings:
                 self.STALE_THRESHOLD_MINUTES = 15  # 잘못된 값이면 기본값 15분 유지
         else:
             self.STALE_THRESHOLD_MINUTES = 15
+
+        # API_FETCH_TIMEOUT_SECONDS: env 오버라이드 (.env에서 API_FETCH_TIMEOUT_SECONDS=200 식으로 변경 가능)
+        aft = os.getenv("API_FETCH_TIMEOUT_SECONDS")
+        if aft is not None:
+            try:
+                self.API_FETCH_TIMEOUT_SECONDS = max(30, int(aft))  # 최소 30초
+            except ValueError:
+                self.API_FETCH_TIMEOUT_SECONDS = 200
 
 
 def compute_optimal_defaults(

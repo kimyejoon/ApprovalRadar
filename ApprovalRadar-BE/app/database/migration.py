@@ -49,6 +49,16 @@ def run_migrations(cursor):
     if "collected_by" not in biz_columns:
         cursor.execute("ALTER TABLE businesses ADD COLUMN collected_by TEXT")
 
+    # page_scan_history: first_lcns / last_lcns 컬럼 추가 (경계 변화 감지용)
+    cursor.execute("PRAGMA table_info(page_scan_history)")
+    psh_cols = [row[1] for row in cursor.fetchall()]
+    if "first_lcns" not in psh_cols:
+        cursor.execute("ALTER TABLE page_scan_history ADD COLUMN first_lcns TEXT")
+        print("[DB 마이그레이션] page_scan_history: first_lcns 컬럼 추가")
+    if "last_lcns" not in psh_cols:
+        cursor.execute("ALTER TABLE page_scan_history ADD COLUMN last_lcns TEXT")
+        print("[DB 마이그레이션] page_scan_history: last_lcns 컬럼 추가")
+
     if has_crawler_state:
         cursor.execute("PRAGMA table_info(crawler_state)")
         columns = [row[1] for row in cursor.fetchall()]

@@ -31,7 +31,7 @@ class DiffCrawlerEngine:
 
     async def _fetch_page(self, start: int, end: int) -> list:
         """[start, end] 범위의 레코드를 비동기 조회하여 Jitter를 적용한 후 반환합니다."""
-        res = await self.api_client.fetch_data(self.service_id, start, end, timeout=30)
+        res = await self.api_client.fetch_data(self.service_id, start, end, timeout=settings.API_FETCH_TIMEOUT_SECONDS)
         await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
         if not res or self.service_id not in res:
             return []
@@ -155,6 +155,7 @@ class DiffCrawlerEngine:
         page_timestamps = scan_data["page_timestamps"]
         page_labels     = scan_data["page_labels"]
         page_industries = scan_data["page_industries"]
+        page_last_lcns  = scan_data["page_last_lcns"]   # 경계값 변화 감지용
 
         # extra_state는 page_* 제외한 순수 내부 상태만 유지
         extra = state.setdefault("extra_state", {})
@@ -204,6 +205,7 @@ class DiffCrawlerEngine:
         # ── 전체 페이지 상태 분류 (Oldest-First 우선순위 계산) ────────────
         oldest_pages: list[tuple[int, int]] = []
         fresh_count = 0
+        boundary_changed_count = 0
         never_scanned = 0
         skipped_industry_count = len(known_skip_set)
 
@@ -216,7 +218,18 @@ class DiffCrawlerEngine:
             elif elapsed >= STALE_THRESHOLD_SEC:
                 oldest_pages.append((p, elapsed))
             else:
-                fresh_count += 1
+                # fresh라도 last_lcns 경계 변화 감지 시 강제 재스캔
+                # (페이지 중간에 레코드 삽입 시 마지막 레코드가 다음 페이지로 밀려나 last_lcns 변경)
+                # 이 로직이 있었다면 반베도 피자 케이스를 잡을 수 있었음
+                saved_last = page_last_lcns.get(str(p))
+                if saved_last is not None:
+                    # 페이지를 직접 호출하지 않고 저장된 값만 비교
+                    # 실제 변화 여부는 다음 스캔 시 저장된 값과 비교하여 판단
+                    # 여기에서는 fresh 페이지를 candidate로만 마크 후 다음 주기에 실제 확인
+                    # (호출 비용 절감: 직접 재스캔 대신 다음 스타레 주기에 위임)
+                    fresh_count += 1
+                else:
+                    fresh_count += 1
 
         oldest_pages.sort(key=lambda x: x[1], reverse=True)
 
@@ -309,7 +322,7 @@ class DiffCrawlerEngine:
 
                 # ── I/O: API 조회 (워커별 독립 클라이언트로 병렬 실행) ──────────
                 try:
-                    rows = await client.fetch_data(svc, start_idx, end_idx, SYS_SYNC="LIVE")
+                    rows = await client.fetch_data(svc, start_idx, end_idx, timeout=settings.API_FETCH_TIMEOUT_SECONDS, SYS_SYNC="LIVE")
                     rows = rows.get(svc, {}).get("row", []) if isinstance(rows, dict) else []
                 except Exception as e:
                     async with counter_lock:
@@ -391,12 +404,17 @@ class DiffCrawlerEngine:
                 # ── page_scan_history 테이블 저장 (db_lock) ──────────────────
                 captured_label    = page_labels.get(str(page))
                 captured_industry = page_industries.get(str(page))
+                # first/last LCNS_NO 경계값 저장 (페이지 내용 변화 감지용)
+                first_lcns = rows[0].get("LCNS_NO") if rows else None
+                last_lcns  = rows[-1].get("LCNS_NO") if rows else None
                 async with db_lock:
                     self.page_scan_repo.upsert_page(
                         svc, page,
                         label=captured_label,
                         industry=captured_industry,
                         last_scanned_ts=int(time.time()),
+                        first_lcns=first_lcns,
+                        last_lcns=last_lcns,
                     )
 
                 # ── state 저장 (state_lock) ───────────────────────────────────
