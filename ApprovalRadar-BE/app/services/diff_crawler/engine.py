@@ -260,6 +260,9 @@ class DiffCrawlerEngine:
             f"대상: {pages_total}p"
         )
 
+        # ── 워커별 독립 ApiClient 생성 (공유 시 키 경합 → 연속 한도 초과 방지) ──────
+        worker_clients = [ApiClient() for _ in range(n_workers)]
+
         async def _scan_one(page: int, worker_id: int, is_retry: bool = False) -> None:
             nonlocal cycle_api_calls
             start_idx = (page - 1) * PAGE_SIZE + 1
@@ -267,6 +270,8 @@ class DiffCrawlerEngine:
             is_probe  = page not in known_tail_pages
             probe_tag = " [TAIL PROBE]" if is_probe else ""
             retry_tag = " [재시도]" if is_retry else ""
+            # 재시도는 0번 워커이므로 첫 번째 클라이언트 사용
+            client = worker_clients[(worker_id - 1) % n_workers] if worker_id > 0 else worker_clients[0]
 
             async with semaphore:
                 logger.info(
@@ -275,9 +280,10 @@ class DiffCrawlerEngine:
                 )
                 page_fetch_start = time.time()
 
-                # ── I/O: API 조회 (병렬 실행) ────────────────────────────────
+                # ── I/O: API 조회 (워커별 독립 클라이언트로 병렬 실행) ──────────
                 try:
-                    rows = await self._fetch_page(start_idx, end_idx)
+                    rows = await client.fetch_data(svc, start_idx, end_idx, SYS_SYNC="LIVE")
+                    rows = rows.get(svc, {}).get("row", []) if isinstance(rows, dict) else []
                 except Exception as e:
                     async with counter_lock:
                         cycle_api_calls += 1
@@ -379,7 +385,32 @@ class DiffCrawlerEngine:
                     avg_sec = sum(page_elapsed_times) / len(page_elapsed_times) if page_elapsed_times else fetch_elapsed
                     est_remaining_min = round((remaining * avg_sec) / 60, 1)
 
+        # ── 1차: 병렬 실행 ────────────────────────────────────────────────────
+        tasks = [
+            _scan_one(page, (i % n_workers) + 1)
+            for i, page in enumerate(target_pages)
+        ]
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        finally:
+            # 워커 클라이언트 세션 정리
+            for wc in worker_clients:
+                await wc.aclose()
 
+        # ── 2차: 실패 페이지 순차 재처리 (WAF 안정화 후, 포기 없음) ────────────
+        if retry_set:
+            wait_sec = 10
+            logger.warning(
+                f"[{svc}] 🔄 1차 실패 {len(retry_set)}p → {wait_sec}초 대기 후 순차 재시도: "
+                f"{sorted(retry_set)}"
+            )
+            await asyncio.sleep(wait_sec)
+            retry_client = ApiClient()
+            try:
+                for page in sorted(retry_set):
+                    await _scan_one(page, worker_id=0, is_retry=True)
+            finally:
+                await retry_client.aclose()
 
         # ── 업종 경계 프로브 (메인 스캔 완료 후 순차 실행) ────────────────
         # page_industries가 어느 정도 채워진 경우에만 실행 (초기 풀스캔 중엔 생략)
