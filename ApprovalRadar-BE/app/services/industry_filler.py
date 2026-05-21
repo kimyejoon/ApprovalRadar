@@ -17,6 +17,7 @@ async def _fetch_and_update_industry(
     api_client: ApiClient,
     lcns_no: str,
     business_repo: BusinessRepository,
+    db_lock: asyncio.Lock,
 ) -> bool:
     """
     I2500 API로 특정 업소의 세부업종 + 대표자 + 연락처 + 인허가일을 조회하여 DB에 업데이트합니다.
@@ -54,13 +55,15 @@ async def _fetch_and_update_industry(
     if not industry_type and not representative_name and not phone_number and not license_date:
         return False
 
-    business_repo.update_from_i2500(
-        license_no=lcns_no,
-        industry_type=industry_type,
-        representative_name=representative_name,
-        phone_number=phone_number,
-        license_date=license_date,
-    )
+    # SQLite 스레드/태스크 간 동시 쓰기 경합 방지
+    async with db_lock:
+        business_repo.update_from_i2500(
+            license_no=lcns_no,
+            industry_type=industry_type,
+            representative_name=representative_name,
+            phone_number=phone_number,
+            license_date=license_date,
+        )
     return True
 
 
@@ -96,14 +99,22 @@ async def fill_missing_industry_types():
 
     results = {"success": 0, "fail": 0, "exhausted": False}
     results_lock = asyncio.Lock()
+    db_lock = asyncio.Lock()
 
     # 동시 워커 수 설정
     n_workers = min(settings.SCAN_WORKERS, total_missing)
     if n_workers < 1:
         n_workers = 1
 
-    async def worker():
-        async with ApiClient() as api_client:
+    # 워커별 ApiClient 생성 및 분산된 시작 키 할당 (WAF 세마포어 병목 방지)
+    worker_clients = [ApiClient() for _ in range(n_workers)]
+    n_keys = len(settings.API_KEYS)
+    if n_keys > 0:
+        for i, wc in enumerate(worker_clients):
+            wc.key_manager.current_key_idx = i % n_keys
+
+    async def worker(api_client: ApiClient, worker_id: int):
+        try:
             while not queue.empty():
                 if ApiClient.is_exhausted():
                     async with results_lock:
@@ -116,14 +127,14 @@ async def fill_missing_industry_types():
                     break
 
                 try:
-                    updated = await _fetch_and_update_industry(api_client, lcns_no, business_repo)
+                    updated = await _fetch_and_update_industry(api_client, lcns_no, business_repo, db_lock)
                     async with results_lock:
                         if updated:
                             results["success"] += 1
-                            logger.info(f"✅ {lcns_no} 세부업종 업데이트 완료")
+                            logger.info(f"(W{worker_id}) ✅ {lcns_no} 세부업종 업데이트 완료")
                         else:
                             results["fail"] += 1
-                            logger.info(f"⚠️ {lcns_no} → 세부업종 데이터 없음 또는 필드 비어있음")
+                            logger.info(f"(W{worker_id}) ⚠️ {lcns_no} → 세부업종 데이터 없음 또는 필드 비어있음")
                 except ApiKeysExhaustedError:
                     async with results_lock:
                         results["exhausted"] = True
@@ -131,7 +142,7 @@ async def fill_missing_industry_types():
                 except Exception as e:
                     async with results_lock:
                         results["fail"] += 1
-                    logger.error(f"Failed to fetch or update {lcns_no}: {e}")
+                    logger.error(f"(W{worker_id}) Failed to fetch or update {lcns_no}: {e}")
                 finally:
                     queue.task_done()
 
@@ -146,9 +157,11 @@ async def fill_missing_industry_types():
 
                 # WAF 차단 방지 Jitter
                 await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+        finally:
+            await api_client.aclose()
 
     # 병렬 실행
-    workers = [asyncio.create_task(worker()) for _ in range(n_workers)]
+    workers = [asyncio.create_task(worker(wc, i + 1)) for i, wc in enumerate(worker_clients)]
     await asyncio.gather(*workers)
 
     processed_count = results["success"] + results["fail"]
@@ -190,14 +203,22 @@ async def fill_industry_for_licenses(license_nos: list[str]) -> None:
 
     results = {"success": 0, "fail": 0, "exhausted": False}
     results_lock = asyncio.Lock()
+    db_lock = asyncio.Lock()
 
     # 동시 워커 수 설정
     n_workers = min(settings.SCAN_WORKERS, len(unique_licenses))
     if n_workers < 1:
         n_workers = 1
 
-    async def worker():
-        async with ApiClient() as api_client:
+    # 워커별 ApiClient 생성 및 분산된 시작 키 할당 (WAF 세마포어 병목 방지)
+    worker_clients = [ApiClient() for _ in range(n_workers)]
+    n_keys = len(settings.API_KEYS)
+    if n_keys > 0:
+        for i, wc in enumerate(worker_clients):
+            wc.key_manager.current_key_idx = i % n_keys
+
+    async def worker(api_client: ApiClient, worker_id: int):
+        try:
             while not queue.empty():
                 if ApiClient.is_exhausted():
                     async with results_lock:
@@ -210,14 +231,14 @@ async def fill_industry_for_licenses(license_nos: list[str]) -> None:
                     break
 
                 try:
-                    updated = await _fetch_and_update_industry(api_client, lcns_no, business_repo)
+                    updated = await _fetch_and_update_industry(api_client, lcns_no, business_repo, db_lock)
                     async with results_lock:
                         if updated:
                             results["success"] += 1
-                            logger.info(f"[즉시 Backfill] ✅ {lcns_no} 업데이트 완료")
+                            logger.info(f"[즉시 Backfill] (W{worker_id}) ✅ {lcns_no} 업데이트 완료")
                         else:
                             results["fail"] += 1
-                            logger.debug(f"[즉시 Backfill] ⚠️ {lcns_no} → 세부업종 데이터 없음")
+                            logger.debug(f"[즉시 Backfill] (W{worker_id}) ⚠️ {lcns_no} → 세부업종 데이터 없음")
                 except ApiKeysExhaustedError:
                     async with results_lock:
                         results["exhausted"] = True
@@ -225,15 +246,17 @@ async def fill_industry_for_licenses(license_nos: list[str]) -> None:
                 except Exception as e:
                     async with results_lock:
                         results["fail"] += 1
-                    logger.error(f"[즉시 Backfill] ❌ {lcns_no} 처리 실패: {e}")
+                    logger.error(f"[즉시 Backfill] (W{worker_id}) ❌ {lcns_no} 처리 실패: {e}")
                 finally:
                     queue.task_done()
 
                 # WAF 차단 방지 Jitter
                 await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+        finally:
+            await api_client.aclose()
 
     # 병렬 실행
-    workers = [asyncio.create_task(worker()) for _ in range(n_workers)]
+    workers = [asyncio.create_task(worker(wc, i + 1)) for i, wc in enumerate(worker_clients)]
     await asyncio.gather(*workers)
 
     if results["exhausted"]:
