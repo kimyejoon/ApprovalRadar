@@ -37,8 +37,50 @@ def build_business_where_clause(
     if regions:
         region_conditions = []
         for r in regions:
-            region_conditions.append("address LIKE ?")
-            params.append(f"%{r}%")
+            # Map standard region names to database address start patterns to ensure
+            # special provinces (like 강원특별자치도, 전북특별자치도) are matched and false positives are avoided.
+            prefixes = []
+            if r == '강원도':
+                prefixes = ['강원도%', '강원특별%']
+            elif r == '전라북도':
+                prefixes = ['전라북도%', '전북%']
+            elif r == '제주특별자치도':
+                prefixes = ['제주%']
+            elif r == '세종특별자치시':
+                prefixes = ['세종%']
+            elif r == '서울특별시':
+                prefixes = ['서울%']
+            elif r == '인천광역시':
+                prefixes = ['인천%']
+            elif r == '경기도':
+                prefixes = ['경기%']
+            elif r == '부산광역시':
+                prefixes = ['부산%']
+            elif r == '대구광역시':
+                prefixes = ['대구%']
+            elif r == '광주광역시':
+                prefixes = ['광주%']
+            elif r == '대전광역시':
+                prefixes = ['대전%']
+            elif r == '울산광역시':
+                prefixes = ['울산%']
+            elif r == '충청북도':
+                prefixes = ['충청북도%', '충북%']
+            elif r == '충청남도':
+                prefixes = ['충청남도%', '충남%']
+            elif r == '전라남도':
+                prefixes = ['전라남도%', '전남%']
+            elif r == '경상북도':
+                prefixes = ['경상북도%', '경북%']
+            elif r == '경상남도':
+                prefixes = ['경상남도%', '경남%']
+            else:
+                prefixes = [f"{r}%"]
+            
+            for p in prefixes:
+                region_conditions.append("address LIKE ?")
+                params.append(p)
+                
         if region_conditions:
             query_conditions.append(f"({' OR '.join(region_conditions)})")
     

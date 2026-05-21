@@ -3,19 +3,18 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
 from database import get_db
 from typing import Optional
+from app.repositories.query_builder import build_business_where_clause
 
 def generate_excel_export(start_date: Optional[str], end_date: Optional[str], search: Optional[str] = None, regions: Optional[list] = None, infer_update_type: Optional[list] = None, industry_type: Optional[list] = None) -> io.BytesIO:
     """
     주어진 조건에 맞춰 데이터를 조회한 후,
     엑셀 파일 데이터(io.BytesIO)로 반환합니다.
     """
-    from app.repositories.business_repository import BusinessRepository
-    
     with get_db() as conn:
         cursor = conn.cursor()
         
-        repo = BusinessRepository()
-        where_clause, params = repo._build_where_clause(search, start_date, end_date, regions, infer_update_type, industry_type)
+        # repositories.query_builder 함수를 사용하여 WHERE 절 생성
+        where_clause, params = build_business_where_clause(search, start_date, end_date, regions, infer_update_type, industry_type)
             
         # 데이터 조회 (last_event_date 또는 created_at 기준 내림차순)
         query = f"SELECT * FROM businesses{where_clause} ORDER BY last_event_date DESC, created_at DESC"
@@ -39,8 +38,8 @@ def generate_excel_export(start_date: Optional[str], end_date: Optional[str], se
         '초기수집(과거변경있음)': '기타',
     }
 
-    # 헤더 설정 (프론트엔드 테이블 컬럼 순서와 동일)
-    headers = ["업소명", "소재지", "인허가번호", "대표자명", "세부업종", "변경타입", "인허가변동시각", "전화번호"]
+    # 헤더 설정 (프론트엔드 테이블 컬럼 순서 및 한글명과 완전 일치)
+    headers = ["업소명", "인허가번호", "소재지", "대표자명", "업종", "변경 타입", "인허가 변동시각", "전화번호"]
     ws.append(headers)
 
     # 헤더 스타일 지정
@@ -56,9 +55,24 @@ def generate_excel_export(start_date: Optional[str], end_date: Optional[str], se
     for row in rows:
         record = dict(row)
 
-        # 변경타입: infer_update_type → 한글 매핑
+        # 업소명 (이전 상호명)
+        business_name = record.get("business_name", "") or ""
+        prev_name = record.get("prev_business_name", "") or ""
+        if prev_name:
+            business_name = f"{business_name} (이전: {prev_name})"
+
+        # 대표자명 (이전 대표자명)
+        rep_name = record.get("representative_name", "") or ""
+        prev_rep = record.get("prev_representative_name", "") or ""
+        if prev_rep:
+            rep_name = f"{rep_name} (이전: {prev_rep})"
+
+        # 변경타입: infer_update_type → 한글 매핑 및 상세내역 포함
         raw_update_type = record.get("infer_update_type", "") or ""
         change_type = CATEGORY_NAMES.get(raw_update_type, raw_update_type)
+        update_detail = record.get("infer_update_detail", "") or ""
+        if update_detail:
+            change_type = f"{change_type} ({update_detail})"
 
         # 인허가변동시각: last_event_time (ISO 8601 → 한국 가독성 포맷)
         last_event_time = record.get("last_event_time", "") or ""
@@ -70,10 +84,10 @@ def generate_excel_export(start_date: Optional[str], end_date: Optional[str], se
                 pass  # 파싱 실패 시 원본 유지
 
         ws.append([
-            record.get("business_name", ""),
-            record.get("address", ""),
+            business_name,
             record.get("license_no", ""),
-            record.get("representative_name", ""),
+            record.get("address", ""),
+            rep_name,
             record.get("industry_type", "") or "",
             change_type,
             last_event_time,

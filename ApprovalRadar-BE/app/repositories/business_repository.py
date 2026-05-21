@@ -149,6 +149,35 @@ class BusinessRepository(AbstractBusinessRepository):
                 c.execute(query, params)
                 c.commit()
 
+    def update_business_by_key(self, license_no: str, last_event_date: str, updates: dict, conn=None):
+        query = '''
+            UPDATE businesses 
+            SET business_name = ?, address = ?, representative_name = ?, 
+                business_status = ?, phone_number = ?,
+                industry_type = COALESCE(?, industry_type),
+                representative_history = ?, licensing_history = ?,
+                update_type = ?, prev_business_status = ?, prev_representative_name = ?, prev_business_name = ?,
+                infer_update_type = ?, infer_update_detail = ?,
+                last_event_time = ?, license_time = ?,
+                updated_at = ?, is_new = 1
+            WHERE license_no = ? AND last_event_date = ?
+        '''
+        params = (
+            updates["business_name"], updates["address"], updates["representative_name"], 
+            updates["business_status"], updates["phone_number"], updates.get("industry_type"),
+            updates["representative_history"], updates["licensing_history"],
+            updates.get("update_type"), updates.get("prev_business_status"), updates.get("prev_representative_name"), updates.get("prev_business_name"),
+            updates.get("infer_update_type"), updates.get("infer_update_detail"),
+            updates.get("last_event_time"), updates.get("license_time"),
+            updates["updated_at"], license_no, last_event_date
+        )
+        if conn:
+            conn.execute(query, params)
+        else:
+            with get_db() as c:
+                c.execute(query, params)
+                c.commit()
+
     def update_industry_type(self, license_no: str, industry_type: str, conn=None):
         query = "UPDATE businesses SET industry_type = ? WHERE license_no = ?"
         params = (industry_type, license_no)
@@ -214,5 +243,39 @@ class BusinessRepository(AbstractBusinessRepository):
             with get_db() as c:
                 c.execute(query, params)
                 c.commit()
+
+    def update_businesses_batch(self, update_list: list, conn=None):
+        query = '''
+            UPDATE businesses 
+            SET business_name = ?, address = ?, representative_name = ?, 
+                business_status = ?, phone_number = ?,
+                industry_type = COALESCE(?, industry_type),
+                representative_history = ?, licensing_history = ?,
+                update_type = ?, prev_business_status = ?, prev_representative_name = ?, prev_business_name = ?,
+                infer_update_type = ?, infer_update_detail = ?,
+                last_event_time = ?, license_time = ?,
+                updated_at = ?, is_new = 1
+            WHERE license_no = ? AND last_event_date = ?
+        '''
+        if conn:
+            conn.executemany(query, update_list)
+        else:
+            with get_db() as c:
+                c.executemany(query, update_list)
+                c.commit()
+
+    def insert_businesses_batch(self, insert_list: list, conn=None):
+        query = '''
+            INSERT INTO businesses 
+            (license_no, business_name, address, representative_name, business_status, license_date, phone_number, industry_type, last_event_date, is_new, update_type, prev_business_status, prev_representative_name, prev_business_name, infer_update_type, infer_update_detail, last_event_time, license_time, change_reason, change_before, change_after, collected_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        '''
+        if conn:
+            conn.executemany(query, insert_list)
+        else:
+            with get_db() as c:
+                c.executemany(query, insert_list)
+                c.commit()
+
 
 

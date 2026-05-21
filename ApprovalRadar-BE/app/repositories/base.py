@@ -15,6 +15,10 @@ class AbstractBusinessRepository(ABC):
         pass
 
     @abstractmethod
+    def update_business_by_key(self, license_no: str, last_event_date: str, updates: dict, conn: Optional[Any] = None) -> None:
+        pass
+
+    @abstractmethod
     def get_approvals(
         self, page: int, size: int, search: Optional[str] = None,
         start_date: Optional[str] = None, end_date: Optional[str] = None,

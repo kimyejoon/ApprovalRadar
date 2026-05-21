@@ -26,7 +26,7 @@ class Settings:
     GAP_MIN = 0.5       # Jitter 최솟값(초) - WAF 차단 시 키 전환으로 우회
     GAP_MAX = 1.5       # Jitter 최댓값(초) - 축소하여 스캔 속도 향상
     # 탐색 최소주기 - .env의 SCRAPER_INTERVAL_MINUTES 로 오버라이드 가능 (기본값 15분)
-    SCRAPER_INTERVAL_MINUTES: int = 30
+    SCRAPER_INTERVAL_MINUTES: int = 5
     
     # 모니터링 최적화 설정
     PIVOT_INTERVAL = 5000  # 희소 색인(Sparse Index) 피벗 간격
@@ -85,7 +85,7 @@ class Settings:
             try:
                 self.SCRAPER_INTERVAL_MINUTES = int(interval)
             except ValueError:
-                self.SCRAPER_INTERVAL_MINUTES = 30  # 잘못된 값이면 기본값(30) 유지
+                self.SCRAPER_INTERVAL_MINUTES = 5  # 잘못된 값이면 기본값(5) 유지
 
     # Rolling Scan pages도 env 오버라이드 가능
         rsp = os.getenv("ROLLING_SCAN_PAGES_PER_CYCLE")

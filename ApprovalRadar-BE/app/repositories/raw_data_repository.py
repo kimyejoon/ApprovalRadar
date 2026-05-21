@@ -18,3 +18,15 @@ class RawDataRepository:
             with get_db() as c:
                 c.execute(query, params)
                 c.commit()
+
+    def insert_raw_data_batch(self, raw_list: list, conn=None):
+        query = '''
+            INSERT OR REPLACE INTO api_raw_data (license_no, raw_json, fetched_at)
+            VALUES (?, ?, ?)
+        '''
+        if conn:
+            conn.executemany(query, raw_list)
+        else:
+            with get_db() as c:
+                c.executemany(query, raw_list)
+                c.commit()
