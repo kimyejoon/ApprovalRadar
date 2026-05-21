@@ -150,7 +150,9 @@ async def poll_changes_for_date(target_date: str) -> dict:
             all_items = []
             page = 1
             MAX_PAGES = 20  # 안전장치 (20,000건 상한)
+            MAX_CONSECUTIVE_EMPTY = 3  # 연속 빈 페이지 3개 → 중간 갭 허용 후 종료
 
+            consecutive_empty = 0
             while page <= MAX_PAGES:
                 start = (page - 1) * PAGE_SIZE + 1
                 end = page * PAGE_SIZE
@@ -160,13 +162,21 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 )
 
                 if not page_res or SERVICE_ID not in page_res:
-                    break
+                    consecutive_empty += 1
+                    if consecutive_empty >= MAX_CONSECUTIVE_EMPTY:
+                        break
+                    page += 1
+                    continue
 
                 rows = page_res[SERVICE_ID].get("row", [])
                 if not rows:
-                    break
+                    consecutive_empty += 1
+                    if consecutive_empty >= MAX_CONSECUTIVE_EMPTY:
+                        break
+                else:
+                    consecutive_empty = 0  # 데이터 있으면 카운터 리셋
+                    all_items.extend(rows)
 
-                all_items.extend(rows)
                 page += 1
 
             result["total"] = len(all_items)
@@ -299,41 +309,32 @@ def _save_poll_history(result: dict):
 
 async def _run_poller_async():
     """
-    시간대별 폴링 전략:
-    - 00:00~18:59 → 어제 날짜만 폴링
-    - 19:00~23:59 → 오늘 폴링 (주) + 어제 보조 폴링
+    항상 어제 + 오늘 동시 폴링.
+
+    근거:
+    - I2500 CHNG_DT <= 로직 확인: 어제 날짜로 조회해도 오늘 레코드 포함 가능
+    - 오늘 날짜 폴링이 업무시간 전이면 INFO-700 → 0건으로 무해하게 종료
+    - 시간 제한 없이 24시간 최대 커버리지 확보
     """
     now = datetime.datetime.now()
     today_str = now.strftime("%Y%m%d")
     yesterday_str = (now - datetime.timedelta(days=1)).strftime("%Y%m%d")
-    hour = now.hour
 
-    if hour >= 19:
-        # 19:00 이후: 오늘 (주) + 어제 (보조)
-        logger.info(
-            f"[전략C] 🕐 {hour}시 → 오늘({today_str}) 주 폴링 + 어제({yesterday_str}) 보조"
-        )
-        today_result = await poll_changes_for_date(today_str)
-        yesterday_result = await poll_changes_for_date(yesterday_str)
+    logger.info(
+        f"[전략C] 🕐 어제({yesterday_str}) + 오늘({today_str}) 동시 폴링 시작"
+    )
 
-        logger.info(
-            f"[전략C] 📊 결과: 오늘({today_str}) API {today_result['total']:,}건 "
-            f"→ 신규 {today_result['new']}건 | "
-            f"어제({yesterday_str}) API {yesterday_result['total']:,}건 "
-            f"→ 신규 {yesterday_result['new']}건"
-        )
-    else:
-        # 00:00~18:59: 어제만
-        logger.info(
-            f"[전략C] 🕐 {hour}시 → 어제({yesterday_str}) 폴링 (당일 데이터 19시 이후 반영)"
-        )
-        yesterday_result = await poll_changes_for_date(yesterday_str)
+    # 어제 먼저 (자정 이후 즉시 포착)
+    yesterday_result = await poll_changes_for_date(yesterday_str)
+    # 오늘 (업무시간 전이면 0건, 업무시간 중이면 실시간 포착)
+    today_result = await poll_changes_for_date(today_str)
 
-        logger.info(
-            f"[전략C] 📊 결과: 어제({yesterday_str}) API {yesterday_result['total']:,}건 "
-            f"→ 신규 {yesterday_result['new']}건 / 기존 {yesterday_result['skipped']:,}건 "
-            f"({yesterday_result['elapsed']}초)"
-        )
+    logger.info(
+        f"[전략C] 📊 결과: "
+        f"어제({yesterday_str}) API {yesterday_result['total']:,}건 → 신규 {yesterday_result['new']}건 | "
+        f"오늘({today_str}) API {today_result['total']:,}건 → 신규 {today_result['new']}건"
+    )
+
 
 
 def run_chng_dt_poller():
