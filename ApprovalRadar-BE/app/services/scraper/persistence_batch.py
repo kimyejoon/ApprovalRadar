@@ -62,6 +62,8 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
         to_update = []
         to_insert = []
         to_insert_raw = []
+        update_log_details = []
+        update_raw_logs = []
 
         for m in mapped_rows:
             fields = m["fields"]
@@ -113,10 +115,10 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
                     if fields["phone_number"] != db_record.get("phone_number"):
                         diff_details.append(f"phone_number({db_record.get('phone_number')} -> {fields['phone_number']})")
 
-                    logger.info(
-                        f"🔄 [속성 변경 감지] 업소 {lcns_no} ({event_date}) 의 DB 레코드 속성이 "
-                        f"API 응답값과 상이하여 즉각 업데이트를 수행합니다. 변경내역: {', '.join(diff_details)}"
-                    )
+                    diff_details_str = ", ".join(diff_details)
+                    update_log_details.append(diff_details_str)
+                    update_raw_logs.append(f"{lcns_no} ({diff_details_str})")
+
                     updates = {
                         "business_name": fields["business_name"],
                         "address": fields["address"],
@@ -227,6 +229,17 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
         # Batch execute updates and inserts!
         if to_update:
             business_repo.update_businesses_batch(to_update, conn=conn)
+            # Group updates by diff details for clean logging
+            detail_counts = {}
+            for d in update_log_details:
+                detail_counts[d] = detail_counts.get(d, 0) + 1
+            summary_parts = [f"{k} {v}건" for k, v in sorted(detail_counts.items(), key=lambda x: -x[1])]
+            logger.info(
+                f"🔄 [속성 변경 감지] DB 레코드와 API 데이터 상이로 총 {len(to_update)}건 즉각 업데이트 수행 "
+                f"({', '.join(summary_parts)})"
+            )
+            if update_raw_logs:
+                logger.debug(f"🔍 업데이트 상세 대상: {', '.join(update_raw_logs)}")
         if to_insert:
             business_repo.insert_businesses_batch(to_insert, conn=conn)
         if to_insert_raw:
