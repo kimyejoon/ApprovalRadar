@@ -97,14 +97,15 @@ CREATE_BUSINESS_MEMOS_TABLE = '''
 
 CREATE_CHNG_DT_POLL_HISTORY_TABLE = '''
     CREATE TABLE IF NOT EXISTS chng_dt_poll_history (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        poll_date       TEXT NOT NULL,
-        polled_at       TEXT NOT NULL,
-        total_api_count INTEGER DEFAULT 0,
-        new_inserted    INTEGER DEFAULT 0,
-        already_exists  INTEGER DEFAULT 0,
-        pages_fetched   INTEGER DEFAULT 0,
-        elapsed_sec     REAL DEFAULT 0
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        poll_date           TEXT NOT NULL,
+        polled_at           TEXT NOT NULL,
+        total_api_count     INTEGER DEFAULT 0,  -- 실제 가져온 행 수 (len(rows))
+        new_inserted        INTEGER DEFAULT 0,
+        already_exists      INTEGER DEFAULT 0,
+        pages_fetched       INTEGER DEFAULT 0,
+        elapsed_sec         REAL DEFAULT 0,
+        api_raw_total_count INTEGER DEFAULT 0   -- I2500 API 응답의 total_count 필드 (실제 데이터셋 크기)
     )
 '''
 

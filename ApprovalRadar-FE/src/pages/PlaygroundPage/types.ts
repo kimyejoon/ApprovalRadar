@@ -68,6 +68,7 @@ export interface ChngDtPollEntry {
   already_exists: number;
   pages_fetched: number;
   elapsed_sec: number;
+  api_raw_total_count: number;  // I2500 API 응답의 실제 total_count 필드
 }
 
 export interface ChngDtTrendResponse {

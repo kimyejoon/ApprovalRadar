@@ -59,6 +59,13 @@ def run_migrations(cursor):
         cursor.execute("ALTER TABLE page_scan_history ADD COLUMN last_lcns TEXT")
         print("[DB 마이그레이션] page_scan_history: last_lcns 컬럼 추가")
 
+    # chng_dt_poll_history: api_raw_total_count 컬럼 추가 (I2500 API 실제 total_count 저장)
+    cursor.execute("PRAGMA table_info(chng_dt_poll_history)")
+    cph_cols = [row[1] for row in cursor.fetchall()]
+    if "api_raw_total_count" not in cph_cols:
+        cursor.execute("ALTER TABLE chng_dt_poll_history ADD COLUMN api_raw_total_count INTEGER DEFAULT 0")
+        print("[DB 마이그레이션] chng_dt_poll_history: api_raw_total_count 컬럼 추가")
+
     if has_crawler_state:
         cursor.execute("PRAGMA table_info(crawler_state)")
         columns = [row[1] for row in cursor.fetchall()]

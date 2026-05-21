@@ -72,7 +72,8 @@ def get_chng_dt_trend_data() -> dict:
     with get_db() as conn:
         rows = conn.execute(
             """SELECT poll_date, polled_at, total_api_count, new_inserted,
-                      already_exists, pages_fetched, elapsed_sec
+                      already_exists, pages_fetched, elapsed_sec,
+                      COALESCE(api_raw_total_count, 0) as api_raw_total_count
                FROM chng_dt_poll_history
                WHERE poll_date IN (?, ?)
                ORDER BY polled_at ASC""",
@@ -89,6 +90,7 @@ def get_chng_dt_trend_data() -> dict:
             "already_exists": r["already_exists"],
             "pages_fetched": r["pages_fetched"],
             "elapsed_sec": r["elapsed_sec"],
+            "api_raw_total_count": r["api_raw_total_count"],  # I2500 API 실제 total_count
         }
         if r["poll_date"] == yesterday_str:
             yesterday_entries.append(entry)

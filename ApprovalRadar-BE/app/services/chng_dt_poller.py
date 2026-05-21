@@ -134,7 +134,8 @@ async def poll_changes_for_date(target_date: str) -> dict:
     start_time = time.time()
     result = {
         "total": 0, "new": 0, "skipped": 0,
-        "date": target_date, "pages": 0, "elapsed": 0.0
+        "date": target_date, "pages": 0, "elapsed": 0.0,
+        "api_raw_total_count": 0,  # I2500 API 응답의 실제 total_count
     }
 
     if ApiClient.is_exhausted():
@@ -151,36 +152,79 @@ async def poll_changes_for_date(target_date: str) -> dict:
             page = 1
             MAX_PAGES = 20  # 안전장치 (20,000건 상한)
             MAX_CONSECUTIVE_EMPTY = 3  # 연속 빈 페이지 3개 → 중간 갭 허용 후 종료
+            api_raw_total = 0  # 첫 페이지 응답의 total_count 필드
+
+            logger.info(
+                f"[전략C] 폴링 시작: CHNG_DT={target_date} | "
+                f"최대 {MAX_PAGES}페이지/{MAX_PAGES * PAGE_SIZE:,}건 상한"
+            )
 
             consecutive_empty = 0
             while page <= MAX_PAGES:
                 start = (page - 1) * PAGE_SIZE + 1
                 end = page * PAGE_SIZE
+                page_fetch_start = time.time()
 
                 page_res = await api_client.fetch_data(
                     SERVICE_ID, start, end, CHNG_DT=target_date
                 )
 
+                page_elapsed = round(time.time() - page_fetch_start, 1)
+
                 if not page_res or SERVICE_ID not in page_res:
                     consecutive_empty += 1
+                    logger.debug(
+                        f"[전략C] P{page} 원시 응답 없음 → consecutive_empty={consecutive_empty}/{MAX_CONSECUTIVE_EMPTY}"
+                    )
                     if consecutive_empty >= MAX_CONSECUTIVE_EMPTY:
+                        logger.info(f"[전략C] 연속 {MAX_CONSECUTIVE_EMPTY}페이지 빈 페이지 → 스캔 종료")
                         break
                     page += 1
                     continue
 
-                rows = page_res[SERVICE_ID].get("row", [])
+                svc_data = page_res[SERVICE_ID]
+                rows = svc_data.get("row", [])
+
+                # 첫 페이지에서 API total_count 캐치
+                if page == 1:
+                    raw_total_str = svc_data.get("total_count", "0")
+                    try:
+                        api_raw_total = int(raw_total_str)
+                    except (ValueError, TypeError):
+                        api_raw_total = 0
+                    logger.info(
+                        f"[전략C] I2500 API 엔드포인트 total_count={api_raw_total:,} "
+                        f"(CHNG_DT={target_date})"
+                    )
+
                 if not rows:
                     consecutive_empty += 1
+                    logger.debug(
+                        f"[전략C] P{page} 행 0건 → consecutive_empty={consecutive_empty}/{MAX_CONSECUTIVE_EMPTY}"
+                    )
                     if consecutive_empty >= MAX_CONSECUTIVE_EMPTY:
+                        logger.info(f"[전략C] 연속 {MAX_CONSECUTIVE_EMPTY}페이지 빈 페이지 → 스캔 종료")
                         break
                 else:
                     consecutive_empty = 0  # 데이터 있으면 카운터 리셋
                     all_items.extend(rows)
+                    logger.info(
+                        f"[전략C] 폴링 P{page}/{MAX_PAGES} ✔ | "
+                        f"이번 페이지 {len(rows):,}건 | "
+                        f"누적 {len(all_items):,}건 | "
+                        f"소요 {page_elapsed}초"
+                    )
 
                 page += 1
 
+            result["api_raw_total_count"] = api_raw_total
             result["total"] = len(all_items)
             result["pages"] = page - 1
+
+            logger.info(
+                f"[전략C] I2500 전페이지 수집 완료: "
+                f"API total={api_raw_total:,} | 실수집={len(all_items):,}건 | {page-1}페이지"
+            )
 
             if not all_items:
                 logger.debug(f"[CHNG_DT Poller] {target_date}: API 데이터 없음")
@@ -293,18 +337,20 @@ def _save_poll_history(result: dict):
             conn.execute(
                 """INSERT INTO chng_dt_poll_history
                    (poll_date, polled_at, total_api_count, new_inserted,
-                    already_exists, pages_fetched, elapsed_sec)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    already_exists, pages_fetched, elapsed_sec, api_raw_total_count)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     result["date"], now_iso,
                     result["total"], result["new"],
                     result["skipped"], result["pages"],
-                    result["elapsed"]
+                    result["elapsed"],
+                    result.get("api_raw_total_count", 0),
                 )
             )
             conn.commit()
     except Exception as e:
-        logger.warning(f"[CHNG_DT Poller] 이력 저장 실패: {e}")
+        logger.warning(f"[전략C] 이력 저장 실패: {e}")
+
 
 
 async def _run_poller_async():
