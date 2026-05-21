@@ -6,6 +6,7 @@ import datetime
 from app.core.config import settings
 from app.clients.foodsafety_api import ApiClient
 from app.repositories.state_repository import StateRepository
+from app.repositories.page_scan_repository import PageScanRepository
 from app.core.logger import logger
 
 PAGE_SIZE = 1000
@@ -26,6 +27,7 @@ class DiffCrawlerEngine:
         self.api_client = api_client
         self.service_id = service_id
         self.state_repo = StateRepository()
+        self.page_scan_repo = PageScanRepository()
 
     async def _fetch_page(self, start: int, end: int) -> list:
         """[start, end] 범위의 레코드를 비동기 조회하여 Jitter를 적용한 후 반환합니다."""
@@ -55,8 +57,6 @@ class DiffCrawlerEngine:
         total_pages: int,
         page_industries: dict,
         page_labels: dict,
-        page_timestamps: dict,
-        state: dict,
         svc: str,
     ) -> int:
         """
@@ -114,8 +114,12 @@ class DiffCrawlerEngine:
                         page_industries[str(probe_page)] = first_industry
                     if first_char and last_char:
                         page_labels[str(probe_page)] = f"{first_char}~{last_char}"
-                    page_timestamps[str(probe_page)] = int(time.time())
-                    self.state_repo.save_state(svc, state)
+                    self.page_scan_repo.upsert_page(
+                        svc, probe_page,
+                        label=page_labels.get(str(probe_page)),
+                        industry=first_industry or None,
+                        last_scanned_ts=int(time.time()),
+                    )
 
                     if first_industry in TARGET_INDUSTRIES:
                         logger.info(
@@ -145,10 +149,15 @@ class DiffCrawlerEngine:
         5. 페이지 완료 즉시: scraper 위임 → 상태 저장 → 풍부한 SSE 발행.
         """
         svc = self.service_id
+
+        # ── page_scan_history 테이블에서 로드 ────────────────────────────────
+        scan_data = self.page_scan_repo.load_all(svc)
+        page_timestamps = scan_data["page_timestamps"]
+        page_labels     = scan_data["page_labels"]
+        page_industries = scan_data["page_industries"]
+
+        # extra_state는 page_* 제외한 순수 내부 상태만 유지
         extra = state.setdefault("extra_state", {})
-        page_timestamps = extra.setdefault("page_timestamps", {})
-        page_labels = extra.setdefault("page_labels", {})
-        page_industries = extra.setdefault("page_industries", {})
 
         # ── 실제 총 페이지 수 동적 계산 ──────────────────────────────────────
         last_total_count = state.get("last_total_count", 0)
@@ -312,8 +321,16 @@ class DiffCrawlerEngine:
                             f"last_total_count 갱신: {new_total:,}건 (P{new_total_pages})"
                         )
 
-                # ── 타임스탬프 즉시 저장 ──────────────────────────────────────
-                page_timestamps[str(page)] = int(time.time())
+                # ── 타임스탬프 및 라벨을 page_scan_history 테이블에 즉시 저장 ─────
+                captured_label = page_labels.get(str(page))
+                captured_industry = page_industries.get(str(page))
+                self.page_scan_repo.upsert_page(
+                    svc, page,
+                    label=captured_label,
+                    industry=captured_industry,
+                    last_scanned_ts=int(time.time()),
+                )
+                # extra_state(page_* 제외)만 save_state로 저장
                 self.state_repo.save_state(svc, state)
                 scanned_success_pages.append(page)
 
@@ -369,8 +386,6 @@ class DiffCrawlerEngine:
                 total_pages=total_pages,
                 page_industries=page_industries,
                 page_labels=page_labels,
-                page_timestamps=page_timestamps,
-                state=state,
                 svc=svc,
             )
             if updated_boundary != target_boundary:

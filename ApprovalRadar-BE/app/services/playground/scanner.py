@@ -40,57 +40,48 @@ def trigger_range_scan_task(start: int, end: int):
 def get_page_scan_history_data(service_id: str) -> dict:
     state_repo = StateRepository()
     state = state_repo.load_state(service_id)
-
     total_count = state.get("last_total_count", 0)
-    fingerprints = state.get("page_fingerprints", {})
-    scan_times = state.get("page_scan_times", {})
-
-    # I2861 전용 extra_state 라벨 및 타임스탬프 로드
-    extra = state.get("extra_state", {})
-    page_labels = extra.get("page_labels", {})
-    page_industries = extra.get("page_industries", {})
-    page_timestamps = extra.get("page_timestamps", {})
-
     total_pages = (total_count + 999) // 1000 if total_count > 0 else 0
+
+    # page_scan_history 테이블에서 직접 로드 (JSON extra_state 대신)
+    from app.repositories.page_scan_repository import PageScanRepository
+    scan_data = PageScanRepository().load_all(service_id)
+    page_timestamps = scan_data["page_timestamps"]  # {str(page): int(unix_ts)}
+    page_labels     = scan_data["page_labels"]
+    page_industries = scan_data["page_industries"]
 
     entries = []
     for p in range(total_pages):
+        page_num = p + 1
         page_start = p * 1000 + 1
-        fp = fingerprints.get(str(page_start))
 
-        if service_id == "I2861":
-            ts_val = page_timestamps.get(str(p + 1))
-            if ts_val:
-                # astimezone() 으로 서버 로컬 타임존(KST)을 명시하여 JS가 UTC로 오파싱하는 것을 방지
-                import datetime as _dt
-                ts = _dt.datetime.fromtimestamp(ts_val, tz=_dt.timezone.utc).astimezone().isoformat()
-            else:
-                ts = None
-
+        ts_val = page_timestamps.get(str(page_num))
+        if ts_val:
+            import datetime as _dt
+            ts = _dt.datetime.fromtimestamp(ts_val, tz=_dt.timezone.utc).astimezone().isoformat()
         else:
-            ts = scan_times.get(str(page_start))
+            ts = None
 
-        label = page_labels.get(str(p + 1))
-        industry = page_industries.get(str(p + 1))
+        label    = page_labels.get(str(page_num))
+        industry = page_industries.get(str(page_num))
+
+        # fingerprint는 I2861에서 의미 없으므로 고정 표시
+        fp = "LIVE-SCAN" if ts else None
 
         entries.append({
-            "page_number": p + 1,
-            "page_start": page_start,
-            "fingerprint": fp[:12] if fp else (None if service_id != "I2861" else "LIVE-SCAN"),
+            "page_number": page_num,
+            "page_start":  page_start,
+            "fingerprint": fp,
             "last_scanned": ts,
-            "label": label,
+            "label":   label,
             "industry": industry,
         })
 
-    if service_id == "I2861":
-        scanned = sum(1 for e in entries if e["last_scanned"] is not None)
-    else:
-        scanned = sum(1 for e in entries if e["fingerprint"] is not None)
-
+    scanned = sum(1 for e in entries if e["last_scanned"] is not None)
     return {
-        "total_pages": total_pages,
-        "scanned_pages": scanned,
-        "entries": entries,
+        "total_pages":    total_pages,
+        "scanned_pages":  scanned,
+        "entries":        entries,
     }
 
 

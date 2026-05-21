@@ -243,3 +243,15 @@ CREATE_INDEX_CREATED_AT = 'CREATE INDEX IF NOT EXISTS idx_businesses_created_at 
 CREATE_INDEX_BUSINESS_NAME = 'CREATE INDEX IF NOT EXISTS idx_businesses_business_name ON businesses (business_name);'
 CREATE_INDEX_LOGS_LEVEL = 'CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs (level);'
 CREATE_INDEX_LOGS_CREATED_AT = 'CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs (created_at);'
+
+CREATE_PAGE_SCAN_HISTORY_TABLE = '''
+    CREATE TABLE IF NOT EXISTS page_scan_history (
+        service_id      TEXT    NOT NULL,
+        page_number     INTEGER NOT NULL,
+        label           TEXT,
+        industry        TEXT,
+        last_scanned_ts INTEGER,
+        PRIMARY KEY (service_id, page_number)
+    )
+'''
+

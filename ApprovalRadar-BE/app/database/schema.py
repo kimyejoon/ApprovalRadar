@@ -1,7 +1,7 @@
 import sqlite3
 import os
 from app.database import ddl
-from app.database.migration import run_migrations, migrate_env_keys_to_db
+from app.database.migration import run_migrations, migrate_env_keys_to_db, migrate_extra_state_to_page_scan_history
 
 def init_db():
     from database import DB_FILE
@@ -41,10 +41,13 @@ def init_db():
     cursor.execute(ddl.CREATE_SMART_SWEEP_CACHE_TABLE)
     cursor.execute(ddl.CREATE_SMART_SWEEP_LOG_TABLE)
     cursor.execute(ddl.CREATE_API_KEY_USAGE_BY_SERVICE_TABLE)
+    cursor.execute(ddl.CREATE_PAGE_SCAN_HISTORY_TABLE)
 
     conn.commit()
     conn.close()
     
     # .env에 있는 키를 DB로 자동 마이그레이션 (최초 1회)
     migrate_env_keys_to_db()
+    # extra_state JSON의 page 데이터를 page_scan_history 테이블로 마이그레이션 (최초 1회)
+    migrate_extra_state_to_page_scan_history()
 

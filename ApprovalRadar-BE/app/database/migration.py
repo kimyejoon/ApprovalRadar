@@ -105,3 +105,51 @@ def migrate_env_keys_to_db():
             print(f"[DB 마이그레이션] .env 키 {inserted}개를 api_keys 테이블에 등록했습니다.")
     finally:
         conn.close()
+
+
+def migrate_extra_state_to_page_scan_history():
+    """서버 시작 시 crawler_state.extra_state의 page_* 데이터를 page_scan_history 테이블로 1회 마이그레이션.
+    이미 page_scan_history에 데이터가 있으면 스킵 (멱등성 보장)."""
+    import json
+    import sqlite3
+    from database import DB_FILE
+
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    try:
+        # 이미 데이터가 있으면 스킵
+        existing_count = conn.execute("SELECT COUNT(*) FROM page_scan_history").fetchone()[0]
+        if existing_count > 0:
+            return
+
+        # crawler_state에서 extra_state 읽기
+        rows = conn.execute("SELECT service_id, extra_state FROM crawler_state").fetchall()
+        migrated = 0
+        for row in rows:
+            service_id = row["service_id"]
+            extra = json.loads(row["extra_state"] or "{}")
+            page_timestamps = extra.get("page_timestamps", {})
+            page_labels     = extra.get("page_labels", {})
+            page_industries = extra.get("page_industries", {})
+
+            # 모든 페이지 번호 수집 (세 딕셔너리의 합집합)
+            all_pages = set(page_timestamps) | set(page_labels) | set(page_industries)
+            for p_str in all_pages:
+                ts  = page_timestamps.get(p_str)
+                lbl = page_labels.get(p_str)
+                ind = page_industries.get(p_str)
+                conn.execute(
+                    """INSERT OR IGNORE INTO page_scan_history
+                       (service_id, page_number, label, industry, last_scanned_ts)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (service_id, int(p_str), lbl, ind, ts)
+                )
+                migrated += 1
+
+        conn.commit()
+        if migrated > 0:
+            print(f"[DB 마이그레이션] extra_state → page_scan_history: {migrated}개 페이지 이전 완료")
+    except Exception as e:
+        print(f"[DB 마이그레이션] page_scan_history 마이그레이션 실패: {e}")
+    finally:
+        conn.close()
