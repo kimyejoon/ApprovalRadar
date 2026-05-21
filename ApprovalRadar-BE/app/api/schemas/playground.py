@@ -24,6 +24,8 @@ class PageScanEntry(BaseModel):
     page_start: int
     fingerprint: Optional[str] = None
     last_scanned: Optional[str] = None
+    label: Optional[str] = None
+    industry: Optional[str] = None
 
 
 class PageScanHistoryResponse(BaseModel):
