@@ -27,6 +27,8 @@ class Settings:
     GAP_MAX = 1.5       # Jitter 최댓값(초) - 축소하여 스캔 속도 향상
     # 탐색 최소주기 - .env의 SCRAPER_INTERVAL_MINUTES 로 오버라이드 가능 (기본값 15분)
     SCRAPER_INTERVAL_MINUTES: int = 5
+    # 페이지 만료 임계 시간 (분) - .env의 STALE_THRESHOLD_MINUTES 로 오버라이드 가능 (기본값 15분)
+    STALE_THRESHOLD_MINUTES: int = 15
     
     # 모니터링 최적화 설정
     PIVOT_INTERVAL = 5000  # 희소 색인(Sparse Index) 피벗 간격
@@ -102,6 +104,16 @@ class Settings:
                 self.SCAN_WORKERS = max(1, min(int(sw), 16))  # 1~16 범위 클램프
             except ValueError:
                 pass
+
+        # STALE_THRESHOLD_MINUTES: env 오버라이드 (.env에서 STALE_THRESHOLD_MINUTES=15 식으로 변경 가능)
+        stm = os.getenv("STALE_THRESHOLD_MINUTES")
+        if stm is not None:
+            try:
+                self.STALE_THRESHOLD_MINUTES = int(stm)
+            except ValueError:
+                self.STALE_THRESHOLD_MINUTES = 15  # 잘못된 값이면 기본값 15분 유지
+        else:
+            self.STALE_THRESHOLD_MINUTES = 15
 
 
 def compute_optimal_defaults(

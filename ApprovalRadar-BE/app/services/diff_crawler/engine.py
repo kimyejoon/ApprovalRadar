@@ -10,7 +10,7 @@ from app.repositories.page_scan_repository import PageScanRepository
 from app.core.logger import logger
 
 PAGE_SIZE = 1000
-STALE_THRESHOLD_SEC = 3600   # 1시간
+STALE_THRESHOLD_SEC = settings.STALE_THRESHOLD_MINUTES * 60
 # 알려진 마지막 페이지 이후 추가 조회할 Tail Probe 페이지 수 (신규 데이터 유입 감지)
 TAIL_PROBE_EXTRA = 3
 # 업종 경계 프로브: target_boundary 이후 최대 몇 페이지까지 순차 확인할지
