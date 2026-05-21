@@ -394,6 +394,38 @@ class DiffCrawlerEngine:
                     avg_sec = sum(page_elapsed_times) / len(page_elapsed_times) if page_elapsed_times else fetch_elapsed
                     est_remaining_min = round((remaining * avg_sec) / 60, 1)
 
+                cycle_info = {
+                    "elapsed_sec":       round(elapsed_so_far, 1),
+                    "api_calls":         cycle_api_calls,
+                    "pages_done":        done_so_far,
+                    "pages_total":       pages_total,
+                    "est_remaining_min": est_remaining_min,
+                }
+
+                captured_label_log = page_labels.get(str(page), "—")
+                today_ip  = page_stats["today_in_page"]
+                yest_ip   = page_stats["yesterday_in_page"]
+                today_new = page_stats["today"]
+                yest_new  = page_stats["yesterday"]
+                today_log = f"{today_ip}건" + (f"(+{today_new}신규)" if today_new else "")
+                yest_log  = f"{yest_ip}건" + (f"(+{yest_new}신규)" if yest_new else "")
+                logger.info(
+                    f"[{svc}] W{worker_id} ✅ P{page}/{total_pages} [{captured_label_log}] 완료 | "
+                    f"조회 {row_count:,}건 | "
+                    f"오늘 {today_log} · 어제 {yest_log} · "
+                    f"신규 {page_stats['new_indexed']}건 · 중복 {page_stats['skipped_dup']}건 | "
+                    f"소요 {elapsed_so_far:.1f}초 · API {cycle_api_calls}회 · 잔여 ~{est_remaining_min}분"
+                )
+
+                # ── SSE 발행 (PLAYGROUND_UPDATE → 프론트 페이지 히스토리) ──────
+                broadcaster.broadcast_sync(json.dumps({
+                    "type":       "PLAYGROUND_UPDATE",
+                    "page":       page,
+                    "page_label": page_labels.get(str(page)),
+                    "stats":      page_stats,
+                    "cycle":      cycle_info,
+                }, ensure_ascii=False))
+
         # ── 1차: 병렬 실행 ────────────────────────────────────────────────────
         tasks = [
             _scan_one(page, (i % n_workers) + 1)
