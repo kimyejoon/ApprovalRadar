@@ -93,8 +93,8 @@ class ApiClient:
         while attempt < max_retries and not shutdown_event.is_set():
             api_key = self.get_current_key()
             
-            # I2861 및 I2500 호출 시 가짜 파라미터를 무조건 강제 적용하여 실시간 Live View 활성화
-            if service_id in ("I2861", "I2500"):
+            # I2861 호출 시 가짜 파라미터를 무조건 강제 적용하여 실시간 Live View 활성화
+            if service_id == "I2861":
                 if not kwargs:
                     kwargs = {"SYS_SYNC": "LIVE"}
                 elif "SYS_SYNC" not in kwargs:
