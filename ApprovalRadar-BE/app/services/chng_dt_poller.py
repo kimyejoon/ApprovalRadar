@@ -37,6 +37,89 @@ FIELD_MAP = {
 }
 
 
+async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: str, item_i2500: dict) -> list[dict]:
+    """
+    I2861 단건 조회를 날려 진짜 변경 정보와 허수를 구분합니다.
+    """
+    service_i2861 = "I2861"
+    try:
+        res = await api_client.fetch_data(service_i2861, 1, 10, LCNS_NO=lcns, timeout=15)
+    except Exception as e:
+        logger.warning(f"[CHNG_DT Poller] I2861 검증 API 호출 실패 (LCNS_NO={lcns}): {e}")
+        # API 호출 실패 시에는 안전을 위해 I2500 정보 그대로 오늘 자 변동으로 처리
+        return [{
+            "LCNS_NO": lcns,
+            "BSSH_NM": item_i2500.get("BSSH_NM", ""),
+            "SITE_ADDR": item_i2500.get("ADDR", ""),
+            "PRSDNT_NM": item_i2500.get("PRSDNT_NM", ""),
+            "BSN_STATE_NM": None,
+            "PRMS_DT": item_i2500.get("PRMS_DT", ""),
+            "TELNO": item_i2500.get("TELNO", ""),
+            "INDUTY_CD_NM": item_i2500.get("INDUTY_CD_NM", ""),
+            "CHNG_DT": target_date,
+            "SITE_ADDR_RDN": item_i2500.get("ADDR", ""),
+        }]
+        
+    rows = []
+    if res and service_i2861 in res:
+        rows = res[service_i2861].get("row", [])
+        
+    # 오늘 자 변경행이 있는지 필터링
+    today_rows = [r for r in rows if r.get("CHNG_DT") == target_date]
+    
+    if today_rows:
+        logger.info(f"[CHNG_DT Poller] 🟢 {lcns} ({item_i2500.get('BSSH_NM', '')}) 진짜 오늘 변경 검증 성공 (사유: {today_rows[0].get('CHNG_PRVNS')})")
+        mapped = []
+        for r in today_rows:
+            mapped.append({
+                "LCNS_NO": lcns,
+                "BSSH_NM": r.get("BSSH_NM") or item_i2500.get("BSSH_NM"),
+                "SITE_ADDR": r.get("SITE_ADDR") or item_i2500.get("ADDR"),
+                "PRSDNT_NM": r.get("PRSDNT_NM") or item_i2500.get("PRSDNT_NM"),
+                "BSN_STATE_NM": None,
+                "PRMS_DT": item_i2500.get("PRMS_DT"),
+                "TELNO": r.get("TELNO") or item_i2500.get("TELNO"),
+                "INDUTY_CD_NM": r.get("INDUTY_CD_NM") or item_i2500.get("INDUTY_CD_NM"),
+                "CHNG_DT": target_date,
+                "SITE_ADDR_RDN": r.get("SITE_ADDR") or item_i2500.get("ADDR"),
+                "CHNG_PRVNS": r.get("CHNG_PRVNS"),
+                "CHNG_BF_CN": r.get("CHNG_BF_CN"),
+                "CHNG_AF_CN": r.get("CHNG_AF_CN"),
+            })
+        return mapped
+    else:
+        # 허수 (단순 DB 싱크만 오늘 됨)
+        actual_date = None
+        if rows:
+            dates = [r.get("CHNG_DT") for r in rows if r.get("CHNG_DT")]
+            if dates:
+                actual_date = max(dates)
+                
+        if not actual_date:
+            # 변경 이력이 아예 없는 신규 업소인 경우 인허가일자 사용
+            actual_date = item_i2500.get("PRMS_DT")
+            
+        if not actual_date:
+            actual_date = "19700101"
+            
+        logger.info(f"[CHNG_DT Poller] ⚪ {lcns} ({item_i2500.get('BSSH_NM', '')}) 단순 동기화 건 감지 (실제최종일자: {actual_date})")
+        return [{
+            "LCNS_NO": lcns,
+            "BSSH_NM": item_i2500.get("BSSH_NM"),
+            "SITE_ADDR": item_i2500.get("ADDR"),
+            "PRSDNT_NM": item_i2500.get("PRSDNT_NM"),
+            "BSN_STATE_NM": None,
+            "PRMS_DT": item_i2500.get("PRMS_DT"),
+            "TELNO": item_i2500.get("TELNO"),
+            "INDUTY_CD_NM": item_i2500.get("INDUTY_CD_NM"),
+            "CHNG_DT": actual_date, # 과거 날짜로 설정하여 DB에는 기록되나 오늘 자 실시간 알림에서 제외
+            "SITE_ADDR_RDN": item_i2500.get("ADDR"),
+            "CHNG_PRVNS": "초기자료등록" if not rows else "시스템동기화(과거이력)",
+            "CHNG_BF_CN": None,
+            "CHNG_AF_CN": None,
+        }]
+
+
 async def poll_changes_for_date(target_date: str) -> dict:
     """
     I2500 CHNG_DT=target_date 조회 → DB에 없는 건만 INSERT.
@@ -77,70 +160,60 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 )
 
                 if not page_res or SERVICE_ID not in page_res:
-                    logger.warning(f"[CHNG_DT Poller] {target_date} 페이지 {start}~{end} 응답 없음")
                     break
 
-                block = page_res[SERVICE_ID]
-                code = block.get("RESULT", {}).get("CODE", "")
-
-                if code == "INFO-200":
-                    if page == 1:
-                        logger.info(f"[CHNG_DT Poller] CHNG_DT={target_date} 변동분 없음 (INFO-200)")
-                    else:
-                        logger.info(f"[CHNG_DT Poller] {target_date} 페이지 {page} → INFO-200, 수집 완료")
-                    break
-
-                if code != "INFO-000":
-                    logger.warning(f"[CHNG_DT Poller] {target_date} 페이지 {page} 응답 코드: {code}")
-                    break
-
-                rows = block.get("row", [])
+                rows = page_res[SERVICE_ID].get("row", [])
                 if not rows:
                     break
 
                 all_items.extend(rows)
-
-                if len(rows) < PAGE_SIZE:
-                    break
-
                 page += 1
-                if shutdown_event.is_set():
-                    break
 
             result["total"] = len(all_items)
-            result["pages"] = page if all_items else 0
+            result["pages"] = page - 1
 
             if not all_items:
+                logger.debug(f"[CHNG_DT Poller] {target_date}: API 데이터 없음")
                 result["elapsed"] = round(time.time() - start_time, 1)
                 _save_poll_history(result)
                 return result
 
-            logger.info(
-                f"[CHNG_DT Poller] I2500 CHNG_DT={target_date}: "
-                f"{len(all_items):,}건 수집 ({page}p)"
-            )
-
-            # ── Step 2: DB 중복 체크 (LCNS, event_date 쌍) ──
-            lcns_list = [item.get("LCNS_NO", "") for item in all_items if item.get("LCNS_NO")]
+            # ── Step 2: DB 중복 조회 최적화 (Batch SELECT) ──
             existing_pairs = set()
+            lcns_list = [
+                item["LCNS_NO"] for item in all_items if item.get("LCNS_NO")
+            ]
+            if lcns_list:
+                # 900개씩 chunking (SQLite 파라미터 개수 제한 999개 대비)
+                CHUNK_SIZE = 900
+                with get_db() as conn:
+                    for i in range(0, len(lcns_list), CHUNK_SIZE):
+                        batch = lcns_list[i : i + CHUNK_SIZE]
+                        ph = ",".join(["?"] * len(batch))
+                        rows = conn.execute(
+                            f"SELECT license_no, last_event_date FROM businesses "
+                            f"WHERE license_no IN ({ph})",
+                            batch
+                        ).fetchall()
+                        for row in rows:
+                            existing_pairs.add((row["license_no"], row["last_event_date"]))
 
+            # ── Step 3: 오늘 이미 검사 완료된 건 및 기존 수집된 건 필터 ──
+            date_hyphen = f"{target_date[:4]}-{target_date[4:6]}-{target_date[6:8]}"
+            processed_lcns_today = set()
             with get_db() as conn:
-                for i in range(0, len(lcns_list), 500):
-                    batch = lcns_list[i:i + 500]
-                    ph = ",".join(["?"] * len(batch))
-                    rows = conn.execute(
-                        f"SELECT license_no, last_event_date FROM businesses "
-                        f"WHERE license_no IN ({ph})",
-                        batch
-                    ).fetchall()
-                    for row in rows:
-                        existing_pairs.add((row["license_no"], row["last_event_date"]))
+                rows = conn.execute(
+                    "SELECT license_no FROM businesses WHERE updated_at LIKE ? OR created_at LIKE ?",
+                    (f"{date_hyphen}%", f"{date_hyphen}%")
+                ).fetchall()
+                processed_lcns_today = {r["license_no"] for r in rows}
 
-            # ── Step 3: 신규 건만 필터 ──
             new_items = []
             for item in all_items:
                 lcns = item.get("LCNS_NO", "")
                 if not lcns:
+                    continue
+                if lcns in processed_lcns_today:
                     continue
                 pair = (lcns, target_date)
                 if pair not in existing_pairs:
@@ -158,22 +231,21 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 _save_poll_history(result)
                 return result
 
-            # ── Step 4: I2500 → I2861 형식으로 변환하여 scraper 파이프라인 처리 ──
+            # ── Step 4: I2500 후보군 검증 및 I2861 형식 변환 ──
+            logger.info(f"[CHNG_DT Poller] 🔍 신규 후보군 {len(new_items):,}건에 대해 I2861 변경이력 교차 검증 시작 (동시성 10)...")
+            semaphore = asyncio.Semaphore(10)
+            
+            async def verify_task(item):
+                async with semaphore:
+                    lcns = item.get("LCNS_NO", "")
+                    return await _verify_actual_change(api_client, lcns, target_date, item)
+            
+            tasks = [verify_task(item) for item in new_items]
+            task_results = await asyncio.gather(*tasks)
+            
             mapped_rows = []
-            for item in new_items:
-                i2861_row = {
-                    "LCNS_NO": item.get("LCNS_NO", ""),
-                    "BSSH_NM": item.get("BSSH_NM", ""),
-                    "SITE_ADDR": item.get("ADDR", ""),
-                    "PRSDNT_NM": item.get("PRSDNT_NM", ""),
-                    "BSN_STATE_NM": None,
-                    "PRMS_DT": item.get("PRMS_DT", ""),
-                    "TELNO": item.get("TELNO", ""),
-                    "INDUTY_CD_NM": item.get("INDUTY_CD_NM", ""),
-                    "CHNG_DT": target_date,
-                    "SITE_ADDR_RDN": item.get("ADDR", ""),
-                }
-                mapped_rows.append(i2861_row)
+            for r_list in task_results:
+                mapped_rows.extend(r_list)
 
             logger.info(
                 f"[CHNG_DT Poller] 🆕 {target_date}: "
