@@ -260,8 +260,17 @@ class DiffCrawlerEngine:
             f"대상: {pages_total}p"
         )
 
-        # ── 워커별 독립 ApiClient 생성 (공유 시 키 경합 → 연속 한도 초과 방지) ──────
+        # ── 워커별 독립 ApiClient 생성 + 시작 키 오프셋 분산 ─────────────────────
+        # 문제: ApiClient()는 모두 _last_working_key_idx=0 에서 시작 → 같은 키 경합
+        # 해결: 워커 i를 n_keys//n_workers 간격으로 다른 키에서 시작시킴
         worker_clients = [ApiClient() for _ in range(n_workers)]
+        n_keys = len(settings.API_KEYS)
+        if n_keys >= n_workers:
+            key_step = n_keys // n_workers
+            for i, wc in enumerate(worker_clients):
+                wc.key_manager.current_key_idx = (i * key_step) % n_keys
+                masked = wc.key_manager._mask_key(wc.key_manager.api_keys[wc.key_manager.current_key_idx])
+                logger.info(f"[{svc}] 🔑 W{i+1} 시작 키: {masked} (key_idx={i * key_step})")
 
         async def _scan_one(page: int, worker_id: int, is_retry: bool = False) -> None:
             nonlocal cycle_api_calls
