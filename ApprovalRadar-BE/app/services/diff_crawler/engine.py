@@ -173,15 +173,34 @@ class DiffCrawlerEngine:
         known_skip_set   = {int(p) for p, i in page_industries.items() if i in SKIP_INDUSTRIES}
         unknown_set      = set(range(1, total_pages + 1)) - known_target_set - known_skip_set
 
-        # target_boundary: page_industries에서 확인된 타깃 업종 마지막 페이지
-        # (미확인이면 total_pages 사용 → 전체 스캔으로 자연 발견)
-        if known_target_set:
+        # target_boundary: DB에 저장된 경계값 우선 로드 (재시작 후에도 유지)
+        # 미저장 시 page_industries에서 실시간 계산
+        saved_boundary = extra.get("target_boundary_page", 0)
+        if saved_boundary > 0:
+            target_boundary = saved_boundary
+            logger.info(
+                f"[{svc}] 📌 저장된 업종 경계 로드: P{target_boundary} "
+                f"(known_target={len(known_target_set)}p, known_skip={len(known_skip_set)}p)"
+            )
+        elif known_target_set:
             target_boundary = max(known_target_set)
+            logger.info(f"[{svc}] 📌 업종 경계 실시간 계산: P{target_boundary} (saved_boundary 없음)")
         else:
             target_boundary = total_pages
+            logger.info(f"[{svc}] 📌 업종 경계 미확인 → 전체 스캔 (P{target_boundary})")
 
         # ── 스캔 후보 풀 구성: 타깃 + 미확인 (알려진 스킵 제외) ────────────
-        candidate_set = (known_target_set | unknown_set) & set(range(1, total_pages + 1))
+        # target_boundary 이후의 unknown 페이지는 제외
+        # → 한 번 집단급식소 구간 진입 시 이후는 모두 스캔 불필요
+        # 단, 한 번도 스캔 안 된 페이지(never_scanned)는 경계 이전까지만 포함
+        bounded_unknown = {p for p in unknown_set if p <= target_boundary}
+        candidate_set = (known_target_set | bounded_unknown) & set(range(1, total_pages + 1))
+
+        logger.info(
+            f"[{svc}] 🗂 후보 구성: 타깃확인 {len(known_target_set)}p + "
+            f"미확인(경계 이내) {len(bounded_unknown)}p = {len(candidate_set)}p "
+            f"(경계 P{target_boundary} 이후 unknown {len(unknown_set) - len(bounded_unknown)}p 제외)"
+        )
 
         # ── 전체 페이지 상태 분류 (Oldest-First 우선순위 계산) ────────────
         oldest_pages: list[tuple[int, int]] = []
