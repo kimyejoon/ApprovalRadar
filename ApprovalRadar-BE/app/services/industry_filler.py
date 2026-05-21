@@ -88,52 +88,78 @@ async def fill_missing_industry_types():
         logger.info("모든 업소의 세부업종이 이미 채워져 있습니다. 작업을 종료합니다.")
         return
 
-    logger.info(f"총 {total_missing}건의 세부업종 누락 데이터를 발견했습니다. 백필을 시작합니다.")
+    logger.info(f"총 {total_missing}건의 세부업종 누락 데이터를 발견했습니다. 병렬 백필을 시작합니다.")
 
-    processed_count = 0
-    success_count = 0
-    fail_count = 0
+    queue = asyncio.Queue()
+    for lcns in missing_licenses:
+        queue.put_nowait(lcns)
 
-    async with ApiClient() as api_client:
-        for lcns_no in missing_licenses:
-            if ApiClient.is_exhausted():
-                logger.warning("[Backfill] API 키 소진 → 백필 작업 중단. 내일 자정 이후 자동 재개됩니다.")
-                break
+    results = {"success": 0, "fail": 0, "exhausted": False}
+    results_lock = asyncio.Lock()
 
-            try:
-                updated = await _fetch_and_update_industry(api_client, lcns_no, business_repo)
-                if updated:
-                    success_count += 1
-                    logger.info(f"✅ {lcns_no} 세부업종 업데이트 완료")
-                else:
-                    fail_count += 1
-                    logger.info(f"⚠️ {lcns_no} → 세부업종 데이터 없음 또는 필드 비어있음")
+    # 동시 워커 수 설정
+    n_workers = min(settings.SCAN_WORKERS, total_missing)
+    if n_workers < 1:
+        n_workers = 1
 
-            except ApiKeysExhaustedError:
-                logger.warning("[Backfill] API 키 소진 → 백필 작업 중단. 내일 자정 이후 자동 재개됩니다.")
-                break
-            except Exception as e:
-                logger.error(f"Failed to fetch or update {lcns_no}: {e}")
-                fail_count += 1
+    async def worker():
+        async with ApiClient() as api_client:
+            while not queue.empty():
+                if ApiClient.is_exhausted():
+                    async with results_lock:
+                        results["exhausted"] = True
+                    break
+                
+                try:
+                    lcns_no = queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
 
-            processed_count += 1
-            if processed_count % 100 == 0 or processed_count == total_missing:
-                logger.info(
-                    f"[진척도] {processed_count}/{total_missing} 처리 완료 "
-                    f"(성공: {success_count}, 실패: {fail_count})"
-                )
+                try:
+                    updated = await _fetch_and_update_industry(api_client, lcns_no, business_repo)
+                    async with results_lock:
+                        if updated:
+                            results["success"] += 1
+                            logger.info(f"✅ {lcns_no} 세부업종 업데이트 완료")
+                        else:
+                            results["fail"] += 1
+                            logger.info(f"⚠️ {lcns_no} → 세부업종 데이터 없음 또는 필드 비어있음")
+                except ApiKeysExhaustedError:
+                    async with results_lock:
+                        results["exhausted"] = True
+                    break
+                except Exception as e:
+                    async with results_lock:
+                        results["fail"] += 1
+                    logger.error(f"Failed to fetch or update {lcns_no}: {e}")
+                finally:
+                    queue.task_done()
 
-            # WAF 차단 방지 Jitter
-            await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+                # 주기적으로 진행 상태 로그 출력 (100건 단위)
+                async with results_lock:
+                    processed = results["success"] + results["fail"]
+                    if processed % 100 == 0 or processed == total_missing:
+                        logger.info(
+                            f"[진척도] {processed}/{total_missing} 처리 완료 "
+                            f"(성공: {results['success']}, 실패: {results['fail']})"
+                        )
 
-    logger.info(f"🎉 백필 작업 완료! 총 {processed_count}건 중 {success_count}건 성공, {fail_count}건 실패.")
+                # WAF 차단 방지 Jitter
+                await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+
+    # 병렬 실행
+    workers = [asyncio.create_task(worker()) for _ in range(n_workers)]
+    await asyncio.gather(*workers)
+
+    processed_count = results["success"] + results["fail"]
+    logger.info(f"🎉 백필 작업 완료! 총 {processed_count}건 중 {results['success']}건 성공, {results['fail']}건 실패.")
 
 
 # ─── 신규 삽입 건 즉시 백필 ───────────────────────────────────────────────────
 
 async def fill_industry_for_licenses(license_nos: list[str]) -> None:
     """
-    신규 삽입 건에 한정한 즉시(Immediate) 세부업종 Backfill.
+    신규 삽입 건에 한정한 즉시(Immediate) 세부업종 병렬 Backfill.
 
     scraper.py에서 신규 Row를 DB에 삽입한 직후 호출되어, industry_type이 비어있는
     license_no 목록을 대상으로 I2500 API를 호출하여 세부업종을 즉시 채웁니다.
@@ -150,39 +176,76 @@ async def fill_industry_for_licenses(license_nos: list[str]) -> None:
         )
         return
 
-    logger.info(f"[즉시 Backfill] 신규 삽입 {len(license_nos)}건에 대해 세부업종 즉시 채우기 시작...")
+    # 중복 라이선스 번호 제거
+    unique_licenses = list(set(license_nos))
+    logger.info(
+        f"[즉시 Backfill] 신규 삽입 {len(unique_licenses)}건(원시 {len(license_nos)}건)에 대해 "
+        f"세부업종 즉시 병렬 채우기 시작..."
+    )
+    
     business_repo = BusinessRepository()
-    success_count = 0
-    fail_count = 0
+    queue = asyncio.Queue()
+    for lcns in unique_licenses:
+        queue.put_nowait(lcns)
 
-    async with ApiClient() as api_client:
-        for lcns_no in license_nos:
-            try:
-                updated = await _fetch_and_update_industry(api_client, lcns_no, business_repo)
-                if updated:
-                    success_count += 1
-                    logger.info(f"[즉시 Backfill] ✅ {lcns_no} 업데이트 완료")
-                else:
-                    fail_count += 1
-                    logger.debug(f"[즉시 Backfill] ⚠️ {lcns_no} → 세부업종 데이터 없음")
+    results = {"success": 0, "fail": 0, "exhausted": False}
+    results_lock = asyncio.Lock()
 
-            except ApiKeysExhaustedError:
-                logger.warning(
-                    f"[즉시 Backfill] API 키 소진 → 작업 중단. "
-                    f"잔여 {len(license_nos) - success_count - fail_count}건은 "
-                    f"6시간 주기 backfill_job에서 재시도됩니다."
-                )
-                break
-            except Exception as e:
-                fail_count += 1
-                logger.error(f"[즉시 Backfill] ❌ {lcns_no} 처리 실패: {e}")
+    # 동시 워커 수 설정
+    n_workers = min(settings.SCAN_WORKERS, len(unique_licenses))
+    if n_workers < 1:
+        n_workers = 1
 
-            # WAF 차단 방지 Jitter
-            await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+    async def worker():
+        async with ApiClient() as api_client:
+            while not queue.empty():
+                if ApiClient.is_exhausted():
+                    async with results_lock:
+                        results["exhausted"] = True
+                    break
+                
+                try:
+                    lcns_no = queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+
+                try:
+                    updated = await _fetch_and_update_industry(api_client, lcns_no, business_repo)
+                    async with results_lock:
+                        if updated:
+                            results["success"] += 1
+                            logger.info(f"[즉시 Backfill] ✅ {lcns_no} 업데이트 완료")
+                        else:
+                            results["fail"] += 1
+                            logger.debug(f"[즉시 Backfill] ⚠️ {lcns_no} → 세부업종 데이터 없음")
+                except ApiKeysExhaustedError:
+                    async with results_lock:
+                        results["exhausted"] = True
+                    break
+                except Exception as e:
+                    async with results_lock:
+                        results["fail"] += 1
+                    logger.error(f"[즉시 Backfill] ❌ {lcns_no} 처리 실패: {e}")
+                finally:
+                    queue.task_done()
+
+                # WAF 차단 방지 Jitter
+                await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
+
+    # 병렬 실행
+    workers = [asyncio.create_task(worker()) for _ in range(n_workers)]
+    await asyncio.gather(*workers)
+
+    if results["exhausted"]:
+        left = len(unique_licenses) - results["success"] - results["fail"]
+        logger.warning(
+            f"[즉시 Backfill] API 키 소진으로 일부 작업 중단. "
+            f"잔여 {left}건은 6시간 주기 backfill_job에서 재시도됩니다."
+        )
 
     logger.info(
-        f"[즉시 Backfill] 완료. 총 {len(license_nos)}건 중 "
-        f"성공: {success_count}건, 실패: {fail_count}건"
+        f"[즉시 Backfill] 완료. 총 {len(unique_licenses)}건 중 "
+        f"성공: {results['success']}건, 실패: {results['fail']}건"
     )
 
 
