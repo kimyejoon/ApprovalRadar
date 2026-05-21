@@ -24,18 +24,28 @@ def _get_app_base_dir() -> str:
     # 개발: logger.py → app/core/ → app/ → BE루트
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import queue
+import time
+import threading
+
 class SQLiteHandler(logging.Handler):
     """
-    DB의 system_logs 테이블에 로그를 저장하는 커스텀 핸들러
+    DB의 system_logs 테이블에 로그를 비동기식으로 저장하는 커스텀 핸들러.
+    메인/워커 스레드의 DB 트랜잭션과 충돌하여 database is locked 에러가 발생하는 것을
+    방지하기 위해 단일 백그라운드 스레드에서 큐를 컨슘하여 기록합니다.
     """
     def __init__(self, db_file: str):
         super().__init__()
         self.db_file = db_file
         self._create_table_if_not_exists()
+        self._queue = queue.Queue()
+        self._stop_event = threading.Event()
+        self._worker_thread = threading.Thread(target=self._log_writer, daemon=True, name="LoggerDBWorker")
+        self._worker_thread.start()
         
     def _create_table_if_not_exists(self):
         try:
-            conn = sqlite3.connect(self.db_file)
+            conn = sqlite3.connect(self.db_file, timeout=30.0)
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS system_logs (
@@ -52,21 +62,73 @@ class SQLiteHandler(logging.Handler):
             print(f"Failed to create system_logs table: {e}")
 
     def emit(self, record):
+        # 큐에 레코드를 신속히 적재하고 즉시 리턴 (메인 스레드 블로킹 방지)
         try:
-            msg = self.format(record)
-            level = record.levelname
-            module = record.name
-            
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO system_logs (level, module, message) VALUES (?, ?, ?)",
-                (level, module, msg)
-            )
-            conn.commit()
-            conn.close()
+            self._queue.put(record)
         except Exception:
             self.handleError(record)
+
+    def _log_writer(self):
+        conn = None
+        while not self._stop_event.is_set():
+            try:
+                # 1초 동안 로그가 오기를 대기
+                record = self._queue.get(timeout=1.0)
+            except queue.Empty:
+                # 일정 시간 동안 로그가 없으면 커넥션을 닫아 DB Lock 및 리소스를 해제
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    conn = None
+                continue
+
+            try:
+                if conn is None:
+                    conn = sqlite3.connect(self.db_file, timeout=30.0)
+                    conn.execute("PRAGMA journal_mode=WAL;")
+                    conn.execute("PRAGMA synchronous=NORMAL;")
+                
+                msg = self.format(record)
+                level = record.levelname
+                module = record.name
+                
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO system_logs (level, module, message) VALUES (?, ?, ?)",
+                    (level, module, msg)
+                )
+                conn.commit()
+            except sqlite3.OperationalError as e:
+                # DB가 잠겨서 에러가 발생한 경우 잠시 대기 후 큐에 다시 넣어 재시도
+                if "locked" in str(e).lower():
+                    time.sleep(0.5)
+                    self._queue.put(record)
+                else:
+                    # 기타 운영 에러는 무시하여 무한 루프 방지
+                    pass
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    conn = None
+            except Exception:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    conn = None
+            finally:
+                self._queue.task_done()
+
+    def close(self):
+        self._stop_event.set()
+        if self._worker_thread.is_alive():
+            self._worker_thread.join(timeout=2.0)
+        super().close()
 
 
 class WebSocketLogHandler(logging.Handler):

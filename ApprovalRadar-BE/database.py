@@ -30,7 +30,7 @@ def _get_thread_conn() -> sqlite3.Connection:
     """현재 스레드의 커넥션을 반환합니다. 없으면 새로 생성합니다."""
     conn = getattr(_thread_local, "conn", None)
     if conn is None:
-        conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+        conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=30.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
