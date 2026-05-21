@@ -277,6 +277,8 @@ class DiffCrawlerEngine:
                     "skipped_dup": 0,
                     "today": 0,
                     "yesterday": 0,
+                    "today_in_page": 0,
+                    "yesterday_in_page": 0,
                 }
                 page_industry = page_industries.get(str(page), "")
                 is_skip_page = page_industry in SKIP_INDUSTRIES
@@ -290,6 +292,8 @@ class DiffCrawlerEngine:
                         "skipped_dup": result.get("skipped_dup", 0),
                         "today": result.get("today", 0),
                         "yesterday": result.get("yesterday", 0),
+                        "today_in_page": result.get("today_in_page", 0),
+                        "yesterday_in_page": result.get("yesterday_in_page", 0),
                     })
                     all_rows.extend(rows)
                 elif is_skip_page:
@@ -329,10 +333,17 @@ class DiffCrawlerEngine:
                 }
 
                 captured_label = page_labels.get(str(page), '—')
+                today_ip = page_stats['today_in_page']
+                yest_ip  = page_stats['yesterday_in_page']
+                today_new = page_stats['today']
+                yest_new  = page_stats['yesterday']
+                # 오늘/어제 표시: 전체 건수(신규+중복) 표시, 신규가 있으면 +N신규 표표
+                today_str_log = f"{today_ip}건" + (f"(+{today_new}신규)" if today_new else "")
+                yest_str_log  = f"{yest_ip}건" + (f"(+{yest_new}신규)" if yest_new else "")
                 logger.info(
                     f"[{svc}] ✅ P{page}/{total_pages} [{captured_label}] 완료 | "
                     f"조회 {row_count:,}건 | "
-                    f"오늘 {page_stats['today']}건 · 어제 {page_stats['yesterday']}건 · "
+                    f"오늘 {today_str_log} · 어제 {yest_str_log} · "
                     f"신규 {page_stats['new_indexed']}건 · 중복 {page_stats['skipped_dup']}건 | "
                     f"소요 {elapsed_so_far:.1f}초 · API {cycle_api_calls}회 · 잔여 ~{est_remaining_min}분"
                 )

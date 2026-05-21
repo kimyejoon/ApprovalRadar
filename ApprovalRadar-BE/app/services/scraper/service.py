@@ -100,4 +100,6 @@ async def run_scraper_for_service_with_rows(service_id: str, rows: list, collect
         "skipped_dup": stats["skipped_dup"],
         "today": stats["today"],
         "yesterday": stats["yesterday"],
+        "today_in_page": stats.get("today_in_page", 0),
+        "yesterday_in_page": stats.get("yesterday_in_page", 0),
     }

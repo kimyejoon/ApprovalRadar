@@ -18,8 +18,10 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
         "total_fetched": 조회 건수,
         "new_indexed": 신규 색인 건수,
         "skipped_dup": 미색인(중복 스킵) 건수,
-        "today": 오늘 변동 건수,
-        "yesterday": 어제 변동 건수,
+        "today": 오늘 변동 건수 (신규 INSERT 기준),
+        "yesterday": 어제 변동 건수 (신규 INSERT 기준),
+        "today_in_page": 오늘 날짜 레코드 건수 (신규+중복 전체),
+        "yesterday_in_page": 어제 날짜 레코드 건수 (신규+중복 전체),
     }
     """
     now = datetime.datetime.now().isoformat()
@@ -33,6 +35,8 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
     skipped_dup = 0
     today_count = 0
     yesterday_count = 0
+    today_in_page = 0       # 신규+중복 포함 오늘 날짜 레코드 수
+    yesterday_in_page = 0   # 신규+중복 포함 어제 날짜 레코드 수
     inserted_lcns_list = []
 
     with get_db() as conn:
@@ -61,6 +65,13 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
             license_time = m["license_time"]
 
             pair = (lcns_no, event_date)
+
+            # 전체 조회 기준 오늘/어제 카운트 (신규+중복 불문)
+            if event_date == today_str:
+                today_in_page += 1
+            elif event_date == yesterday_str:
+                yesterday_in_page += 1
+
             if pair in existing_pairs:
                 skipped_dup += 1
                 continue
@@ -119,4 +130,6 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
         "skipped_dup": skipped_dup,
         "today": today_count,
         "yesterday": yesterday_count,
+        "today_in_page": today_in_page,
+        "yesterday_in_page": yesterday_in_page,
     }
