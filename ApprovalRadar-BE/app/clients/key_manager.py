@@ -18,6 +18,8 @@ class KeyManager:
     _recovery_client: httpx.AsyncClient | None = None
     _last_working_key_idx: int = 0
     _REFRESH_INTERVAL: float = 60.0
+    _exhausted_keys: set[str] = set()
+    _db_loaded: bool = False
 
     def __init__(self):
         settings._load_api_keys()
@@ -27,8 +29,39 @@ class KeyManager:
                 self.current_key_idx = self._last_working_key_idx
             else:
                 self.current_key_idx = 0
+            
+            # 모든 워커 인스턴스 간 소진 키 목록 실시간 연동을 위해 클래스 레벨 세트 연결
+            self.exhausted_keys = self._exhausted_keys
+
+            # 서버 재기동 시 데이터베이스로부터 오늘치 사용량과 소진 키 상태를 메모리로 동기화
+            if not self.__class__._db_loaded:
+                try:
+                    from database import get_db
+                    today = datetime.date.today().isoformat()
+                    with get_db() as conn:
+                        # 1. 소진 키 상태 로드
+                        rows_ex = conn.execute(
+                            "SELECT key_masked FROM api_key_usage WHERE usage_date = ? AND exhausted = 1",
+                            (today,)
+                        ).fetchall()
+                        db_exhausted_masked = {r["key_masked"] for r in rows_ex}
+                        for key in self.api_keys:
+                            if self._mask_key(key) in db_exhausted_masked:
+                                self._exhausted_keys.add(key)
+                        
+                        # 2. API 사용량 로드
+                        rows_usage = conn.execute(
+                            "SELECT key_masked, call_count FROM api_key_usage WHERE usage_date = ?",
+                            (today,)
+                        ).fetchall()
+                        for r in rows_usage:
+                            self._usage[r["key_masked"]] = {"date": today, "count": r["call_count"]}
+                    
+                    self.__class__._db_loaded = True
+                except Exception:
+                    pass
+
         self.key_lock = threading.Lock()
-        self.exhausted_keys = set()
         self._last_refresh_time: float = time.time()
 
     @classmethod
@@ -152,6 +185,13 @@ class KeyManager:
 
     def get_current_key(self) -> str:
         with self.key_lock:
+            # 현재 인덱스의 키가 다른 워커에 의해 이미 소진된 키 목록에 존재할 경우,
+            # 불필요한 실패 요청 방지를 위해 소진되지 않은 다음 키로 즉시 건너뜁니다.
+            for _ in range(len(self.api_keys)):
+                key = self.api_keys[self.current_key_idx]
+                if key not in self.exhausted_keys:
+                    return key
+                self.current_key_idx = (self.current_key_idx + 1) % len(self.api_keys)
             return self.api_keys[self.current_key_idx]
 
     async def rotate_key(self, failed_key: str, renew_session_callback):
@@ -171,7 +211,11 @@ class KeyManager:
                 self.current_key_idx = (self.current_key_idx + 1) % len(self.api_keys)
                 candidate = self.api_keys[self.current_key_idx]
                 if candidate not in self.exhausted_keys:
-                    logger.info(f"[키 회전] API 한도 초과! 활성 키로 교체: {candidate[:5]}***")
+                    logger.info(
+                        f"[키 회전] API 한도 초과 감지! "
+                        f"(소진 키: {self._mask_key(failed_key)}) ➔ "
+                        f"활성 키로 교체: {self._mask_key(candidate)}"
+                    )
                     break
             else:
                 raise ApiKeysExhaustedError("All API keys are exhausted for today.")
@@ -183,7 +227,10 @@ class KeyManager:
                 return
             self.current_key_idx = (self.current_key_idx + 1) % len(self.api_keys)
             new_key = self.api_keys[self.current_key_idx]
-            logger.info(f"[키 전환] 일시적 오류(WAF/Timeout)로 임시 키 전환: {new_key[:5]}***")
+            logger.info(
+                f"[키 전환] 일시적 오류(WAF/Timeout)로 임시 키 전환: "
+                f"{self._mask_key(current_key)} ➔ {self._mask_key(new_key)}"
+            )
         await renew_session_callback()
 
     async def check_keys_status(self, service_id: str = "I2861"):
