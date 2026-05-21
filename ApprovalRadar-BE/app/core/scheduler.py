@@ -14,6 +14,7 @@ scheduler = BackgroundScheduler()
 # 이전 실행이 끝나기 전에 새 주기가 시작되면 WAF burst + 키 소진이 발생.
 # threading.Lock(blocking=False)로 이미 실행 중이면 즉시 스킵.
 _scraper_lock = threading.Lock()
+_poller_lock  = threading.Lock()  # chng_dt_poller 전용 (scraper와 독립)
 
 
 def _scraper_job():
@@ -39,6 +40,26 @@ def _backfill_job():
     """스케줄러 동기 래퍼: 6시간 주기 세부업종 백필 비동기 실행."""
     from app.services.industry_filler import fill_missing_industry_types
     asyncio.run(fill_missing_industry_types())
+
+
+def _chng_dt_poller_job():
+    """스케줄러 동기 래퍼: I2500 CHNG_DT 봇러 실시간 폴링.
+
+    scraper_lock과 독립적으로 동작. I2861 Oldest-First Scan이 수십 분짜리 돌아가는
+    동안에도 poller는 독립적으로 CHNG_DT 봇링을 지속합니다.
+    """
+    if not _poller_lock.acquire(blocking=False):
+        logger.warning(
+            "[전략C] ⏭️ 이전 CHNG_DT Poller 실행 중 → 이번 주기 스킵"
+        )
+        return
+    try:
+        from app.services.chng_dt_poller import _run_poller_async
+        asyncio.run(_run_poller_async())
+    except Exception as e:
+        logger.error(f"[전략C] chng_dt_poller 오류: {e}", exc_info=True)
+    finally:
+        _poller_lock.release()
 
 
 def _check_api_key_recovery():
@@ -77,6 +98,11 @@ def start_scheduler():
     logger.info(f"크롤링 주기: {interval}분")
     scheduler.add_job(_scraper_job, 'interval', minutes=interval, id="scraper_job")
 
+    # ✅ [전략C] I2500 CHNG_DT 폴러 — I2861과 동일 주기로 병렬 실행
+    # scraper_lock과 독립적인 poller_lock 사용 → 두 잡이 서로 블록하지 않음
+    scheduler.add_job(_chng_dt_poller_job, 'interval', minutes=interval, id="chng_dt_poller_job")
+    logger.info(f"[전략C] CHNG_DT Poller 등록: {interval}분 주기")
+
     # 10분마다 소진 키 회복 체크 → 회복 시 즉시 크롤링 재가동
     scheduler.add_job(_check_api_key_recovery, 'interval', minutes=10, id="key_recovery_job")
 
@@ -93,9 +119,12 @@ def start_scheduler():
     # 앱 시작 시 즉시 1회 실행 (blocking 방지를 위해 스케줄러에 위임)
     logger.info("Adding initial catch-up scraper job to background...")
     scheduler.add_job(_scraper_job, 'date', run_date=datetime.now(), id="initial_scraper_job")
+    # [전략C] 폴러도 앱 시작 시 즉시 1회 실행
+    scheduler.add_job(_chng_dt_poller_job, 'date', run_date=datetime.now(), id="initial_poller_job")
 
     scheduler.start()
     logger.info("APScheduler started successfully.")
+
 
 
 def shutdown_scheduler():
