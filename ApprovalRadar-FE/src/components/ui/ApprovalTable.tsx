@@ -1,9 +1,39 @@
-import { CaretDown, CaretUp, ArrowsDownUp } from '@phosphor-icons/react';
+import { useState } from 'react';
+import { CaretDown, CaretUp, ArrowsDownUp, Copy, Check } from '@phosphor-icons/react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCodeCell } from '@/components/ui/Table';
 import { formatApprovalDate, formatIndexedAt } from '@/lib/utils';
 import type { ApprovalMappedItem } from '@/lib/api';
 import type { SortKey } from '@/hooks/useApprovalRadar';
 import { CATEGORY_COLORS, CATEGORY_ICONS, INDUSTRY_ICONS } from '@/lib/constants';
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="p-1 rounded-full hover:bg-border-subtle active:bg-border-standard transition-all flex items-center justify-center border border-border-standard text-text-muted hover:text-brand focus:outline-none w-6 h-6 shrink-0 ml-1.5"
+      title="복사하기"
+    >
+      {copied ? (
+        <Check weight="bold" className="w-3.5 h-3.5 text-emerald-500" />
+      ) : (
+        <Copy weight="bold" className="w-3.5 h-3.5" />
+      )}
+    </button>
+  );
+}
 
 interface SortableHeadProps {
   label: string;
@@ -115,17 +145,30 @@ export function ApprovalTable({
               className={`cursor-pointer group ${!item.isRead ? 'bg-emerald-400/20 hover:bg-emerald-400/30' : ''}`}
             >
               <TableCell className="font-medium text-text-primary group-hover:text-brand transition-colors">
-                <div className="flex flex-col">
-                  <span>{item.name}</span>
-                  {item.prevName && (
-                    <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
-                      (이전: {item.prevName})
-                    </span>
-                  )}
+                <div className="flex items-center gap-1.5 justify-between">
+                  <div className="flex flex-col">
+                    <span>{item.name}</span>
+                    {item.prevName && (
+                      <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
+                        (이전: {item.prevName})
+                      </span>
+                    )}
+                  </div>
+                  <CopyButton text={item.name} />
                 </div>
               </TableCell>
-              <TableCodeCell>{item.id}</TableCodeCell>
-              <TableCell>{item.location}</TableCell>
+              <TableCodeCell>
+                <div className="flex items-center gap-1.5 justify-between">
+                  <span>{item.id}</span>
+                  <CopyButton text={item.id} />
+                </div>
+              </TableCodeCell>
+              <TableCell>
+                <div className="flex items-center gap-1.5 justify-between">
+                  <span>{item.location}</span>
+                  <CopyButton text={item.location} />
+                </div>
+              </TableCell>
               <TableCell>
                 <div className="flex flex-col">
                   <span>{item.owner}</span>

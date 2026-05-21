@@ -53,7 +53,13 @@ export function useSSE(sendNotification?: (opts: NotificationOptions) => void) {
           if (!response.data || response.data.length === 0) return;
 
           // 최신순 수신 → 역순 적재 (큐: 오래된 것이 먼저 보임)
-          const items = [...response.data].reverse();
+          const allItems = [...response.data].reverse();
+
+          // 대표자변경 이면서 업종 3종(기본필터)인 경우에만 알림/토스트 노출
+          const items = allItems.filter((item: any) =>
+            item.infer_update_type === '대표자변경' &&
+            ['일반음식점', '제과점영업', '휴게음식점'].includes(item.industry_type || '')
+          );
 
           for (const item of items) {
             const statusName = item.infer_update_type
@@ -93,19 +99,21 @@ export function useSSE(sendNotification?: (opts: NotificationOptions) => void) {
             });
           }
 
-          // 알림음은 건수와 무관하게 1회만
-          playNotificationSound();
+          if (items.length > 0) {
+            // 알림음은 건수와 무관하게 1회만
+            playNotificationSound();
 
-          // 브라우저 Web Notification (탭 백그라운드일 때만)
-          if (sendNotification && items.length > 0) {
-            const first = items[items.length - 1]; // 가장 최신 건
-            const statusName = first.infer_update_type
-              ? CATEGORY_NAMES[first.infer_update_type] || first.infer_update_type
-              : '상태 변경';
-            sendNotification({
-              title: `🔔 인허가 변동 ${items.length}건 감지`,
-              body: `[${statusName}] ${first.business_name} (${first.address})`,
-            });
+            // 브라우저 Web Notification (탭 백그라운드일 때만)
+            if (sendNotification) {
+              const first = items[items.length - 1]; // 가장 최신 건
+              const statusName = first.infer_update_type
+                ? CATEGORY_NAMES[first.infer_update_type] || first.infer_update_type
+                : '상태 변경';
+              sendNotification({
+                title: `🔔 인허가 변동 ${items.length}건 감지`,
+                body: `[${statusName}] ${first.business_name} (${first.address})`,
+              });
+            }
           }
 
           queryClient.invalidateQueries({ queryKey: ['approvals'] });
