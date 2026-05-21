@@ -71,7 +71,10 @@ class ApiClient:
     async def switch_key(self, current_key: str):
         await self.key_manager.switch_key(current_key, self._renew_session)
 
-    async def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5, timeout: int = 30, **kwargs) -> dict:
+    async def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5, timeout: int = None, **kwargs) -> dict:
+        """timeout=None 이면 settings.API_FETCH_TIMEOUT_SECONDS (기본 200초) 적용."""
+        if timeout is None:
+            timeout = settings.API_FETCH_TIMEOUT_SECONDS
         now_ts = time.time()
         if now_ts - self.key_manager._last_refresh_time > KeyManager._REFRESH_INTERVAL:
             self.key_manager.refresh_keys()

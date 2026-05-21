@@ -43,7 +43,7 @@ async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: s
     """
     service_i2861 = "I2861"
     try:
-        res = await api_client.fetch_data(service_i2861, 1, 10, LCNS_NO=lcns, timeout=15)
+        res = await api_client.fetch_data(service_i2861, 1, 10, LCNS_NO=lcns)
     except Exception as e:
         logger.warning(f"[CHNG_DT Poller] I2861 검증 API 호출 실패 (LCNS_NO={lcns}): {e}")
         # API 호출 실패 시에는 안전을 위해 I2500 정보 그대로 오늘 자 변동으로 처리
@@ -156,7 +156,7 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 end = page * PAGE_SIZE
 
                 page_res = await api_client.fetch_data(
-                    SERVICE_ID, start, end, CHNG_DT=target_date, timeout=15
+                    SERVICE_ID, start, end, CHNG_DT=target_date
                 )
 
                 if not page_res or SERVICE_ID not in page_res:

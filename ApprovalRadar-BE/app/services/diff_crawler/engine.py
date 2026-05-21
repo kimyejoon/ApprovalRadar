@@ -42,7 +42,7 @@ class DiffCrawlerEngine:
 
     async def _fetch_single(self, idx: int) -> dict | None:
         """특정 단일 인덱스 1건 비동기 조회 및 Jitter 적용."""
-        rows = await self.api_client.fetch_data(self.service_id, idx, idx, timeout=10)
+        rows = await self.api_client.fetch_data(self.service_id, idx, idx, timeout=settings.API_FETCH_TIMEOUT_SECONDS)
         await asyncio.sleep(random.uniform(settings.GAP_MIN, settings.GAP_MAX))
         if not rows or self.service_id not in rows:
             return None
