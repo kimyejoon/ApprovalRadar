@@ -21,8 +21,10 @@ export function PlaygroundPage() {
   const { data: summary, refetch } = useQuery<PlaygroundSummary>({
     queryKey: ['playgroundSummary'],
     queryFn: () => fetchPlaygroundSummary(),
-    staleTime: Infinity,      // SSE가 갱신을 책임지므로 자동 만료 없음
+    staleTime: 0,              // 마운트 시 항상 최신 데이터 fetch (새로고침 후 빈화면 방지)
+    refetchOnMount: true,      // 컴포넌트 마운트마다 1회 fetch
     refetchOnWindowFocus: false,
+    refetchInterval: false,    // 주기 폴링 없음 - SSE PLAYGROUND_UPDATE 이벤트로만 재실행
   });
 
   const handleTriggerMsg = useCallback((msg: string) => {
