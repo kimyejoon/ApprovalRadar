@@ -7,6 +7,7 @@ import { SettingsPage } from '@/pages/SettingsPage';
 import { PlaygroundPage } from '@/pages/PlaygroundPage';
 import { ToastProvider } from '@/components/ui/toast';
 import { useSSE } from '@/hooks/useSSE';
+import { useNotification } from '@/hooks/useNotification';
 import { SystemAlertPopup } from '@/components/ui/SystemAlertPopup';
 import { emitSystemAlert } from '@/lib/systemAlertEmitter';
 
@@ -22,7 +23,8 @@ declare global {
 }
 
 export default function App() {
-  useSSE(); // 앱 최상단에서 SSE 연결 및 리스닝 시작
+  const { sendNotification } = useNotification(); // 최초 마운트 시 알림 권한 요청
+  useSSE(sendNotification); // SSE 연결 + 백그라운드 탭 알림 연동
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
   // DEV 환경 전용 window.__radar__ 개발자 콘솔 도구 등록

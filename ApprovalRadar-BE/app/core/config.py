@@ -36,6 +36,9 @@ class Settings:
     # 서비스별 비례 배분됨 → compute_optimal_defaults() 참조
     # 34키 기반: Oldest-First Scan은 별도 제한 없이 만료 페이지 전부 스캔
     ROLLING_SCAN_PAGES_PER_CYCLE: int = 150
+
+    # I2861 Oldest-First Scan 병렬 워커 수 (.env SCAN_WORKERS 로 오버라이드)
+    SCAN_WORKERS: int = 4
     
     # API Keys
     API_KEYS = []
@@ -84,11 +87,19 @@ class Settings:
             except ValueError:
                 self.SCRAPER_INTERVAL_MINUTES = 30  # 잘못된 값이면 기본값(30) 유지
 
-        # Rolling Scan pages도 env 오버라이드 가능
+    # Rolling Scan pages도 env 오버라이드 가능
         rsp = os.getenv("ROLLING_SCAN_PAGES_PER_CYCLE")
         if rsp is not None:
             try:
                 self.ROLLING_SCAN_PAGES_PER_CYCLE = int(rsp)
+            except ValueError:
+                pass
+
+        # SCAN_WORKERS: I2861 Oldest-First Scan 병렬 워커 수 (기본 4)
+        sw = os.getenv("SCAN_WORKERS")
+        if sw is not None:
+            try:
+                self.SCAN_WORKERS = max(1, min(int(sw), 16))  # 1~16 범위 클램프
             except ValueError:
                 pass
 

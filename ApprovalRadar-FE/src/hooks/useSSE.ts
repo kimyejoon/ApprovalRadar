@@ -7,6 +7,7 @@ import { fetchApprovals } from '@/lib/api';
 import { CATEGORY_NAMES } from '@/lib/constants';
 import { emitSystemAlert } from '@/lib/systemAlertEmitter';
 import type { SystemAlertType } from '@/lib/systemAlertEmitter';
+import type { NotificationOptions } from './useNotification';
 
 declare global {
   interface Window {
@@ -19,7 +20,7 @@ const API_BASE_URL = envApiUrl !== undefined
   ? (envApiUrl === '' ? window.location.origin : envApiUrl)
   : 'http://localhost:8000';
 
-export function useSSE() {
+export function useSSE(sendNotification?: (opts: NotificationOptions) => void) {
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -94,6 +95,18 @@ export function useSSE() {
 
           // 알림음은 건수와 무관하게 1회만
           playNotificationSound();
+
+          // 브라우저 Web Notification (탭 백그라운드일 때만)
+          if (sendNotification && items.length > 0) {
+            const first = items[items.length - 1]; // 가장 최신 건
+            const statusName = first.infer_update_type
+              ? CATEGORY_NAMES[first.infer_update_type] || first.infer_update_type
+              : '상태 변경';
+            sendNotification({
+              title: `🔔 인허가 변동 ${items.length}건 감지`,
+              body: `[${statusName}] ${first.business_name} (${first.address})`,
+            });
+          }
 
           queryClient.invalidateQueries({ queryKey: ['approvals'] });
           queryClient.invalidateQueries({ queryKey: ['indicators'] });
@@ -172,7 +185,7 @@ export function useSSE() {
         delete window.triggerTestNotification;
       }
     };
-  }, [addToast, queryClient]);
+  }, [addToast, queryClient, sendNotification]);
 
   return null;
 }
