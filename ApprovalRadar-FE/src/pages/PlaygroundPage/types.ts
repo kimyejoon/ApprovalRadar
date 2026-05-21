@@ -60,3 +60,24 @@ export interface PlaygroundSummary {
   tail_history: TailHistory;
   page_scan: PageScanHistory;
 }
+
+export interface ChngDtPollEntry {
+  polled_at: string;
+  total_api_count: number;
+  new_inserted: number;
+  already_exists: number;
+  pages_fetched: number;
+  elapsed_sec: number;
+}
+
+export interface ChngDtTrendResponse {
+  target_date: string;
+  entries: ChngDtPollEntry[];
+  latest_total: number;
+  total_inserted: number;
+  yesterday_date: string;
+  yesterday_entries: ChngDtPollEntry[];
+  today_date: string;
+  today_entries: ChngDtPollEntry[];
+}
+

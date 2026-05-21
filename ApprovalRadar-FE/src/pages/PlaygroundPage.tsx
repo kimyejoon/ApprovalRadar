@@ -9,6 +9,9 @@ import { fetchPlaygroundSummary } from './PlaygroundPage/api';
 import { ManualTriggerSection } from './PlaygroundPage/components/ManualTriggerSection';
 import { TodayDetectionSection } from './PlaygroundPage/components/TodayDetectionSection';
 import { PageScanHistorySection } from './PlaygroundPage/components/PageScanHistorySection';
+import { SchedulerSection } from './PlaygroundPage/components/SchedulerSection';
+import { TailHistorySection } from './PlaygroundPage/components/TailHistorySection';
+import { ChngDtTrendSection } from './PlaygroundPage/components/ChngDtTrendSection';
 
 export function PlaygroundPage() {
   /**
@@ -36,6 +39,8 @@ export function PlaygroundPage() {
   const pageScan = summary?.page_scan
     ? { total_pages: summary.page_scan.total_pages, scanned_pages: summary.page_scan.scanned_pages, entries: summary.page_scan.entries }
     : null;
+  const scheduler = summary?.scheduler ?? null;
+  const tailHistory = summary?.tail_history?.entries ?? [];
 
   return (
     <div className="space-y-6">
@@ -69,7 +74,16 @@ export function PlaygroundPage() {
         <TodayDetectionSection today={today} />
       </div>
 
-      {/* Row 2: Page Scan History */}
+      {/* Row 2: CHNG_DT Time Series Trend Chart */}
+      <ChngDtTrendSection />
+
+      {/* Row 3: Scheduler Status + Known Tail History */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SchedulerSection scheduler={scheduler} />
+        <TailHistorySection tailHistory={tailHistory} />
+      </div>
+
+      {/* Row 4: Page Scan History */}
       <PageScanHistorySection pageScan={pageScan} />
     </div>
   );
