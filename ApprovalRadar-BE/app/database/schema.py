@@ -32,6 +32,8 @@ def init_db():
     cursor.execute(ddl.CREATE_INDEX_LAST_EVENT_DATE)
     cursor.execute(ddl.CREATE_INDEX_CREATED_AT)
     cursor.execute(ddl.CREATE_INDEX_BUSINESS_NAME)
+    cursor.execute(ddl.CREATE_INDEX_INFER_UPDATE_TYPE)
+    cursor.execute(ddl.CREATE_INDEX_INDUSTRY_TYPE)
     cursor.execute(ddl.CREATE_INDEX_LOGS_LEVEL)
     cursor.execute(ddl.CREATE_INDEX_LOGS_CREATED_AT)
     

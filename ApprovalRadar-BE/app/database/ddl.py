@@ -241,6 +241,8 @@ CREATE_INDEX_POLL_DATE = 'CREATE INDEX IF NOT EXISTS idx_chng_dt_poll_date ON ch
 CREATE_INDEX_LAST_EVENT_DATE = 'CREATE INDEX IF NOT EXISTS idx_businesses_last_event_date ON businesses (last_event_date);'
 CREATE_INDEX_CREATED_AT = 'CREATE INDEX IF NOT EXISTS idx_businesses_created_at ON businesses (created_at);'
 CREATE_INDEX_BUSINESS_NAME = 'CREATE INDEX IF NOT EXISTS idx_businesses_business_name ON businesses (business_name);'
+CREATE_INDEX_INFER_UPDATE_TYPE = 'CREATE INDEX IF NOT EXISTS idx_businesses_infer_update_type ON businesses (infer_update_type);'
+CREATE_INDEX_INDUSTRY_TYPE = 'CREATE INDEX IF NOT EXISTS idx_businesses_industry_type ON businesses (industry_type);'
 CREATE_INDEX_LOGS_LEVEL = 'CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs (level);'
 CREATE_INDEX_LOGS_CREATED_AT = 'CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs (created_at);'
 
