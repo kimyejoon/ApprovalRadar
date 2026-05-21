@@ -232,49 +232,76 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 _save_poll_history(result)
                 return result
 
-            # ── Step 2: DB 중복 조회 최적화 (Batch SELECT) ──
-            existing_pairs = set()
+            # ── Step 2: 이미 오늘 변경건이 DB에 있는 LCNS 조회 (Batch SELECT) ──
+            today_lcns_in_db: set[str] = set()
             lcns_list = [
                 item["LCNS_NO"] for item in all_items if item.get("LCNS_NO")
             ]
             if lcns_list:
-                # 900개씩 chunking (SQLite 파라미터 개수 제한 999개 대비)
                 CHUNK_SIZE = 900
                 with get_db() as conn:
                     for i in range(0, len(lcns_list), CHUNK_SIZE):
                         batch = lcns_list[i : i + CHUNK_SIZE]
                         ph = ",".join(["?"] * len(batch))
-                        rows = conn.execute(
-                            f"SELECT license_no, last_event_date FROM businesses "
-                            f"WHERE license_no IN ({ph})",
-                            batch
+                        rows_db = conn.execute(
+                            f"SELECT license_no FROM businesses "
+                            f"WHERE license_no IN ({ph}) AND last_event_date = ?",
+                            batch + [target_date]
                         ).fetchall()
-                        for row in rows:
-                            existing_pairs.add((row["license_no"], row["last_event_date"]))
+                        for row in rows_db:
+                            today_lcns_in_db.add(row["license_no"])
 
-            # ── Step 3: 오늘 이미 검사 완료된 건 및 기존 수집된 건 필터 ──
-            date_hyphen = f"{target_date[:4]}-{target_date[4:6]}-{target_date[6:8]}"
-            processed_lcns_today = set()
-            with get_db() as conn:
-                rows = conn.execute(
-                    "SELECT license_no FROM businesses WHERE updated_at LIKE ? OR created_at LIKE ?",
-                    (f"{date_hyphen}%", f"{date_hyphen}%")
-                ).fetchall()
-                processed_lcns_today = {r["license_no"] for r in rows}
+            logger.info(
+                f"[CHNG_DT Poller] DB 필터: "
+                f"전체 {len(all_items):,}건 중 금일 이미 수집된 LCNS {len(today_lcns_in_db):,}건 제외 예정"
+            )
 
+            # ── Step 3: 후보군 필터링 ──
+            #   제외 조건:
+            #     (A) PRMS_DT == target_date → 신규등록 건 (변경이 아님)
+            #     (B) 이미 DB에 last_event_date=target_date 레코드 존재 → 이미 수집됨
+            #     (C) 동일 LCNS_NO 중복 (I2500 같은 페이지 내 중복)
+            #   포함 조건:
+            #     DB에 전혀 없는 건 → 단순 동기화라도 INSERT 필요
             new_items = []
+            seen_lcns_in_cycle: set[str] = set()
+            skip_new_reg = 0
+            skip_already_today = 0
+            skip_dedup = 0
+
             for item in all_items:
                 lcns = item.get("LCNS_NO", "")
                 if not lcns:
                     continue
-                if lcns in processed_lcns_today:
+
+                # (A) 신규등록 건 제외 (PRMS_DT == target_date)
+                prms_dt = item.get("PRMS_DT") or ""
+                if prms_dt == target_date:
+                    skip_new_reg += 1
                     continue
-                pair = (lcns, target_date)
-                if pair not in existing_pairs:
-                    new_items.append(item)
-                    existing_pairs.add(pair)
+
+                # (B) 이미 금일 변경건이 DB에 있는 경우 제외
+                if lcns in today_lcns_in_db:
+                    skip_already_today += 1
+                    continue
+
+                # (C) 동일 폴링 사이클 내 중복 LCNS 제거 (I2861 검증은 1회로 충분)
+                if lcns in seen_lcns_in_cycle:
+                    skip_dedup += 1
+                    continue
+                seen_lcns_in_cycle.add(lcns)
+
+                new_items.append(item)
 
             result["skipped"] = len(all_items) - len(new_items)
+
+            logger.info(
+                f"[CHNG_DT Poller] 필터 결과: "
+                f"신규등록 스킵 {skip_new_reg:,}건 | "
+                f"금일 이미수집 스킵 {skip_already_today:,}건 | "
+                f"중복 스킵 {skip_dedup:,}건 | "
+                f"I2861 검증 대상 {len(new_items):,}건"
+            )
 
             if not new_items:
                 logger.info(
