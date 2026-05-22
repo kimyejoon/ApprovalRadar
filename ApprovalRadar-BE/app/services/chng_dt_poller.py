@@ -80,7 +80,10 @@ FIELD_MAP = {
 }
 
 
-async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: str, item_i2500: dict) -> list[dict]:
+async def _verify_actual_change(
+    api_client: ApiClient, lcns: str, target_date: str, item_i2500: dict,
+    prog: str = ""
+) -> list[dict]:
     """
     I2861 단건 조회를 날려 진짜 변경 정보와 허수를 구분합니다.
     """
@@ -117,7 +120,7 @@ async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: s
             api_client.key_manager.api_keys[api_client.key_manager.current_key_idx]
         )
         logger.info(
-            f"[CHNG_DT Poller | {_mk}] 🟢 {lcns} ({item_i2500.get('BSSH_NM', '')}) "
+            f"[CHNG_DT Poller | {_mk}] {prog} 🟢 {lcns} ({item_i2500.get('BSSH_NM', '')}) "
             f"최근 변경 {len(recent_rows)}건 감지 "
             f"(최신: {max(r.get('CHNG_DT','') for r in recent_rows)}, 사유: {recent_rows[0].get('CHNG_PRVNS')})"
         )
@@ -148,7 +151,7 @@ async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: s
             # (INSERT OR IGNORE로 중복 방지, SSE는 발행 안 함)
             actual_date = max((r.get("CHNG_DT") or "") for r in rows)
             logger.info(
-                f"[CHNG_DT Poller | {_mk}] ⚪ {lcns} ({item_i2500.get('BSSH_NM', '')}) "
+                f"[CHNG_DT Poller | {_mk}] {prog} ⚪ {lcns} ({item_i2500.get('BSSH_NM', '')}) "
                 f"과거 변경 이력 감지 (최신: {actual_date}) — 과거 날짜로 DB 저장"
             )
             mapped = []
@@ -172,7 +175,7 @@ async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: s
         else:
             # ⚫ 진짜 허수: I2861 이력이 아예 없음 → DB 저장 불가, 캐시만 등록
             logger.info(
-                f"[CHNG_DT Poller | {_mk}] ⚫ {lcns} ({item_i2500.get('BSSH_NM', '')}) "
+                f"[CHNG_DT Poller | {_mk}] {prog} ⚫ {lcns} ({item_i2500.get('BSSH_NM', '')}) "
                 f"I2861 이력 없음 (신규등록 전 DB 동기화) — DB 저장 제외"
             )
             return [{"LCNS_NO": lcns, "CHNG_DT": None, "CHNG_PRVNS": "초기자료등록"}]
@@ -417,17 +420,21 @@ async def poll_changes_for_date(target_date: str) -> dict:
             semaphore = pool.semaphore
             from scraper import run_scraper_for_service_with_rows
 
+            total_items   = len(new_items)
             today_str_poll = datetime.datetime.now().strftime("%Y%m%d")
             pending_past_rows: list[dict] = []   # 과거 날짜 데이터 배치 큐
             sync_lcns_this_round: list[str] = []
             real_today_count: int = 0            # 즉시 삽입된 오늘 변경건 수
+            done_count: int = 0                  # 검증 완료 건수 (진행률용)
 
             async def verify_and_insert_task(item, worker_idx: int):
-                nonlocal real_today_count
+                nonlocal real_today_count, done_count
                 async with semaphore:
                     lcns = item.get("LCNS_NO", "")
                     verify_client = pool.get_client(worker_idx)
-                    r_list = await _verify_actual_change(verify_client, lcns, target_date, item)
+                    done_count += 1
+                    prog = f"[{done_count}/{total_items}]"
+                    r_list = await _verify_actual_change(verify_client, lcns, target_date, item, prog=prog)
 
                     if not r_list:
                         return
@@ -451,7 +458,7 @@ async def poll_changes_for_date(target_date: str) -> dict:
                         af_cn = today_rows[0].get("CHNG_AF_CN") or ""
                         detail = f" ({bf_cn} → {af_cn})" if (bf_cn or af_cn) else ""
                         logger.info(
-                            f"[CHNG_DT Poller] 🟢 즉시 삽입+SSE: {lcns} "
+                            f"[CHNG_DT Poller] {prog} 🟢 즉시 삽입+SSE: {lcns} "
                             f"({item.get('BSSH_NM', '')}) [{prvns}]{detail}"
                         )
                         # 즉시 삽입 후 today_lcns_in_db 갱신 → I2861 스캔과의 중복 방지
