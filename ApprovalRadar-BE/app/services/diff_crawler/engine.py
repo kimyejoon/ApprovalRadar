@@ -5,6 +5,7 @@ import json
 import datetime
 from app.core.config import settings
 from app.clients.foodsafety_api import ApiClient
+from app.clients.key_manager import KeyManager
 from app.repositories.state_repository import StateRepository
 from app.repositories.page_scan_repository import PageScanRepository
 from app.core.logger import logger
@@ -288,16 +289,25 @@ class DiffCrawlerEngine:
         )
 
         # ── 워커별 독립 ApiClient 생성 + 시작 키 오프셋 분산 ─────────────────────
-        # 문제: ApiClient()는 모두 _last_working_key_idx=0 에서 시작 → 같은 키 경합
-        # 해결: 워커 i를 n_keys//n_workers 간격으로 다른 키에서 시작시킴
+        # 소진된 키를 제외한 살아있는 키만 균등 배분 (소진 키에 워커 몰림 방지)
         worker_clients = [ApiClient() for _ in range(n_workers)]
         n_keys = len(settings.API_KEYS)
         if n_keys >= n_workers:
-            key_step = n_keys // n_workers
+            # 살아있는 키 인덱스만 추출 (헬스체크 결과 반영)
+            alive_indices = [
+                i for i, k in enumerate(settings.API_KEYS)
+                if k not in KeyManager._exhausted_keys
+            ]
+            base_indices = alive_indices if alive_indices else list(range(n_keys))
+            key_step = max(1, len(base_indices) // n_workers)
             for i, wc in enumerate(worker_clients):
-                wc.key_manager.current_key_idx = (i * key_step) % n_keys
-                masked = wc.key_manager._mask_key(wc.key_manager.api_keys[wc.key_manager.current_key_idx])
-                logger.info(f"[{svc}] 🔑 W{i+1} 시작 키: {masked} (key_idx={i * key_step})")
+                assigned_idx = base_indices[(i * key_step) % len(base_indices)]
+                wc.key_manager.current_key_idx = assigned_idx
+                masked = wc.key_manager._mask_key(wc.key_manager.api_keys[assigned_idx])
+                logger.info(
+                    f"[{svc}] 🔑 W{i+1} 시작 키: {masked} "
+                    f"(key_idx={assigned_idx}, 살아있는 키 {len(base_indices)}/{n_keys}개 중)"
+                )
 
         async def _scan_one(page: int, worker_id: int, is_retry: bool = False) -> None:
             nonlocal cycle_api_calls
