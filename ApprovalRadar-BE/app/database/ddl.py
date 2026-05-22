@@ -324,8 +324,10 @@ CREATE_PAGE_SCAN_HISTORY_TABLE = '''
         first_lcns      TEXT,    -- 해당 페이지 첫 번째 레코드의 LCNS_NO (경계 변화 감지용)
         last_lcns       TEXT,    -- 해당 페이지 마지막 레코드의 LCNS_NO (경계 변화 감지용)
         PRIMARY KEY (service_id, page_number)
-    );
+    )
+'''
 
+CREATE_API_HEALTH_LOG_TABLE = '''
     CREATE TABLE IF NOT EXISTS api_health_log (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         recorded_at     TEXT    NOT NULL,           -- ISO8601 타임스탬프
