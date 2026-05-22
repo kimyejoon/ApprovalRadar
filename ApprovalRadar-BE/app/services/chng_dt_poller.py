@@ -112,8 +112,11 @@ async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: s
     recent_rows = [r for r in rows if (r.get("CHNG_DT") or "") >= cutoff_date]
 
     if recent_rows:
+        _mk = api_client.key_manager._mask_key(
+            api_client.key_manager.api_keys[api_client.key_manager.current_key_idx]
+        )
         logger.info(
-            f"[CHNG_DT Poller] 🟢 {lcns} ({item_i2500.get('BSSH_NM', '')}) "
+            f"[CHNG_DT Poller | {_mk}] 🟢 {lcns} ({item_i2500.get('BSSH_NM', '')}) "
             f"최근 변경 {len(recent_rows)}건 감지 "
             f"(최신: {max(r.get('CHNG_DT','') for r in recent_rows)}, 사유: {recent_rows[0].get('CHNG_PRVNS')})"
         )
@@ -150,7 +153,10 @@ async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: s
         if not actual_date:
             actual_date = "19700101"
             
-        logger.info(f"[CHNG_DT Poller] ⚪ {lcns} ({item_i2500.get('BSSH_NM', '')}) 단순 동기화 건 감지 (실제최종일자: {actual_date}) — DB 저장 제외")
+        _mk = api_client.key_manager._mask_key(
+            api_client.key_manager.api_keys[api_client.key_manager.current_key_idx]
+        )
+        logger.info(f"[CHNG_DT Poller | {_mk}] ⚪ {lcns} ({item_i2500.get('BSSH_NM', '')}) 단순 동기화 건 감지 (실제최종일자: {actual_date}) — DB 저장 제외")
         # CHNG_PRVNS 마커를 보존해 호출부에서 is_sync 판별 + 캐시 등록 가능하게 함
         # (빈 리스트 반환 시 verify_and_insert_task가 즉시 return → sync 캐시 미등록 → 무한 재검증)
         return [{
@@ -252,8 +258,11 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 else:
                     consecutive_empty = 0  # 데이터 있으면 카운터 리셋
                     all_items.extend(rows)
+                    _mk = api_client.key_manager._mask_key(
+                        api_client.key_manager.api_keys[api_client.key_manager.current_key_idx]
+                    )
                     logger.info(
-                        f"[전략C] 폴링 P{page}/{MAX_PAGES} ✔ | "
+                        f"[전략C | {_mk}] 폴링 P{page}/{MAX_PAGES} ✔ | "
                         f"이번 페이지 {len(rows):,}건 | "
                         f"누적 {len(all_items):,}건 | "
                         f"소요 {page_elapsed}초"
