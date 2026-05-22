@@ -452,8 +452,11 @@ class DiffCrawlerEngine:
                     yest_new  = page_stats["yesterday"]
                     today_log = f"{today_ip}건" + (f"(+{today_new}신규)" if today_new else "")
                     yest_log  = f"{yest_ip}건" + (f"(+{yest_new}신규)" if yest_new else "")
+                    # 현재 워커가 사용 중인 키 마스킹
+                    _cur_key = client.key_manager.api_keys[client.key_manager.current_key_idx]
+                    _cur_masked = client.key_manager._mask_key(_cur_key)
                     logger.info(
-                        f"[{svc}] W{worker_id} ✅ P{page}/{total_pages} [{captured_label_log}] 완료 | "
+                        f"[{svc} | {_cur_masked}] W{worker_id} ✅ P{page}/{total_pages} [{captured_label_log}] 완료 | "
                         f"조회 {row_count:,}건 | "
                         f"오늘 {today_log} · 어제 {yest_log} · "
                         f"신규 {page_stats['new_indexed']}건 · 중복 {page_stats['skipped_dup']}건 | "
