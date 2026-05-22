@@ -25,6 +25,11 @@ SERVICE_ID = "I2500"
 PAGE_SIZE = 1000
 POLL_INTERVAL_MINUTES = 5
 
+# 당일 단순 동기화로 확인된 업소 캐시 (재기동 시 초기화, 날짜 바뀌면 자동 리셋)
+# 목적: 첫 폴링에서 검증 완료된 단순 동기화 업소를 이후 사이클에서 즉시 스킵
+_sync_cache_date: str = ""
+_sync_cache_lcns: set[str] = set()
+
 # I2500 → businesses 테이블 필드 매핑
 FIELD_MAP = {
     "LCNS_NO": "license_no",
@@ -232,9 +237,15 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 _save_poll_history(result)
                 return result
 
+            # 주: 단순 동기화 캐시 날짜 확인 / 다른 날짜면 리셋
+            global _sync_cache_date, _sync_cache_lcns
+            if _sync_cache_date != target_date:
+                _sync_cache_date = target_date
+                _sync_cache_lcns = set()
+                logger.debug(f"[CHNG_DT Poller] 단순동기화 캐시 리셋: {target_date}")
+
             # ── Step 2: 이미 오늘 변경건이 DB에 있는 LCNS 조회 (Batch SELECT) ──
             today_lcns_in_db: set[str] = set()
-            existing_lcns_in_db: set[str] = set()  # 어떤 날짜든 DB에 있는 LCNS
             lcns_list = [
                 item["LCNS_NO"] for item in all_items if item.get("LCNS_NO")
             ]
@@ -244,7 +255,6 @@ async def poll_changes_for_date(target_date: str) -> dict:
                     for i in range(0, len(lcns_list), CHUNK_SIZE):
                         batch = lcns_list[i : i + CHUNK_SIZE]
                         ph = ",".join(["?"] * len(batch))
-                        # 오늘자 레코드가 있는 LCNS (이미 오늘 수집됨)
                         rows_db = conn.execute(
                             f"SELECT license_no FROM businesses "
                             f"WHERE license_no IN ({ph}) AND last_event_date = ?",
@@ -253,21 +263,10 @@ async def poll_changes_for_date(target_date: str) -> dict:
                         for row in rows_db:
                             today_lcns_in_db.add(row["license_no"])
 
-                        # 어떤 날짜든 DB에 있는 LCNS (기존 추적 중인 업소)
-                        rows_any = conn.execute(
-                            f"SELECT DISTINCT license_no FROM businesses "
-                            f"WHERE license_no IN ({ph})",
-                            batch
-                        ).fetchall()
-                        for row in rows_any:
-                            existing_lcns_in_db.add(row["license_no"])
-
             logger.info(
                 f"[CHNG_DT Poller] DB 필터: "
-                f"전체 {len(all_items):,}건 | "
-                f"금일 이미수집 {len(today_lcns_in_db):,}건 | "
-                f"기존 DB 업소 {len(existing_lcns_in_db):,}건 (Rolling Scan 위임) | "
-                f"신규 후보 예상 {len(all_items) - len(existing_lcns_in_db):,}건"
+                f"전체 {len(all_items):,}건 | 금일 이미수집 {len(today_lcns_in_db):,}건 | "
+                f"단순동기화 캐시 {len(_sync_cache_lcns):,}건"
             )
 
             # ── Step 3: 후보군 필터링 ──
@@ -275,14 +274,13 @@ async def poll_changes_for_date(target_date: str) -> dict:
             #     (A) PRMS_DT == target_date → 신규등록 건 (변경이 아님)
             #     (B) 이미 DB에 last_event_date=target_date 레코드 존재 → 이미 수집됨
             #     (C) 동일 LCNS_NO 중복 (I2500 같은 페이지 내 중복)
-            #     (D) 이미 DB에 있는 업소(어떤 날짜든) → Rolling Scan이 변경 담당
-            #         (CHNG_DT Poller는 DB에 없는 신규 업소 실시간 포착에 집중)
+            #     (D) 단순 동기화 캐시에 있는 업소 → 이미 당일 검증 완료, 변경없음 확인됨
             new_items = []
             seen_lcns_in_cycle: set[str] = set()
             skip_new_reg = 0
             skip_already_today = 0
             skip_dedup = 0
-            skip_existing_db = 0
+            skip_sync_cache = 0
 
             for item in all_items:
                 lcns = item.get("LCNS_NO", "")
@@ -300,10 +298,11 @@ async def poll_changes_for_date(target_date: str) -> dict:
                     skip_already_today += 1
                     continue
 
-                # (D) 이미 DB에 존재하는 업소 → Rolling Scan이 오늘 변경건 담당
-                #     CHNG_DT Poller는 DB에 없는 신규 업소 포착에 집중
-                if lcns in existing_lcns_in_db:
-                    skip_existing_db += 1
+                # (D) 단순 동기화 이미 확인됨 (in-memory 캐시) → 스킵
+                #     첫 폴링에서 I2861 검증 후 단순동기화로 판명된 업소는
+                #     이후 폴링에서 자동 스킵 (구소 폴링가속화)
+                if lcns in _sync_cache_lcns:
+                    skip_sync_cache += 1
                     continue
 
                 # (C) 동일 폴링 사이클 내 중복 LCNS 제거 (I2861 검증은 1회로 충분)
@@ -320,9 +319,9 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 f"[CHNG_DT Poller] 필터 결과: "
                 f"신규등록 스킵 {skip_new_reg:,}건 | "
                 f"금일 이미수집 스킵 {skip_already_today:,}건 | "
-                f"기존DB 위임 스킵 {skip_existing_db:,}건 | "
+                f"동기화캐시 스킵 {skip_sync_cache:,}건 | "
                 f"중복 스킵 {skip_dedup:,}건 | "
-                f"I2861 검증 대상(신규 업소) {len(new_items):,}건"
+                f"I2861 검증 대상 {len(new_items):,}건"
             )
 
             if not new_items:
@@ -347,8 +346,21 @@ async def poll_changes_for_date(target_date: str) -> dict:
             task_results = await asyncio.gather(*tasks)
             
             mapped_rows = []
-            for r_list in task_results:
+            sync_lcns_this_round: list[str] = []
+            for item, r_list in zip(new_items, task_results):
                 mapped_rows.extend(r_list)
+                # 단순 동기화 판명된 업소 → 캐시에 저장 (이후 폴링 스킵)
+                if r_list and r_list[0].get("CHNG_PRVNS") in ("\uc2dc\uc2a4\ud15c\ub3d9\uae30\ud654(\uacfc\uac70\uc774\ub825)", "\ucd08\uae30\uc790\ub8cc\ub4f1\ub85d"):
+                    lcns_key = item.get("LCNS_NO", "")
+                    if lcns_key:
+                        sync_lcns_this_round.append(lcns_key)
+
+            if sync_lcns_this_round:
+                _sync_cache_lcns.update(sync_lcns_this_round)
+                logger.info(
+                    f"[CHNG_DT Poller] 폴링 캐시: 단순동기화 {len(sync_lcns_this_round):,}건 추가 → 누적 {len(_sync_cache_lcns):,}건 "
+                    f"(다음 사이클에서 자동 스킵)"
+                )
 
             logger.info(
                 f"[CHNG_DT Poller] 🆕 {target_date}: "
