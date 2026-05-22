@@ -56,7 +56,20 @@ async def stream_updates(request: Request):
                     yield f"data: {msg}\n\n"
                 except asyncio.TimeoutError:
                     # 5초 동안 들어온 메시지가 없으면 Ping(Heartbeat) 발송
-                    ping_data = json.dumps({"type": "PING", "message": "현재 정상 연결중임 (보낼 업데이트 없음)"}, ensure_ascii=False)
+                    # api_health 상태도 함께 실어 보내 프론트가 별도 폴링 없이 수신
+                    try:
+                        from app.services.api_health_tracker import health_tracker
+                        health_payload = health_tracker.get_status()
+                    except Exception:
+                        health_payload = None
+                    ping_data = json.dumps(
+                        {
+                            "type": "PING",
+                            "message": "현재 정상 연결중임 (보낼 업데이트 없음)",
+                            "api_health": health_payload,
+                        },
+                        ensure_ascii=False,
+                    )
                     yield f"data: {ping_data}\n\n"
         except asyncio.CancelledError:
             # 클라이언트 연결 종료 시

@@ -46,6 +46,7 @@ def init_db():
     cursor.execute(ddl.CREATE_API_KEY_USAGE_BY_SERVICE_TABLE)
     cursor.execute(ddl.CREATE_PAGE_SCAN_HISTORY_TABLE)
     cursor.execute(ddl.CREATE_API_HEALTH_LOG_TABLE)
+    cursor.execute(ddl.CREATE_CHNG_DT_SYNC_VERIFIED_TABLE)
 
     conn.commit()
     conn.close()

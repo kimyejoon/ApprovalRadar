@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '@/store/useToastStore';
+import { useApiHealthStore } from '@/store/useApiHealthStore';
 import { useScanProgressStore } from '@/store/useScanProgressStore';
 import { playNotificationSound } from '@/lib/audio';
 import { fetchApprovals } from '@/lib/api';
@@ -23,6 +24,8 @@ const API_BASE_URL = envApiUrl !== undefined
 export function useSSE(sendNotification?: (opts: NotificationOptions) => void) {
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
+  const setHealth = useApiHealthStore((s) => s.setHealth);
+  const prevHealthStatus = useRef<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
 
@@ -130,6 +133,43 @@ export function useSSE(sendNotification?: (opts: NotificationOptions) => void) {
       eventSource.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
+
+          // PING에 포함된 api_health 처리 (5초마다 자동 갱신)
+          if (data.api_health && data.api_health.status) {
+            const h = data.api_health;
+            const newStatus = h.status;
+            setHealth(h);
+
+            // 상태 변경 시 토스트 알림
+            if (prevHealthStatus.current !== null && prevHealthStatus.current !== newStatus) {
+              const STATUS_LABEL: Record<string, string> = {
+                NORMAL: '정상', SLOW: '느림', DEGRADED: '저하', UNSTABLE: '불안정',
+              };
+              const STATUS_TOAST_TYPE: Record<string, 'success' | 'warning' | 'error'> = {
+                NORMAL: 'success', SLOW: 'warning', DEGRADED: 'warning', UNSTABLE: 'error',
+              };
+              const STATUS_DESC: Record<string, string> = {
+                NORMAL: '식품안전나라 API 서버가 정상 응답 중입니다.',
+                SLOW: '응답이 다소 느립니다. 데이터 수집 속도가 저하될 수 있습니다.',
+                DEGRADED: '다수의 타임아웃이 감지됐습니다. 수집 지연이 발생 중입니다.',
+                UNSTABLE: 'API 서버가 불안정합니다. WAF 차단 또는 최대 재시도 초과 발생.',
+              };
+              addToast({
+                title: `외부 API 서버 상태: ${STATUS_LABEL[newStatus] ?? newStatus}`,
+                description: STATUS_DESC[newStatus] ?? '',
+                type: STATUS_TOAST_TYPE[newStatus] ?? 'info',
+                duration: 8000,
+                metadata: h.metrics ? [
+                  { label: '평균 응답', value: `${h.metrics.avg_response_ms.toLocaleString()}ms` },
+                  { label: '타임아웃',  value: `${h.metrics.timeout_count}건` },
+                  { label: '성공률',    value: `${h.metrics.success_rate}%` },
+                  { label: 'WAF 차단',  value: `${h.metrics.waf_block_count}건` },
+                ] : undefined,
+              });
+            }
+            prevHealthStatus.current = newStatus;
+          }
+
           if (data.type === 'UPDATE') {
             // 백엔드 SSE 페이로드에 count 포함 → N개 팝업 생성
             const count = typeof data.count === 'number' && data.count > 0 ? data.count : 1;
@@ -156,7 +196,6 @@ export function useSSE(sendNotification?: (opts: NotificationOptions) => void) {
           }
         }
       };
-
 
       eventSource.onerror = () => {
         eventSource.close();

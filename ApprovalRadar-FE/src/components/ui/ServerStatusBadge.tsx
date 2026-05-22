@@ -1,37 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useToastStore } from '@/store/useToastStore';
-
-// ─── 타입 ─────────────────────────────────────────────────────────────────────
-
-type HealthStatus = 'NORMAL' | 'SLOW' | 'DEGRADED' | 'UNSTABLE' | 'UNKNOWN';
-
-interface HealthMetrics {
-  avg_response_ms: number;
-  timeout_count: number;
-  waf_block_count: number;
-  max_retry_count: number;
-  total_calls: number;
-  success_rate: number;
-}
-
-interface HealthData {
-  status: HealthStatus;
-  status_changed_at: string;
-  window_seconds: number;
-  metrics: HealthMetrics;
-}
+import { useApiHealthStore } from '@/store/useApiHealthStore';
 
 // ─── 상태별 시각 설정 ──────────────────────────────────────────────────────────
 
+type HealthStatus = 'NORMAL' | 'SLOW' | 'DEGRADED' | 'UNSTABLE' | 'UNKNOWN';
+
 const STATUS_CONFIG: Record<
   HealthStatus,
-  { label: string; dot: string; text: string; toast: 'success' | 'warning' | 'error' | 'info' }
+  { label: string; dot: string; text: string }
 > = {
-  NORMAL:   { label: '정상',   dot: 'bg-emerald-500', text: 'text-emerald-500', toast: 'success' },
-  SLOW:     { label: '느림',   dot: 'bg-yellow-400',  text: 'text-yellow-400',  toast: 'warning' },
-  DEGRADED: { label: '저하',   dot: 'bg-orange-500',  text: 'text-orange-500',  toast: 'warning' },
-  UNSTABLE: { label: '불안정', dot: 'bg-red-500',     text: 'text-red-500',     toast: 'error'   },
-  UNKNOWN:  { label: '확인중', dot: 'bg-gray-400',    text: 'text-gray-400',    toast: 'info'    },
+  NORMAL:   { label: '정상',   dot: 'bg-emerald-500', text: 'text-emerald-500' },
+  SLOW:     { label: '느림',   dot: 'bg-yellow-400',  text: 'text-yellow-400'  },
+  DEGRADED: { label: '저하',   dot: 'bg-orange-500',  text: 'text-orange-500'  },
+  UNSTABLE: { label: '불안정', dot: 'bg-red-500',     text: 'text-red-500'     },
+  UNKNOWN:  { label: '확인중', dot: 'bg-gray-400',    text: 'text-gray-400'    },
 };
 
 const STATUS_DESC: Record<HealthStatus, string> = {
@@ -39,55 +21,15 @@ const STATUS_DESC: Record<HealthStatus, string> = {
   SLOW:     '응답이 다소 느립니다. 데이터 수집 속도가 저하될 수 있습니다.',
   DEGRADED: '다수의 타임아웃이 감지됐습니다. 수집 지연이 발생 중입니다.',
   UNSTABLE: 'API 서버가 불안정합니다. WAF 차단 또는 최대 재시도 초과 발생.',
-  UNKNOWN:  '서버 상태를 확인하는 중입니다.',
+  UNKNOWN:  'SSE 연결 후 첫 PING을 기다리는 중입니다. (최대 5초)',
 };
-
-// ─── 폴링 간격 ────────────────────────────────────────────────────────────────
-const POLL_INTERVAL_MS = 30_000; // 30초
 
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 
 export function ServerStatusBadge() {
-  const [health, setHealth] = useState<HealthData | null>(null);
+  const { status, metrics, window_seconds, last_updated } = useApiHealthStore();
   const [isOpen, setIsOpen] = useState(false);
-  const prevStatus = useRef<HealthStatus | null>(null);
-  const addToast = useToastStore((s) => s.addToast);
   const popoverRef = useRef<HTMLDivElement>(null);
-
-  const fetchHealth = async () => {
-    try {
-      const res = await fetch('/health/api-health');
-      if (!res.ok) return;
-      const data: HealthData = await res.json();
-      setHealth(data);
-
-      // 상태가 변경되었을 때만 토스트
-      if (prevStatus.current !== null && prevStatus.current !== data.status) {
-        const cfg = STATUS_CONFIG[data.status] ?? STATUS_CONFIG.UNKNOWN;
-        addToast({
-          title: `외부 API 서버 상태: ${cfg.label}`,
-          description: STATUS_DESC[data.status],
-          type: cfg.toast,
-          duration: 8000,
-          metadata: [
-            { label: '평균 응답', value: `${data.metrics.avg_response_ms.toLocaleString()}ms` },
-            { label: '타임아웃',  value: `${data.metrics.timeout_count}건` },
-            { label: '성공률',    value: `${data.metrics.success_rate}%` },
-            { label: 'WAF 차단',  value: `${data.metrics.waf_block_count}건` },
-          ],
-        });
-      }
-      prevStatus.current = data.status;
-    } catch {
-      // 백엔드 미연결 시 무시
-    }
-  };
-
-  useEffect(() => {
-    fetchHealth();
-    const timer = setInterval(fetchHealth, POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, []);
 
   // 외부 클릭 시 팝오버 닫기
   useEffect(() => {
@@ -100,9 +42,7 @@ export function ServerStatusBadge() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const status: HealthStatus = health?.status ?? 'UNKNOWN';
-  const cfg = STATUS_CONFIG[status];
-  const metrics = health?.metrics;
+  const cfg = STATUS_CONFIG[status as HealthStatus] ?? STATUS_CONFIG.UNKNOWN;
 
   return (
     <div className="relative" ref={popoverRef}>
@@ -146,7 +86,7 @@ export function ServerStatusBadge() {
           {/* 설명 */}
           <div className="px-4 py-3 border-b border-border-standard">
             <p className="text-xs text-text-secondary leading-relaxed">
-              {STATUS_DESC[status]}
+              {STATUS_DESC[status as HealthStatus]}
             </p>
           </div>
 
@@ -165,7 +105,10 @@ export function ServerStatusBadge() {
           {/* 푸터 */}
           <div className="px-4 py-2.5 border-t border-border-standard bg-surface">
             <p className="text-[10px] text-text-muted">
-              최근 {health ? health.window_seconds / 60 : 5}분 기준 · 30초 주기 갱신
+              최근 {window_seconds / 60}분 기준 · SSE PING 5초 갱신
+              {last_updated && (
+                <> · 마지막: {new Date(last_updated).toLocaleTimeString('ko-KR')}</>
+              )}
             </p>
           </div>
         </div>

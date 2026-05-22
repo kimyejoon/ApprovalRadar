@@ -341,3 +341,12 @@ CREATE_API_HEALTH_LOG_TABLE = '''
         window_seconds  INTEGER NOT NULL DEFAULT 300    -- 집계 윈도우 (초)
     )
 '''
+
+CREATE_CHNG_DT_SYNC_VERIFIED_TABLE = '''
+    CREATE TABLE IF NOT EXISTS chng_dt_sync_verified (
+        target_date TEXT NOT NULL,   -- I2500 CHNG_DT 폴링 대상 날짜 (YYYYMMDD)
+        license_no  TEXT NOT NULL,   -- 단순동기화로 확인된 업소 LCNS_NO
+        verified_at TEXT NOT NULL,   -- 확인 시각 (ISO8601)
+        PRIMARY KEY (target_date, license_no)
+    )
+'''

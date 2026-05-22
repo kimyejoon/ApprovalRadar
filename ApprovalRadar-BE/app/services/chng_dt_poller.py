@@ -26,9 +26,39 @@ PAGE_SIZE = 1000
 POLL_INTERVAL_MINUTES = 5
 
 # 당일 단순 동기화로 확인된 업소 캐시 (재기동 시 초기화, 날짜 바뀌면 자동 리셋)
-# 목적: 첫 폴링에서 검증 완료된 단순 동기화 업소를 이후 사이클에서 즉시 스킵
+# DB 영속화로 부팅 시에도 유지됨
 _sync_cache_date: str = ""
 _sync_cache_lcns: set[str] = set()
+
+
+def _load_sync_cache_from_db(target_date: str) -> set:
+    """초기 폴링 시 DB에서 이미 검증된 단순동기화 업소를 로드."""
+    try:
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT license_no FROM chng_dt_sync_verified WHERE target_date = ?",
+                (target_date,)
+            ).fetchall()
+        return {r["license_no"] for r in rows}
+    except Exception:
+        return set()
+
+
+def _save_sync_cache_to_db(target_date: str, lcns_list: list) -> None:
+    """단순동기화 판명된 업소를 DB에 백업. 이미 있는 건 IGNORE."""
+    if not lcns_list:
+        return
+    now = datetime.datetime.now().isoformat()
+    try:
+        with get_db() as conn:
+            conn.executemany(
+                "INSERT OR IGNORE INTO chng_dt_sync_verified "
+                "(target_date, license_no, verified_at) VALUES (?, ?, ?)",
+                [(target_date, lcns, now) for lcns in lcns_list]
+            )
+            conn.commit()
+    except Exception as e:
+        logger.debug(f"[CHNG_DT Poller] sync_verified DB 저장 실패: {e}")
 
 # I2500 → businesses 테이블 필드 매핑
 FIELD_MAP = {
@@ -241,8 +271,12 @@ async def poll_changes_for_date(target_date: str) -> dict:
             global _sync_cache_date, _sync_cache_lcns
             if _sync_cache_date != target_date:
                 _sync_cache_date = target_date
-                _sync_cache_lcns = set()
-                logger.debug(f"[CHNG_DT Poller] 단순동기화 캐시 리셋: {target_date}")
+                # DB에서 이미 검증된 단순동기화 로드 (재기동 후에도 유지)
+                _sync_cache_lcns = _load_sync_cache_from_db(target_date)
+                logger.debug(
+                    f"[CHNG_DT Poller] 단순동기화 캐시 로드: {target_date} "
+                    f"DB {len(_sync_cache_lcns):,}건"
+                )
 
             # ── Step 2: 이미 오늘 변경건이 DB에 있는 LCNS 조회 (Batch SELECT) ──
             today_lcns_in_db: set[str] = set()
@@ -357,9 +391,11 @@ async def poll_changes_for_date(target_date: str) -> dict:
 
             if sync_lcns_this_round:
                 _sync_cache_lcns.update(sync_lcns_this_round)
+                # DB에도 영속저장 (재기동 후에도 스킵 보장)
+                _save_sync_cache_to_db(target_date, sync_lcns_this_round)
                 logger.info(
                     f"[CHNG_DT Poller] 폴링 캐시: 단순동기화 {len(sync_lcns_this_round):,}건 추가 → 누적 {len(_sync_cache_lcns):,}건 "
-                    f"(다음 사이클에서 자동 스킵)"
+                    f"(다음 사이클에서 자동 스킵, DB 영속화 완료)"
                 )
 
             logger.info(
