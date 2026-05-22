@@ -275,30 +275,40 @@ class DiffCrawlerEngine:
         page_elapsed_times: list[float] = []
 
         # ── 병렬 스캔 동기화 프리미티브 ─────────────────────────────────────
-        n_workers = settings.SCAN_WORKERS
-        semaphore   = asyncio.Semaphore(n_workers)   # 동시 워커 수 제한
-        db_lock     = asyncio.Lock()                  # SQLite 쓰기 직렬화
-        state_lock  = asyncio.Lock()                  # 공유 dict 보호
-        counter_lock = asyncio.Lock()                 # 카운터 원자적 갱신
-        retry_set: set[int] = set()                   # 1차 실패 페이지 → 2차 재처리
+        n_workers = settings.SCAN_WORKERS        # 초기값 (살아있는 키 수에 따라 아래에서 클램핑)
+        db_lock     = asyncio.Lock()              # SQLite 쓰기 직렬화
+        state_lock  = asyncio.Lock()              # 공유 dict 보호
+        counter_lock = asyncio.Lock()             # 카운터 원자적 갱신
+        retry_set: set[int] = set()               # 1차 실패 페이지 → 2차 재처리
         pages_total = len(target_pages)
+
+        # ── 워커별 독립 ApiClient 생성 + 시작 키 오프셋 분산 ─────────────────────
+        # 소진된 키를 제외한 살아있는 키만 균등 배분 (소진 키에 워커 몰림 방지)
+        n_keys = len(settings.API_KEYS)
+        # 살아있는 키 인덱스 추출 (헬스체크 결과 반영)
+        alive_indices = [
+            i for i, k in enumerate(settings.API_KEYS)
+            if k not in KeyManager._exhausted_keys
+        ]
+        base_indices = alive_indices if alive_indices else list(range(n_keys))
+
+        # 워커 수를 살아있는 키 수로 상한 제한 (같은 키에 워커 몰림 → WAF 차단 방지)
+        n_workers = min(n_workers, len(base_indices))
+        if n_workers < settings.SCAN_WORKERS:
+            logger.warning(
+                f"[{svc}] ⚠️ 살아있는 키 {len(base_indices)}개 → "
+                f"워커 수 {settings.SCAN_WORKERS} → {n_workers}으로 축소 (WAF 차단 방지)"
+            )
+
+        semaphore = asyncio.Semaphore(n_workers)
 
         logger.info(
             f"[{svc}] 🔀 병렬 스캔 시작 | 워커 수: {n_workers} | "
             f"대상: {pages_total}p"
         )
 
-        # ── 워커별 독립 ApiClient 생성 + 시작 키 오프셋 분산 ─────────────────────
-        # 소진된 키를 제외한 살아있는 키만 균등 배분 (소진 키에 워커 몰림 방지)
         worker_clients = [ApiClient() for _ in range(n_workers)]
-        n_keys = len(settings.API_KEYS)
-        if n_keys >= n_workers:
-            # 살아있는 키 인덱스만 추출 (헬스체크 결과 반영)
-            alive_indices = [
-                i for i, k in enumerate(settings.API_KEYS)
-                if k not in KeyManager._exhausted_keys
-            ]
-            base_indices = alive_indices if alive_indices else list(range(n_keys))
+        if n_keys >= n_workers and n_workers > 0:
             key_step = max(1, len(base_indices) // n_workers)
             for i, wc in enumerate(worker_clients):
                 assigned_idx = base_indices[(i * key_step) % len(base_indices)]
