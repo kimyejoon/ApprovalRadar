@@ -324,6 +324,18 @@ CREATE_PAGE_SCAN_HISTORY_TABLE = '''
         first_lcns      TEXT,    -- 해당 페이지 첫 번째 레코드의 LCNS_NO (경계 변화 감지용)
         last_lcns       TEXT,    -- 해당 페이지 마지막 레코드의 LCNS_NO (경계 변화 감지용)
         PRIMARY KEY (service_id, page_number)
+    );
+
+    CREATE TABLE IF NOT EXISTS api_health_log (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        recorded_at     TEXT    NOT NULL,           -- ISO8601 타임스탬프
+        status          TEXT    NOT NULL,           -- NORMAL / SLOW / DEGRADED / UNSTABLE
+        avg_response_ms INTEGER NOT NULL DEFAULT 0, -- 평균 응답시간 (ms)
+        timeout_count   INTEGER NOT NULL DEFAULT 0, -- 타임아웃 건수 (롤링 윈도우 내)
+        waf_block_count INTEGER NOT NULL DEFAULT 0, -- WAF 차단 건수
+        max_retry_count INTEGER NOT NULL DEFAULT 0, -- 최대재시도 초과 건수
+        total_calls     INTEGER NOT NULL DEFAULT 0, -- 전체 API 호출 수
+        success_rate    REAL    NOT NULL DEFAULT 100.0, -- 성공률 (%)
+        window_seconds  INTEGER NOT NULL DEFAULT 300    -- 집계 윈도우 (초)
     )
 '''
-

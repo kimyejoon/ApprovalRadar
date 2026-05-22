@@ -12,6 +12,7 @@ from app.core.events import shutdown_event
 from app.clients.key_manager import KeyManager, ApiKeysExhaustedError
 from app.clients.response_handler import ResponseHandler
 from app.clients.waf_strategy import WafStrategy
+from app.services.api_health_tracker import health_tracker
 
 class ApiClient:
     # 하위 호환성을 위한 클래스 메소드 래핑
@@ -72,9 +73,10 @@ class ApiClient:
         await self.key_manager.switch_key(current_key, self._renew_session)
 
     async def fetch_data(self, service_id: str, start_idx: int, end_idx: int, max_retries: int = 5, timeout: int = None, **kwargs) -> dict:
-        """timeout=None 이면 settings.API_FETCH_TIMEOUT_SECONDS (기본 200초) 적용."""
+        """timeout=None 이면 settings.API_FETCH_TIMEOUT_SECONDS (기본 300초) 적용."""
         if timeout is None:
             timeout = settings.API_FETCH_TIMEOUT_SECONDS
+        _req_start = time.time()  # 요청 시작 시각 (헬스 트래킹용)
         now_ts = time.time()
         if now_ts - self.key_manager._last_refresh_time > KeyManager._REFRESH_INTERVAL:
             self.key_manager.refresh_keys()
@@ -138,6 +140,8 @@ class ApiClient:
                                 continue
                             sem.release()
                             sem_acquired = False
+                            elapsed_ms = (time.time() - _req_start) * 1000
+                            health_tracker.record_success(elapsed_ms, service_id)
                             return result
 
                         if shutdown_event.is_set():
@@ -163,6 +167,7 @@ class ApiClient:
                             f"(WAF재시도 {waf_retries}/{WafStrategy._MAX_WAF_RETRIES}회) — "
                             f"attempt 카운트 유지 ({attempt}/{max_retries})"
                         )
+                        health_tracker.record_waf_block(service_id)
                         sem.release()
                         sem_acquired = False
                         await self.switch_key(api_key)
@@ -182,6 +187,7 @@ class ApiClient:
                 except httpx.TimeoutException:
                     ctx = f"서비스:{service_id}, 범위:{start_idx}~{end_idx}"
                     logger.warning(f"[읽기 타임아웃] {ctx} | 서버 응답 지연 ({timeout}초 초과). {backoff}초 후 재시도합니다.")
+                    health_tracker.record_timeout(service_id)
                     backoff = await WafStrategy.sleep_backoff(backoff)
                     attempt += 1
 
@@ -202,6 +208,7 @@ class ApiClient:
                     sem_acquired = False
 
         logger.error(f"❌ 최대 재시도 횟수({max_retries}) 초과. API 요청 완전 실패: {start_idx}~{end_idx}")
+        health_tracker.record_max_retry(service_id)
         raise Exception(f"식품나라 API 서버 통신 실패 (최대 재시도 초과): {start_idx}~{end_idx}")
 
     def get_total_call_count(self) -> int:
