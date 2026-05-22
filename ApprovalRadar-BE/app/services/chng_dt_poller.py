@@ -98,14 +98,20 @@ async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: s
     rows = []
     if res and service_i2861 in res:
         rows = res[service_i2861].get("row", [])
-        
-    # 오늘 자 변경행이 있는지 필터링
-    today_rows = [r for r in rows if r.get("CHNG_DT") == target_date]
-    
-    if today_rows:
-        logger.info(f"[CHNG_DT Poller] 🟢 {lcns} ({item_i2500.get('BSSH_NM', '')}) 진짜 오늘 변경 검증 성공 (사유: {today_rows[0].get('CHNG_PRVNS')})")
+
+    # ── 최근 5일 이내 변경건 감지 (앵커가 2일 전이어도 오늘 변경 포착) ──
+    # I2500 CHNG_DT는 >= 필터이므로 앵커 날짜에 오늘 실제 변경건이 포함됨
+    cutoff_date = (datetime.datetime.now() - datetime.timedelta(days=5)).strftime("%Y%m%d")
+    recent_rows = [r for r in rows if (r.get("CHNG_DT") or "") >= cutoff_date]
+
+    if recent_rows:
+        logger.info(
+            f"[CHNG_DT Poller] 🟢 {lcns} ({item_i2500.get('BSSH_NM', '')}) "
+            f"최근 변경 {len(recent_rows)}건 감지 "
+            f"(최신: {max(r.get('CHNG_DT','') for r in recent_rows)}, 사유: {recent_rows[0].get('CHNG_PRVNS')})"
+        )
         mapped = []
-        for r in today_rows:
+        for r in recent_rows:
             mapped.append({
                 "LCNS_NO": lcns,
                 "BSSH_NM": r.get("BSSH_NM") or item_i2500.get("BSSH_NM"),
@@ -115,7 +121,7 @@ async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: s
                 "PRMS_DT": item_i2500.get("PRMS_DT"),
                 "TELNO": r.get("TELNO") or item_i2500.get("TELNO"),
                 "INDUTY_CD_NM": r.get("INDUTY_CD_NM") or item_i2500.get("INDUTY_CD_NM"),
-                "CHNG_DT": target_date,
+                "CHNG_DT": r.get("CHNG_DT"),  # I2861 실제 날짜 그대로
                 "SITE_ADDR_RDN": r.get("SITE_ADDR") or item_i2500.get("ADDR"),
                 "CHNG_PRVNS": r.get("CHNG_PRVNS"),
                 "CHNG_BF_CN": r.get("CHNG_BF_CN"),
@@ -495,30 +501,28 @@ def _save_poll_history(result: dict):
 
 async def _run_poller_async():
     """
-    항상 어제 + 오늘 동시 폴링.
+    I2500 CHNG_DT 앵커 기준 폴링.
 
     근거:
-    - I2500 CHNG_DT <= 로직 확인: 어제 날짜로 조회해도 오늘 레코드 포함 가능
-    - 오늘 날짜 폴링이 업무시간 전이면 INFO-700 → 0건으로 무해하게 종료
-    - 시간 제한 없이 24시간 최대 커버리지 확보
+    - I2500 CHNG_DT 파라미터는 >= 필터로 동작함 (실험으로 확인)
+    - 오늘 날짜만 조회하면 I2861에서 오늘 변경이 확인되는 업소가 누락됨
+    - 앵커를 오늘-2일로 설정하면 최근 변경 전체를 포착
+    - _verify_actual_change에서 최근 5일 이내 I2861 기록을 감지하여
+      오늘 실제 변경건을 즉시 삽입 + SSE 발행
     """
     now = datetime.datetime.now()
+    anchor_date = (now - datetime.timedelta(days=2)).strftime("%Y%m%d")
     today_str = now.strftime("%Y%m%d")
-    yesterday_str = (now - datetime.timedelta(days=1)).strftime("%Y%m%d")
 
     logger.info(
-        f"[전략C] 🕐 어제({yesterday_str}) + 오늘({today_str}) 동시 폴링 시작"
+        f"[전략C] 🕐 앵커({anchor_date}) 기준 단일 폴링 시작 (오늘: {today_str})"
     )
 
-    # 어제 먼저 (자정 이후 즉시 포착)
-    yesterday_result = await poll_changes_for_date(yesterday_str)
-    # 오늘 (업무시간 전이면 0건, 업무시간 중이면 실시간 포착)
-    today_result = await poll_changes_for_date(today_str)
+    result = await poll_changes_for_date(anchor_date)
 
     logger.info(
         f"[전략C] 📊 결과: "
-        f"어제({yesterday_str}) API {yesterday_result['total']:,}건 → 신규 {yesterday_result['new']}건 | "
-        f"오늘({today_str}) API {today_result['total']:,}건 → 신규 {today_result['new']}건"
+        f"앵커({anchor_date}) API {result['total']:,}건 → 신규 {result['new']}건"
     )
 
 
