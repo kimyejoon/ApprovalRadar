@@ -150,22 +150,15 @@ async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: s
         if not actual_date:
             actual_date = "19700101"
             
-        logger.info(f"[CHNG_DT Poller] ⚪ {lcns} ({item_i2500.get('BSSH_NM', '')}) 단순 동기화 건 감지 (실제최종일자: {actual_date})")
+        logger.info(f"[CHNG_DT Poller] ⚪ {lcns} ({item_i2500.get('BSSH_NM', '')}) 단순 동기화 건 감지 (실제최종일자: {actual_date}) — DB 저장 제외")
+        # CHNG_PRVNS 마커를 보존해 호출부에서 is_sync 판별 + 캐시 등록 가능하게 함
+        # (빈 리스트 반환 시 verify_and_insert_task가 즉시 return → sync 캐시 미등록 → 무한 재검증)
         return [{
             "LCNS_NO": lcns,
-            "BSSH_NM": item_i2500.get("BSSH_NM"),
-            "SITE_ADDR": item_i2500.get("ADDR"),
-            "PRSDNT_NM": item_i2500.get("PRSDNT_NM"),
-            "BSN_STATE_NM": None,
-            "PRMS_DT": item_i2500.get("PRMS_DT"),
-            "TELNO": item_i2500.get("TELNO"),
-            "INDUTY_CD_NM": item_i2500.get("INDUTY_CD_NM"),
-            "CHNG_DT": actual_date, # 과거 날짜로 설정하여 DB에는 기록되나 오늘 자 실시간 알림에서 제외
-            "SITE_ADDR_RDN": item_i2500.get("ADDR"),
+            "CHNG_DT": actual_date,
             "CHNG_PRVNS": "초기자료등록" if not rows else "시스템동기화(과거이력)",
-            "CHNG_BF_CN": None,
-            "CHNG_AF_CN": None,
         }]
+
 
 
 async def poll_changes_for_date(target_date: str) -> dict:
@@ -440,8 +433,10 @@ async def poll_changes_for_date(target_date: str) -> dict:
                         # 즉시 삽입 후 today_lcns_in_db 갱신 → I2861 스캔과의 중복 방지
                         today_lcns_in_db.add(lcns)
 
-                    # ── 과거 날짜 데이터: 배치 큐에 적립 ───────────────────────────
-                    if past_rows:
+                    # ── 과거 날짜 데이터: 배치 큐에 적립 (단순동기화 제외) ─────────
+                    # ⚪ 단순동기화 건: I2500 CHNG_DT가 찍혔어도 실제 변경이 아니므로
+                    # DB 저장 자체를 차단 → 캐시 등록만 수행
+                    if past_rows and not is_sync:
                         pending_past_rows.extend(past_rows)
 
                     # 단순동기화 캐시에 추가
