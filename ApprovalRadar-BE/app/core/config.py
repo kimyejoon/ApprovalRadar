@@ -73,7 +73,7 @@ class Settings:
  
         # 2차 fallback: env에서 로드 (DB 키가 없을 때)
         if not self.API_KEYS:
-            for i in range(1, 51):  # 최대 50개 키 지원 (env fallback)
+            for i in range(1, 101):  # 최대 100개 키 지원 (env fallback)
                 key = os.getenv(f"FOOD_SAFETY_API_KEY_{i}")
                 if key:
                     self.API_KEYS.append(key)
