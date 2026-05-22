@@ -100,8 +100,13 @@ async def lifespan(app: FastAPI):
         signal.signal(signal.SIGTERM, _handle_sigint)
     
     # 시작 시 API 키 실제 만료 여부 병렬 검증 (--check-keys)
-    # DB 기록과 무관하게 실제 API 호출로 확인 → 소진 키 자동 등록/복구
+    # init_db()에서 .env 키 자동 마이그레이션 후 DB 재로드 필수
+    # (settings.API_KEYS가 기동 초기 캐시 상태이므로 강제 갱신)
+    from app.core.config import settings as _settings
     from app.clients.key_manager import KeyManager
+    KeyManager._db_loaded = False   # DB 재로드 강제 트리거
+    _settings._load_api_keys()      # 마이그레이션된 57개 키 반영
+    logger.info(f"[🔑 키 로드] settings.API_KEYS 갱신 완료: {len(_settings.API_KEYS)}개")
     await KeyManager.startup_key_health_check()
 
     start_scheduler()
