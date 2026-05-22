@@ -11,7 +11,7 @@ business_repo = BusinessRepository()
 raw_repo = RawDataRepository()
 detector = ChangeDetector()
 
-def persist_single_crawl(service_id: str, new_data_rows: list) -> tuple[int, int]:
+def persist_single_crawl(service_id: str, new_data_rows: list, collected_by: str = "rolling_scan") -> tuple[int, int]:
     """
     단건 크롤링 결과를 순차적으로 분석하여 DB에 반영합니다.
     - 기존 데이터와 델타(변동) 비교 수행
@@ -67,7 +67,7 @@ def persist_single_crawl(service_id: str, new_data_rows: list) -> tuple[int, int
                     "change_reason": fields.get("change_reason"),
                     "change_before": fields.get("change_before"),
                     "change_after": fields.get("change_after"),
-                    "collected_by": "rolling_scan",
+                    "collected_by": collected_by,
                 }
                 business_repo.insert_business(record, conn=conn)
                 raw_repo.insert_raw_data(lcns_no, json.dumps(row, ensure_ascii=False), now, conn=conn)
