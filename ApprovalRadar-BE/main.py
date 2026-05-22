@@ -99,6 +99,11 @@ async def lifespan(app: FastAPI):
         signal.signal(signal.SIGINT, _handle_sigint)
         signal.signal(signal.SIGTERM, _handle_sigint)
     
+    # 시작 시 API 키 실제 만료 여부 병렬 검증 (--check-keys)
+    # DB 기록과 무관하게 실제 API 호출로 확인 → 소진 키 자동 등록/복구
+    from app.clients.key_manager import KeyManager
+    await KeyManager.startup_key_health_check()
+
     start_scheduler()
     
     yield

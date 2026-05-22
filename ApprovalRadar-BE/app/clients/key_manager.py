@@ -259,3 +259,87 @@ class KeyManager:
                 logger.info(f"Key {idx+1} ({masked_key}): {status}")
                 await asyncio.sleep(0.5)
         logger.info("--- 점검 완료 ---\n")
+
+    @classmethod
+    async def startup_key_health_check(cls, service_id: str = "I2859") -> dict:
+        """
+        서버 시작 시 모든 키의 실제 만료 여부를 병렬로 검증합니다.
+
+        - DB 기록/오늘자 사용량과 무관하게 실제 API 호출로 확인
+        - 소진 키 → exhausted_keys 등록 + DB 기록
+        - 어제 소진됐다가 오늘 복구된 키 → 자동 해제
+        - 전체 병렬 처리 (timeout 7s), 오류 시 정상으로 간주 (오탐 방지)
+
+        Returns:
+            {"alive": int, "exhausted": int, "unknown": int, "total": int}
+        """
+        import asyncio as _asyncio
+        today = datetime.date.today().isoformat()
+        keys = settings.API_KEYS[:]
+        if not keys:
+            logger.warning("[🔑 키 헬스체크] 등록된 키 없음 — 스킵")
+            return {"alive": 0, "exhausted": 0, "unknown": 0, "total": 0}
+
+        logger.info(f"[🔑 키 헬스체크] 시작: {len(keys)}개 키 실시간 병렬 검증 중...")
+
+        alive_keys: list[str] = []
+        exhausted_keys: list[str] = []
+        unknown_keys: list[str] = []
+
+        async def _check_one(client: httpx.AsyncClient, key: str) -> tuple[str, str]:
+            """단일 키 헬스체크. 반환: (key, "alive" | "exhausted" | "unknown")"""
+            url = f"{settings.BASE_URL}/{key}/{service_id}/{settings.DATA_TYPE}/1/1"
+            try:
+                resp = await client.get(url, timeout=7)
+                data = resp.json()
+                if service_id in data:
+                    code = data[service_id]["RESULT"]["CODE"]
+                    msg  = data[service_id]["RESULT"].get("MSG", "")
+                    if code in ("INFO-300", "INFO-333") or "유효 호출건수" in msg:
+                        return key, "exhausted"
+                    else:
+                        return key, "alive"
+                return key, "unknown"
+            except Exception:
+                # 통신 오류는 정상으로 간주 (오탐 방지)
+                return key, "alive"
+
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            tasks = [_check_one(client, k) for k in keys]
+            outcomes = await _asyncio.gather(*tasks)
+
+        # 결과 반영
+        with cls._class_lock:
+            for key, status in outcomes:
+                masked = cls._mask_key(key)
+                if status == "exhausted":
+                    cls._exhausted_keys.add(key)
+                    key_usage_repo.mark_exhausted(masked, today)
+                    exhausted_keys.append(masked)
+                elif status == "alive":
+                    # 어제 소진 기록이 있던 키라면 복구 (자정 경과)
+                    if key in cls._exhausted_keys:
+                        cls._exhausted_keys.discard(key)
+                        key_usage_repo.reset(masked, today)
+                    alive_keys.append(masked)
+                else:
+                    unknown_keys.append(masked)
+
+        logger.info(
+            f"[🔑 키 헬스체크] 완료: "
+            f"정상 {len(alive_keys)}개 ✅ | "
+            f"소진 {len(exhausted_keys)}개 ❌ | "
+            f"확인불가 {len(unknown_keys)}개 ❓ "
+            f"(총 {len(keys)}개)"
+        )
+        if exhausted_keys:
+            logger.warning(f"[🔑 키 헬스체크] 소진된 키: {', '.join(exhausted_keys)}")
+        if len(alive_keys) == 0:
+            logger.error("[🔑 키 헬스체크] ⚠️ 모든 키 소진 — 크롤링 불가 상태!")
+
+        return {
+            "alive":     len(alive_keys),
+            "exhausted": len(exhausted_keys),
+            "unknown":   len(unknown_keys),
+            "total":     len(keys),
+        }
