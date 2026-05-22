@@ -5,7 +5,7 @@ import json
 import datetime
 from app.core.config import settings
 from app.clients.foodsafety_api import ApiClient
-from app.clients.key_manager import KeyManager
+from app.clients.worker_pool import ApiWorkerPool
 from app.repositories.state_repository import StateRepository
 from app.repositories.page_scan_repository import PageScanRepository
 from app.core.logger import logger
@@ -275,49 +275,17 @@ class DiffCrawlerEngine:
         page_elapsed_times: list[float] = []
 
         # ── 병렬 스캔 동기화 프리미티브 ─────────────────────────────────────
-        n_workers = settings.SCAN_WORKERS        # 초기값 (살아있는 키 수에 따라 아래에서 클램핑)
-        db_lock     = asyncio.Lock()              # SQLite 쓰기 직렬화
-        state_lock  = asyncio.Lock()              # 공유 dict 보호
+        db_lock      = asyncio.Lock()             # SQLite 쓰기 직렬화
+        state_lock   = asyncio.Lock()             # 공유 dict 보호
         counter_lock = asyncio.Lock()             # 카운터 원자적 갱신
         retry_set: set[int] = set()               # 1차 실패 페이지 → 2차 재처리
         pages_total = len(target_pages)
 
-        # ── 워커별 독립 ApiClient 생성 + 시작 키 오프셋 분산 ─────────────────────
-        # 소진된 키를 제외한 살아있는 키만 균등 배분 (소진 키에 워커 몰림 방지)
-        n_keys = len(settings.API_KEYS)
-        # 살아있는 키 인덱스 추출 (헬스체크 결과 반영)
-        alive_indices = [
-            i for i, k in enumerate(settings.API_KEYS)
-            if k not in KeyManager._exhausted_keys
-        ]
-        base_indices = alive_indices if alive_indices else list(range(n_keys))
-
-        # 워커 수를 살아있는 키 수로 상한 제한 (같은 키에 워커 몰림 → WAF 차단 방지)
-        n_workers = min(n_workers, len(base_indices))
-        if n_workers < settings.SCAN_WORKERS:
-            logger.warning(
-                f"[{svc}] ⚠️ 살아있는 키 {len(base_indices)}개 → "
-                f"워커 수 {settings.SCAN_WORKERS} → {n_workers}으로 축소 (WAF 차단 방지)"
-            )
-
-        semaphore = asyncio.Semaphore(n_workers)
-
-        logger.info(
-            f"[{svc}] 🔀 병렬 스캔 시작 | 워커 수: {n_workers} | "
-            f"대상: {pages_total}p"
-        )
-
-        worker_clients = [ApiClient() for _ in range(n_workers)]
-        if n_keys >= n_workers and n_workers > 0:
-            key_step = max(1, len(base_indices) // n_workers)
-            for i, wc in enumerate(worker_clients):
-                assigned_idx = base_indices[(i * key_step) % len(base_indices)]
-                wc.key_manager.current_key_idx = assigned_idx
-                masked = wc.key_manager._mask_key(wc.key_manager.api_keys[assigned_idx])
-                logger.info(
-                    f"[{svc}] 🔑 W{i+1} 시작 키: {masked} "
-                    f"(key_idx={assigned_idx}, 살아있는 키 {len(base_indices)}/{n_keys}개 중)"
-                )
+        # ── 워커 풀: 살아있는 키 균등 배분 + WAF 차단 방지 클램핑 ────────────
+        pool      = ApiWorkerPool(settings.SCAN_WORKERS, label=svc)
+        n_workers = pool.n_workers
+        semaphore = pool.semaphore
+        logger.info(f"[{svc}] 🔀 병렬 스캔 시작 | 워커 수: {n_workers} | 대상: {pages_total}p")
 
         async def _scan_one(page: int, worker_id: int, is_retry: bool = False) -> None:
             nonlocal cycle_api_calls
@@ -326,8 +294,8 @@ class DiffCrawlerEngine:
             is_probe  = page not in known_tail_pages
             probe_tag = " [TAIL PROBE]" if is_probe else ""
             retry_tag = " [재시도]" if is_retry else ""
-            # 재시도는 0번 워커이므로 첫 번째 클라이언트 사용
-            client = worker_clients[(worker_id - 1) % n_workers] if worker_id > 0 else worker_clients[0]
+            # 재시도(worker_id=0)는 첫 번째 클라이언트, 일반 워커는 0-based round-robin
+            client = pool.get_client(worker_id - 1) if worker_id > 0 else pool.get_client(0)
 
             async with semaphore:
                 logger.info(

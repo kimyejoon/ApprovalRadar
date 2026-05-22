@@ -24,6 +24,7 @@ import time
 from app.core.logger import logger
 from app.core.events import shutdown_event
 from app.clients.foodsafety_api import ApiClient, ApiKeysExhaustedError
+from app.clients.worker_pool import ApiWorkerPool
 from database import get_db
 from app.core.industries import FOOD_SERVICE_INDUSTRIES
 
@@ -406,30 +407,14 @@ async def poll_changes_for_date(target_date: str) -> dict:
             # ── Step 4: I2500 후보군 검증 및 즉시/배치 삽입 ─────────────────────────
             # 오늘 날짜 진짜 변경건 → 검증 완료 즉시 DB 삽입 + SSE 1건 발행
             # 과거 날짜 / 단순동기화 건 → pending_past_rows 배치 큐 → 전건 완료 후 일괄 삽입
-            N_VERIFY_WORKERS = 10
-            from app.clients.key_manager import KeyManager
-            from app.core.config import settings as _cfg
-
-            # 살아있는 키 인덱스 추출 후 N_VERIFY_WORKERS개 클라이언트에 균등 배분
-            alive_indices = [
-                i for i, k in enumerate(_cfg.API_KEYS)
-                if k not in KeyManager._exhausted_keys
-            ]
-            base_indices = alive_indices if alive_indices else list(range(len(_cfg.API_KEYS)))
-            eff_workers = min(N_VERIFY_WORKERS, len(base_indices))
-            key_step = max(1, len(base_indices) // eff_workers)
-
-            verify_clients = [ApiClient() for _ in range(eff_workers)]
-            for wi, vc in enumerate(verify_clients):
-                assigned_idx = base_indices[(wi * key_step) % len(base_indices)]
-                vc.key_manager.current_key_idx = assigned_idx
-
+            pool        = ApiWorkerPool(10, label="CHNG_DT Poller")
+            eff_workers = pool.n_workers
             logger.info(
                 f"[CHNG_DT Poller] 🔍 신규 후보군 {len(new_items):,}건에 대해 "
                 f"I2861 변경이력 교차 검증 시작 "
-                f"(검증 워커: {eff_workers}개, 살아있는 키: {len(base_indices)}개)..."
+                f"(검증 워커: {eff_workers}개, 살아있는 키: {pool.n_alive}개)..."
             )
-            semaphore = asyncio.Semaphore(eff_workers)
+            semaphore = pool.semaphore
             from scraper import run_scraper_for_service_with_rows
 
             today_str_poll = datetime.datetime.now().strftime("%Y%m%d")
@@ -441,7 +426,7 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 nonlocal real_today_count
                 async with semaphore:
                     lcns = item.get("LCNS_NO", "")
-                    verify_client = verify_clients[worker_idx % eff_workers]
+                    verify_client = pool.get_client(worker_idx)
                     r_list = await _verify_actual_change(verify_client, lcns, target_date, item)
 
                     if not r_list:
