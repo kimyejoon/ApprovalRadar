@@ -20,13 +20,12 @@ async def _fetch_and_update_industry(
     db_lock: asyncio.Lock,
 ) -> bool:
     """
-    I2500 API로 특정 업소의 세부업종 + 대표자 + 연락처 + 인허가일을 조회하여 DB에 업데이트합니다.
+    I2500 API로 특정 업소의 세부업종 + 대표자 + 연락처를 조회하여 DB에 업데이트합니다.
 
-    I2500 제공 필드:
+    I2500 제공 필드 (PRMS_DT 인허가일자는 지금당장 필요 없어 수집 제외):
       - INDUTY_CD_NM : 세부업종
-      - PRSDNT_NM    : 대표자 (기존 빈 필드만 채움)
-      - TELNO        : 연락처 (기존 빈 필드만 채움)
-      - PRMS_DT      : 최초인허가일 (None/미색인만 채움)
+      - PRSDNT_NM    : 대표자 (기존 빈 필드만 쇼우)
+      - TELNO        : 연락처 (기존 빈 필드만 쇼우)
 
     Returns:
         True  = 1개 이상 필드 업데이트 성공
@@ -49,10 +48,9 @@ async def _fetch_and_update_industry(
     industry_type = rows[0].get("INDUTY_CD_NM", "")
     representative_name = rows[0].get("PRSDNT_NM", "")
     phone_number = rows[0].get("TELNO", "")
-    license_date = rows[0].get("PRMS_DT", "")
 
     # 모두 빈값이면 업데이트할 것 없음
-    if not industry_type and not representative_name and not phone_number and not license_date:
+    if not industry_type and not representative_name and not phone_number:
         return False
 
     # SQLite 스레드/태스크 간 동시 쓰기 경합 방지
@@ -62,7 +60,6 @@ async def _fetch_and_update_industry(
             industry_type=industry_type,
             representative_name=representative_name,
             phone_number=phone_number,
-            license_date=license_date,
         )
     return True
 
@@ -190,10 +187,33 @@ async def fill_industry_for_licenses(license_nos: list[str]) -> None:
         return
 
     # 중복 라이선스 번호 제거
-    unique_licenses = list(set(license_nos))
+    unique_licenses = list(dict.fromkeys(license_nos))  # 순서 유지된 dedupe
+
+    # ── DB 사전 확인: 대표자명이 이미 있는 라이선스는 I2500 호출 불필요 ──
+    if unique_licenses:
+        with __import__("database").get_db() as _conn:
+            _placeholders = ",".join(["?"] * len(unique_licenses))
+            _cursor = _conn.execute(
+                f"SELECT license_no FROM businesses "
+                f"WHERE license_no IN ({_placeholders}) "
+                f"AND (representative_name IS NOT NULL AND representative_name != '')",
+                unique_licenses
+            )
+            _already_filled = {r["license_no"] for r in _cursor.fetchall()}
+        unique_licenses = [l for l in unique_licenses if l not in _already_filled]
+        if _already_filled:
+            logger.info(
+                f"[즉시 Backfill] {len(_already_filled)}건은 대표자명 이미 확보 → I2500 스킵, "
+                f"잔여 {len(unique_licenses)}건 보완 실행"
+            )
+
+    if not unique_licenses:
+        logger.info("[즉시 Backfill] 모든 대상이 이미 대표자명 보유 → I2500 호출 전량 스킵")
+        return
+
     logger.info(
         f"[즉시 Backfill] 신규 삽입 {len(unique_licenses)}건(원시 {len(license_nos)}건)에 대해 "
-        f"세부업종 즉시 병렬 채우기 시작..."
+        f"세부업종 즉시 병렬 쇼우기 시작..."
     )
     
     business_repo = BusinessRepository()

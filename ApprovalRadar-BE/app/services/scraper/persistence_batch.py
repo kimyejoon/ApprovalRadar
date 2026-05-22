@@ -52,7 +52,7 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
                 batch
             )
             for r in cursor.fetchall():
-                existing_records[(r["license_no"], r["last_event_date"], r.get("change_before") or "")] = dict(r)
+                existing_records[(r["license_no"], r["last_event_date"], r["change_before"] or "")] = dict(r)
 
         logger.info(
             f"  📋 batch SELECT 완료: {len(unique_lcns)}건 LCNS 조회, "
@@ -189,11 +189,18 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
                 )
                 infer_update_detail = None
 
+            # ── 대표자명 즉시 추출 (I2500 백필 없이) ──────────────────────────
+            # mapper.py가 지위승계 건은 이미 change_after로 채움.
+            # 그 외 "대표자변경" 타입(이름 마스킹 패턴)도 change_after = 신임대표자.
+            _rep_name = fields.get("representative_name") or ""
+            if not _rep_name and infer_update_type == "대표자변경" and fields.get("change_after"):
+                _rep_name = fields["change_after"]
+
             record = {
                 "license_no": lcns_no,
                 "business_name": fields["business_name"],
                 "address": fields["address"],
-                "representative_name": fields["representative_name"],
+                "representative_name": _rep_name,
                 "business_status": fields["business_status"],
                 "license_date": license_date,
                 "phone_number": fields["phone_number"],
@@ -209,10 +216,10 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
                 "collected_by": collected_by,
             }
             to_insert.append((
-                record["license_no"], record["business_name"], record["address"], 
-                record["representative_name"], record["business_status"], 
+                record["license_no"], record["business_name"], record["address"],
+                record["representative_name"], record["business_status"],
                 record["license_date"], record["phone_number"], record.get("industry_type"), record["last_event_date"],
-                record.get("update_type"), record.get("prev_business_status"), 
+                record.get("update_type"), record.get("prev_business_status"),
                 record.get("prev_representative_name"), record.get("prev_business_name"), record.get("infer_update_type"), record.get("infer_update_detail"),
                 record.get("last_event_time"), record.get("license_time"),
                 record.get("change_reason"), record.get("change_before"), record.get("change_after"),
@@ -220,7 +227,9 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
             ))
             to_insert_raw.append((lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now))
             new_indexed += 1
-            inserted_lcns_list.append(lcns_no)
+            # 대표자명이 이미 채워진 경우 I2500 백필 불필요 → 백필 목록에서 제외
+            if not _rep_name:
+                inserted_lcns_list.append(lcns_no)
             if event_date == today_str:
                 today_count += 1
             elif event_date == yesterday_str:

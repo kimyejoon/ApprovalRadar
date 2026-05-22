@@ -1,11 +1,13 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../ui/button';
 import { Modal } from '../ui/Modal';
 import { formatApprovalDate, formatPhoneNumber } from '../../lib/utils';
-import { type ApprovalMappedItem, fetchApprovalDetail } from '../../lib/api';
+import { type ApprovalMappedItem, fetchApprovalDetail, syncBusinessHistory } from '../../lib/api';
 import { CATEGORY_COLORS, CATEGORY_ICONS, INDUSTRY_ICONS } from '@/lib/constants';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { MemoSection } from './ApprovalDetailModal/MemoSection';
+import { ArrowsClockwise } from '@phosphor-icons/react';
 
 interface ApprovalDetailModalProps {
   isOpen: boolean;
@@ -15,6 +17,11 @@ interface ApprovalDetailModalProps {
 
 export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalDetailModalProps) {
   const licenseNo = selectedItem?.raw.license_no;
+  const queryClient = useQueryClient();
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<{ text: string; isError: boolean } | null>(null);
+
   const { data: detailResponse, isLoading, isError } = useQuery({
     queryKey: ['approvalDetail', licenseNo],
     queryFn: () => {
@@ -27,6 +34,29 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
   });
 
   const historyData = detailResponse?.data || [];
+
+  const handleSyncHistory = async () => {
+    if (!licenseNo || syncing) return;
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const result = await syncBusinessHistory(licenseNo);
+      const newCount = result.synced ?? 0;
+      const apiTotal = result.api_total ?? 0;
+      setSyncMsg({
+        text: newCount > 0
+          ? `✅ 동기화 완료 — API ${apiTotal}건 중 신규 ${newCount}건 수집`
+          : `✅ 동기화 완료 — API ${apiTotal}건, 모두 이미 수집됨`,
+        isError: false,
+      });
+      // 이력 테이블 즉시 갱신
+      queryClient.invalidateQueries({ queryKey: ['approvalDetail', licenseNo] });
+    } catch {
+      setSyncMsg({ text: '❌ 조회 실패 (API 오류)', isError: true });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <Modal
@@ -44,6 +74,28 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
               <div className="text-lg font-bold text-text-primary">{selectedItem.name}</div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {/* 세부조회 버튼 */}
+              <button
+                id="btn-sync-history"
+                onClick={handleSyncHistory}
+                disabled={syncing}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all border shadow-sm"
+                style={{
+                  color: syncing ? '#9ca3af' : '#a855f7',
+                  borderColor: syncing ? '#374151' : '#a855f7',
+                  backgroundColor: 'transparent',
+                  cursor: syncing ? 'not-allowed' : 'pointer',
+                }}
+                title="I2861 API에서 해당 업소의 전체 변경이력을 즉시 조회하고 누락건을 저장합니다"
+              >
+                <ArrowsClockwise
+                  size={14}
+                  weight="bold"
+                  className={syncing ? 'animate-spin' : ''}
+                />
+                {syncing ? '조회 중...' : '세부조회'}
+              </button>
+
               <a
                 href={`https://www.diningcode.com/list.dc?query=${encodeURIComponent(selectedItem.name)}`}
                 target="_blank"
@@ -67,6 +119,20 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
             </div>
           </div>
 
+          {/* 동기화 결과 메시지 */}
+          {syncMsg && (
+            <div
+              className="px-4 py-2 rounded-md text-sm font-medium"
+              style={{
+                backgroundColor: syncMsg.isError ? 'rgba(239,68,68,0.08)' : 'rgba(168,85,247,0.08)',
+                color: syncMsg.isError ? '#ef4444' : '#a855f7',
+                border: `1px solid ${syncMsg.isError ? 'rgba(239,68,68,0.3)' : 'rgba(168,85,247,0.3)'}`,
+              }}
+            >
+              {syncMsg.text}
+            </div>
+          )}
+
           {/* 메모 섹션 (헤더 ↔ 테이블 사이) */}
           {selectedItem.raw.license_date && selectedItem.name && (
             <MemoSection
@@ -89,9 +155,14 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || syncing ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-text-muted">이력 데이터를 불러오는 중입니다...</TableCell>
+                    <TableCell colSpan={6} className="text-center py-8 text-text-muted">
+                      <div className="flex items-center justify-center gap-2">
+                        <ArrowsClockwise size={16} className="animate-spin" />
+                        {syncing ? 'I2861 API 조회 중입니다...' : '이력 데이터를 불러오는 중입니다...'}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ) : isError ? (
                   <TableRow>
@@ -166,7 +237,7 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
                           )}
                           {item.collected_by && (
                             <span className="text-[10px] text-text-muted/50 mt-1 font-mono">
-                              via {({'rolling_scan': 'Rolling Scan', 'chng_dt_poller': 'CHNG_DT Poller', 'tail_ping': 'Tail Ping', 'range_scan': 'Range Scan'} as Record<string, string>)[item.collected_by] || item.collected_by}
+                              via {({'rolling_scan': 'Rolling Scan', 'chng_dt_poller': 'CHNG_DT Poller', 'tail_ping': 'Tail Ping', 'range_scan': 'Range Scan', 'manual_sync': '세부조회'} as Record<string, string>)[item.collected_by] || item.collected_by}
                             </span>
                           )}
                         </div>

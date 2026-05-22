@@ -369,98 +369,107 @@ class DiffCrawlerEngine:
                 page_industry = page_industries.get(str(page), "")
                 is_skip_page  = page_industry in SKIP_INDUSTRIES
 
-                if rows and not is_skip_page:
-                    async with db_lock:
-                        result = await run_scraper_for_service_with_rows(
-                            svc, rows, collected_by="oldest_first_scan"
-                        )
-                    page_stats.update({
-                        "new_indexed":       result.get("new_indexed", 0),
-                        "skipped_dup":       result.get("skipped_dup", 0),
-                        "today":             result.get("today", 0),
-                        "yesterday":         result.get("yesterday", 0),
-                        "today_in_page":     result.get("today_in_page", 0),
-                        "yesterday_in_page": result.get("yesterday_in_page", 0),
-                    })
-                    async with counter_lock:
-                        all_rows.extend(rows)
-                elif is_skip_page:
-                    logger.info(
-                        f"[{svc}] W{worker_id} ⏭ P{page} [{page_industry}] — 스킵 업종"
-                    )
-
-                # ── Tail Probe: last_total_count 확장 ────────────────────────
-                if is_probe and rows:
-                    new_total = page * PAGE_SIZE
-                    async with state_lock:
-                        if new_total > state.get("last_total_count", 0):
-                            state["last_total_count"] = new_total
-                            new_total_pages = (new_total + PAGE_SIZE - 1) // PAGE_SIZE
-                            logger.info(
-                                f"[{svc}] W{worker_id} 🆕 Tail 확장 감지! "
-                                f"last_total_count 갱신: {new_total:,}건 (P{new_total_pages})"
+                try:
+                    if rows and not is_skip_page:
+                        async with db_lock:
+                            result = await run_scraper_for_service_with_rows(
+                                svc, rows, collected_by="oldest_first_scan"
                             )
+                        page_stats.update({
+                            "new_indexed":       result.get("new_indexed", 0),
+                            "skipped_dup":       result.get("skipped_dup", 0),
+                            "today":             result.get("today", 0),
+                            "yesterday":         result.get("yesterday", 0),
+                            "today_in_page":     result.get("today_in_page", 0),
+                            "yesterday_in_page": result.get("yesterday_in_page", 0),
+                        })
+                        async with counter_lock:
+                            all_rows.extend(rows)
+                    elif is_skip_page:
+                        logger.info(
+                            f"[{svc}] W{worker_id} ⏭ P{page} [{page_industry}] — 스킵 업종"
+                        )
 
-                # ── page_scan_history 테이블 저장 (db_lock) ──────────────────
-                captured_label    = page_labels.get(str(page))
-                captured_industry = page_industries.get(str(page))
-                # first/last LCNS_NO 경계값 저장 (페이지 내용 변화 감지용)
-                first_lcns = rows[0].get("LCNS_NO") if rows else None
-                last_lcns  = rows[-1].get("LCNS_NO") if rows else None
-                async with db_lock:
-                    self.page_scan_repo.upsert_page(
-                        svc, page,
-                        label=captured_label,
-                        industry=captured_industry,
-                        last_scanned_ts=int(time.time()),
-                        first_lcns=first_lcns,
-                        last_lcns=last_lcns,
+                    # ── Tail Probe: last_total_count 확장 ────────────────────────
+                    if is_probe and rows:
+                        new_total = page * PAGE_SIZE
+                        async with state_lock:
+                            if new_total > state.get("last_total_count", 0):
+                                state["last_total_count"] = new_total
+                                new_total_pages = (new_total + PAGE_SIZE - 1) // PAGE_SIZE
+                                logger.info(
+                                    f"[{svc}] W{worker_id} 🆕 Tail 확장 감지! "
+                                    f"last_total_count 갱신: {new_total:,}건 (P{new_total_pages})"
+                                )
+
+                    # ── page_scan_history 테이블 저장 (db_lock) ──────────────────
+                    captured_label    = page_labels.get(str(page))
+                    captured_industry = page_industries.get(str(page))
+                    # first/last LCNS_NO 경계값 저장 (페이지 내용 변화 감지용)
+                    first_lcns = rows[0].get("LCNS_NO") if rows else None
+                    last_lcns  = rows[-1].get("LCNS_NO") if rows else None
+                    async with db_lock:
+                        self.page_scan_repo.upsert_page(
+                            svc, page,
+                            label=captured_label,
+                            industry=captured_industry,
+                            last_scanned_ts=int(time.time()),
+                            first_lcns=first_lcns,
+                            last_lcns=last_lcns,
+                        )
+
+                    # ── state 저장 (state_lock) ───────────────────────────────────
+                    async with state_lock:
+                        self.state_repo.save_state(svc, state)
+                        scanned_success_pages.append(page)
+
+                    # ── 완료 로그 ─────────────────────────────────────────────────
+                    elapsed_so_far = time.time() - start_time
+                    async with counter_lock:
+                        done_so_far = len(scanned_success_pages)
+                        remaining = pages_total - done_so_far
+                        avg_sec = sum(page_elapsed_times) / len(page_elapsed_times) if page_elapsed_times else fetch_elapsed
+                        est_remaining_min = round((remaining * avg_sec) / 60, 1)
+
+                    cycle_info = {
+                        "elapsed_sec":       round(elapsed_so_far, 1),
+                        "api_calls":         cycle_api_calls,
+                        "pages_done":        done_so_far,
+                        "pages_total":       pages_total,
+                        "est_remaining_min": est_remaining_min,
+                    }
+
+                    captured_label_log = page_labels.get(str(page), "—")
+                    today_ip  = page_stats["today_in_page"]
+                    yest_ip   = page_stats["yesterday_in_page"]
+                    today_new = page_stats["today"]
+                    yest_new  = page_stats["yesterday"]
+                    today_log = f"{today_ip}건" + (f"(+{today_new}신규)" if today_new else "")
+                    yest_log  = f"{yest_ip}건" + (f"(+{yest_new}신규)" if yest_new else "")
+                    logger.info(
+                        f"[{svc}] W{worker_id} ✅ P{page}/{total_pages} [{captured_label_log}] 완료 | "
+                        f"조회 {row_count:,}건 | "
+                        f"오늘 {today_log} · 어제 {yest_log} · "
+                        f"신규 {page_stats['new_indexed']}건 · 중복 {page_stats['skipped_dup']}건 | "
+                        f"소요 {elapsed_so_far:.1f}초 · API {cycle_api_calls}회 · 잔여 ~{est_remaining_min}분"
                     )
 
-                # ── state 저장 (state_lock) ───────────────────────────────────
-                async with state_lock:
-                    self.state_repo.save_state(svc, state)
-                    scanned_success_pages.append(page)
+                    # ── SSE 발행 (PLAYGROUND_UPDATE → 프론트 페이지 히스토리) ──────
+                    broadcaster.broadcast_sync(json.dumps({
+                        "type":       "PLAYGROUND_UPDATE",
+                        "page":       page,
+                        "page_label": page_labels.get(str(page)),
+                        "stats":      page_stats,
+                        "cycle":      cycle_info,
+                    }, ensure_ascii=False))
 
-                # ── 완료 로그 ─────────────────────────────────────────────────
-                elapsed_so_far = time.time() - start_time
-                async with counter_lock:
-                    done_so_far = len(scanned_success_pages)
-                    remaining = pages_total - done_so_far
-                    avg_sec = sum(page_elapsed_times) / len(page_elapsed_times) if page_elapsed_times else fetch_elapsed
-                    est_remaining_min = round((remaining * avg_sec) / 60, 1)
-
-                cycle_info = {
-                    "elapsed_sec":       round(elapsed_so_far, 1),
-                    "api_calls":         cycle_api_calls,
-                    "pages_done":        done_so_far,
-                    "pages_total":       pages_total,
-                    "est_remaining_min": est_remaining_min,
-                }
-
-                captured_label_log = page_labels.get(str(page), "—")
-                today_ip  = page_stats["today_in_page"]
-                yest_ip   = page_stats["yesterday_in_page"]
-                today_new = page_stats["today"]
-                yest_new  = page_stats["yesterday"]
-                today_log = f"{today_ip}건" + (f"(+{today_new}신규)" if today_new else "")
-                yest_log  = f"{yest_ip}건" + (f"(+{yest_new}신규)" if yest_new else "")
-                logger.info(
-                    f"[{svc}] W{worker_id} ✅ P{page}/{total_pages} [{captured_label_log}] 완료 | "
-                    f"조회 {row_count:,}건 | "
-                    f"오늘 {today_log} · 어제 {yest_log} · "
-                    f"신규 {page_stats['new_indexed']}건 · 중복 {page_stats['skipped_dup']}건 | "
-                    f"소요 {elapsed_so_far:.1f}초 · API {cycle_api_calls}회 · 잔여 ~{est_remaining_min}분"
-                )
-
-                # ── SSE 발행 (PLAYGROUND_UPDATE → 프론트 페이지 히스토리) ──────
-                broadcaster.broadcast_sync(json.dumps({
-                    "type":       "PLAYGROUND_UPDATE",
-                    "page":       page,
-                    "page_label": page_labels.get(str(page)),
-                    "stats":      page_stats,
-                    "cycle":      cycle_info,
-                }, ensure_ascii=False))
+                except Exception as _db_err:
+                    import traceback
+                    logger.error(
+                        f"[{svc}] W{worker_id} ❌ P{page} DB처리 오류 "
+                        f"(API는 성공, DB 단계 실패): {type(_db_err).__name__}: {_db_err}\n"
+                        + traceback.format_exc()
+                    )
 
         # ── 1차: 병렬 실행 ────────────────────────────────────────────────────
         tasks = [

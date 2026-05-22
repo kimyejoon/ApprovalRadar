@@ -174,3 +174,80 @@ def get_approval_detail(
     except Exception as e:
         logger.error(f"Database error in get_approval_detail: {e}")
         raise HTTPException(status_code=500, detail="내부 서버 오류가 발생했습니다.")
+
+
+@router.post("/{license_no}/sync-history")
+async def sync_business_history(
+    license_no: str = Path(..., description="인허가번호"),
+    repo: BusinessRepository = Depends(get_business_repo)
+):
+    """
+    특정 업소의 I2861 전체 변경이력을 즉시 조회하고 DB에 저장합니다.
+    - DB에 없는 이력은 INSERT
+    - 완료 후 해당 업소의 전체 DB 이력을 반환
+    """
+    import json as _json
+    import asyncio
+    from app.clients.foodsafety_api import ApiClient
+    from app.services.scraper.mapper import map_row_fields, parse_datetime_fields
+    from app.services.scraper.persistence_batch import persist_batch_crawl
+
+    client = ApiClient()
+    try:
+        res = await client.fetch_data("I2861", 1, 1000, LCNS_NO=license_no, SYS_SYNC="LIVE")
+    except Exception as e:
+        logger.error(f"[세부조회] I2861 API 오류 (LCNS_NO={license_no}): {e}")
+        raise HTTPException(status_code=502, detail=f"식품나라 API 조회 실패: {e}")
+    finally:
+        await client.aclose()
+
+    api_rows = []
+    if res and "I2861" in res:
+        block = res["I2861"]
+        if isinstance(block, dict) and block.get("RESULT", {}).get("CODE") == "INFO-000":
+            api_rows = block.get("row", [])
+
+    new_count = 0
+    if api_rows:
+        mapped_rows = []
+        for row in api_rows:
+            fields = map_row_fields("I2861", row)
+            if not fields:
+                continue
+            event_date, event_time, license_date_parsed, license_time = parse_datetime_fields(
+                fields.get("event_date_raw", ""), fields.get("license_date", "")
+            )
+            if not event_date:
+                continue
+            mapped_rows.append({
+                "fields": fields,
+                "event_date": event_date,
+                "event_time": event_time,
+                "license_date": license_date_parsed or "",
+                "license_time": license_time or "",
+                "raw_row": row,
+            })
+
+        if mapped_rows:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: persist_batch_crawl("I2861", mapped_rows, "manual_sync")
+            )
+            new_count = result.get("new_indexed", 0)
+            logger.info(
+                f"[세부조회] LCNS_NO={license_no} 동기화 완료: "
+                f"API {len(api_rows)}건 조회, 신규 {new_count}건 저장"
+            )
+
+    records = repo.get_businesses_by_license_no(license_no)
+    for record in records:
+        try:
+            record["representative_history"] = _json.loads(record.get("representative_history", "[]"))
+            record["licensing_history"] = _json.loads(record.get("licensing_history", "[]"))
+        except Exception:
+            record["representative_history"] = []
+            record["licensing_history"] = []
+
+    return {"status": "success", "data": records, "synced": new_count, "api_total": len(api_rows)}
+
