@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApiHealthStore } from '@/store/useApiHealthStore';
 
 // ─── 상태별 시각 설정 ──────────────────────────────────────────────────────────

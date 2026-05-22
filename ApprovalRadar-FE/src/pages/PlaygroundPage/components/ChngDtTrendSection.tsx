@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChartBar, Clock, Calendar, Database, ArrowUpRight } from '@phosphor-icons/react';
+import { ChartBar, Clock, Database, ArrowUpRight } from '@phosphor-icons/react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Legend, Cell,
@@ -34,7 +34,7 @@ export function ChngDtTrendSection() {
   const todayEntries = trendData?.today_entries ?? [];
   const yesterdayEntries = trendData?.yesterday_entries ?? [];
   const activeEntries = viewDate === 'today' ? todayEntries : yesterdayEntries;
-  const targetDateStr = viewDate === 'today' ? trendData?.today_date : trendData?.yesterday_date;
+
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr || dateStr.length !== 8) return dateStr ?? '';
