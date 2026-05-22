@@ -36,7 +36,13 @@ class BusinessRepository(AbstractBusinessRepository):
             order = "ASC" if sort_order.lower() == "asc" else "DESC"
             
             offset = (page - 1) * size
-            data_query = f"SELECT * FROM businesses{where_clause} ORDER BY {sort_by} {order} LIMIT ? OFFSET ?"
+            # last_event_date 정렬 시: 날짜 1차 → created_at 2차 (동일 날짜 내 수집순)
+            # 다른 컬럼 정렬 시에도 created_at을 동일 방향 보조 정렬로 추가
+            if sort_by == "last_event_date":
+                order_clause = f"last_event_date {order}, created_at {order}"
+            else:
+                order_clause = f"{sort_by} {order}, created_at {order}"
+            data_query = f"SELECT * FROM businesses{where_clause} ORDER BY {order_clause} LIMIT ? OFFSET ?"
             
             cursor.execute(data_query, params + [size, offset])
             rows = cursor.fetchall()
