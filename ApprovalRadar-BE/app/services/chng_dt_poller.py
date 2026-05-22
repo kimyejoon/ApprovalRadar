@@ -4,9 +4,15 @@ I2500 CHNG_DT 폴러 — 3-Way 전략의 세 번째 축.
 매 5분 간격으로 I2500 서비스에 CHNG_DT 파라미터를 넣어
 변동 업소 목록을 직접 조회합니다.
 
-시간대별 전략:
-  - 00:00~18:59 → "어제" 날짜 폴링 (당일 데이터는 19:00 이후에야 반영)
-  - 19:00~23:59 → "오늘" 날짜 폴링 (주 대상) + "어제" 보조 폴링
+앵커 전략 (3중 폴링):
+  D-3 → D-2 → D-1 순서로 순차 폴링
+  - D-3: 가장 넓은 범위, 캐시/DB 먼저 채우기
+  - D-2: D-3 이후 추가된 레코드
+  - D-1: D-2/D-3에서 누락된 ~15건 포속
+         (LCNS가 CHNG_DT 업데이트로 다른 날짜로 이동한 케이스)
+
+  중복 처리: INSERT OR IGNORE + sync_cache 자동 처리
+  근거: test_anchor.py 실증 — D-1 ⊄ D-2 ≒ 15건 누락 확인
 
 매 폴링 결과는 chng_dt_poll_history 테이블에 영속 저장되어
 플레이그라운드에서 시간별 트렌드 차트를 그릴 수 있습니다.
@@ -509,30 +515,45 @@ def _save_poll_history(result: dict):
 
 async def _run_poller_async():
     """
-    I2500 CHNG_DT 앵커 기준 폴링.
+    I2500 CHNG_DT 3중 폴링 (D-3 → D-2 → D-1).
 
-    근거:
-    - I2500 CHNG_DT 파라미터는 >= 필터로 동작함 (실험으로 확인)
-    - 오늘 날짜만 조회하면 I2861에서 오늘 변경이 확인되는 업소가 누락됨
-    - 앵커를 오늘-2일로 설정하면 최근 변경 전체를 포착
-    - _verify_actual_change에서 최근 5일 이내 I2861 기록을 감지하여
-      오늘 실제 변경건을 즉시 삽입 + SSE 발행
+    앵커 전략:
+    - D-3부터 폴링하여 캐시/DB를 먼저 채움
+    - D-2, D-1은 실질적 신규만 처리 (INSERT OR IGNORE 로 중복 안전)
+    - D-1에만 D-2/D-3에 없는 ~15건 노못 (test_anchor 실증)
+
+    근거: D-1 ⊄ D-2 ≒ 15건 누락 (LCNS_NO가 CHNG_DT 업데이트되어 다른 날짜로 이동)
     """
     now = datetime.datetime.now()
-    anchor_date = (now - datetime.timedelta(days=2)).strftime("%Y%m%d")
-    today_str = now.strftime("%Y%m%d")
+
+    # D-3 → D-2 → D-1 순서 (넓은 범위부터 먼저 수집)
+    anchors = [
+        ((now - datetime.timedelta(days=3)).strftime("%Y%m%d"), "D-3"),
+        ((now - datetime.timedelta(days=2)).strftime("%Y%m%d"), "D-2"),
+        ((now - datetime.timedelta(days=1)).strftime("%Y%m%d"), "D-1"),
+    ]
 
     logger.info(
-        f"[전략C] 🕐 앵커({anchor_date}) 기준 단일 폴링 시작 (오늘: {today_str})"
+        f"[전략C] 3중 폴링 시작 — "
+        f"{anchors[0][0]}(D-3) / {anchors[1][0]}(D-2) / {anchors[2][0]}(D-1)"
     )
 
-    result = await poll_changes_for_date(anchor_date)
+    total_new = 0
+    for anchor_date, label in anchors:
+        if shutdown_event.is_set():
+            logger.info("[CHNG_DT Poller] shutdown 감지 → 중단")
+            break
 
-    logger.info(
-        f"[전략C] 📊 결과: "
-        f"앵커({anchor_date}) API {result['total']:,}건 → 신규 {result['new']}건"
-    )
+        result = await poll_changes_for_date(anchor_date)
+        total_new += result["new"]
 
+        logger.info(
+            f"[전략C] 3중 {label}({anchor_date}): "
+            f"API {result['total']:,}건 → 신규 {result['new']}건 "
+            f"(스킵 {result['skipped']:,}건 | {result['elapsed']:.1f}s)"
+        )
+
+    logger.info(f"[전략C] 🔔 3중 폴링 완료: 총 신규 {total_new}건")
 
 
 def run_chng_dt_poller():
