@@ -19,7 +19,7 @@ from app.core.logger import logger
 from app.core.events import shutdown_event
 from app.clients.foodsafety_api import ApiClient, ApiKeysExhaustedError
 from database import get_db
-from app.services.diff_crawler.engine import TARGET_INDUSTRIES
+from app.core.industries import FOOD_SERVICE_INDUSTRIES
 
 # I2500 서비스 ID (인허가변동 이력 — CHNG_DT 필터 작동)
 SERVICE_ID = "I2500"
@@ -337,9 +337,10 @@ async def poll_changes_for_date(target_date: str) -> dict:
                     skip_new_reg += 1
                     continue
 
-                # (A-2) 모니터링 대상 업종만 수집 (일반음식점·휴게음식점·제과점영업)
+                # (A-2) 식품위생법 적용 업종만 수집 (비식품 업종 완전 차단)
+                # FOOD_SERVICE_INDUSTRIES = 일반음식점·휴게음식점·제과점영업·위탁급식영업·집단급식소·유흥주점영업·단란주점
                 induty = (item.get("INDUTY_CD_NM") or "").strip()
-                if induty and induty not in TARGET_INDUSTRIES:
+                if induty and induty not in FOOD_SERVICE_INDUSTRIES:
                     skip_new_reg += 1   # 스킵 카운터 공유 (업종 외)
                     continue
 

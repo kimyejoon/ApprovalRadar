@@ -8,6 +8,7 @@ from app.clients.foodsafety_api import ApiClient
 from app.repositories.state_repository import StateRepository
 from app.repositories.page_scan_repository import PageScanRepository
 from app.core.logger import logger
+from app.core.industries import TARGET_INDUSTRIES, SKIP_INDUSTRIES
 
 PAGE_SIZE = 1000
 STALE_THRESHOLD_SEC = settings.STALE_THRESHOLD_MINUTES * 60
@@ -15,11 +16,6 @@ STALE_THRESHOLD_SEC = settings.STALE_THRESHOLD_MINUTES * 60
 TAIL_PROBE_EXTRA = 3
 # 업종 경계 프로브: target_boundary 이후 최대 몇 페이지까지 순차 확인할지
 INDUSTRY_BOUNDARY_PROBE_MAX = 5
-
-# 모니터링 대상 업종 (수집 필요)
-TARGET_INDUSTRIES = {"일반음식점", "휴게음식점", "제과점영업"}
-# 수집 불필요 업종 (known_skip 페이지로 분류되면 스캔 제외)
-SKIP_INDUSTRIES = {"위탁급식영업", "집단급식소", "유흥주점영업", "단란주점"}
 
 
 class DiffCrawlerEngine:
