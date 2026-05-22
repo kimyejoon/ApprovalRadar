@@ -175,9 +175,12 @@ async def poll_changes_for_date(target_date: str) -> dict:
 
     if ApiClient.is_exhausted():
         logger.debug(f"[CHNG_DT Poller] API 키 소진 → {target_date} 스킵")
+        result["elapsed"] = round(time.time() - start_time, 1)
+        _save_poll_history(result)
         return result
 
     if shutdown_event.is_set():
+        result["elapsed"] = round(time.time() - start_time, 1)
         return result
 
     try:

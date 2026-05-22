@@ -27,8 +27,9 @@ class Settings:
     GAP_MAX = 1.5       # Jitter 최댓값(초) - 축소하여 스캔 속도 향상
     # 탐색 최소주기 - .env의 SCRAPER_INTERVAL_MINUTES 로 오버라이드 가능 (기본값 15분)
     SCRAPER_INTERVAL_MINUTES: int = 5
-    # 페이지 만료 임계 시간 (분) - .env의 STALE_THRESHOLD_MINUTES 로 오버라이드 가능 (기본값 15분)
-    STALE_THRESHOLD_MINUTES: int = 15
+    # 페이지 만료 임계 시간 (분) - .env의 STALE_THRESHOLD_MINUTES 로 오버라이드 가능 (기본값 20분)
+    # I2500 CHNG_DT 폴러가 5분마다 변동 감지하므로, rolling scan은 20분 간격도 안전
+    STALE_THRESHOLD_MINUTES: int = 20
     # API 단건 fetch 타임아웃 (초) - .env의 API_FETCH_TIMEOUT_SECONDS 로 오버라이드 가능 (기본값 300초)
     # 식품안전나라 API 서버가 최대 200~300초가량 응답 지연될 수 있어 넉넉하게 설정
     API_FETCH_TIMEOUT_SECONDS: int = 300
@@ -116,7 +117,7 @@ class Settings:
             except ValueError:
                 self.STALE_THRESHOLD_MINUTES = 15  # 잘못된 값이면 기본값 15분 유지
         else:
-            self.STALE_THRESHOLD_MINUTES = 15
+            self.STALE_THRESHOLD_MINUTES = 20
 
         # API_FETCH_TIMEOUT_SECONDS: env 오버라이드 (.env에서 API_FETCH_TIMEOUT_SECONDS=300 식으로 변경 가능)
         aft = os.getenv("API_FETCH_TIMEOUT_SECONDS")

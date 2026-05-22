@@ -177,6 +177,7 @@ export function useSSE(sendNotification?: (opts: NotificationOptions) => void) {
           } else if (data.type === 'PLAYGROUND_UPDATE') {
             // Oldest-First Scan 페이지 완료 → 플레이그라운드 캐시 무효화 + 실시간 진행 스토어 업데이트
             queryClient.invalidateQueries({ queryKey: ['playgroundSummary'] });
+            queryClient.invalidateQueries({ queryKey: ['chngDtTrend'] });
             if (data.page && data.stats && data.cycle) {
               useScanProgressStore.getState().updatePage({
                 page: data.page,
