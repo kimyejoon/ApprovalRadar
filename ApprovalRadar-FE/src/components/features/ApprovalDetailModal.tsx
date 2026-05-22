@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../ui/button';
 import { Modal } from '../ui/Modal';
@@ -34,6 +34,17 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
   });
 
   const historyData = detailResponse?.data || [];
+
+  // 같은 (license_no, last_event_date) 를 1개 행으로 묶기
+  const groupedHistory = useMemo(() => {
+    const groups = new Map<string, typeof historyData>();
+    for (const item of historyData) {
+      const key = `${item.license_no}__${item.last_event_date}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(item);
+    }
+    return Array.from(groups.values());
+  }, [historyData]);
 
   const handleSyncHistory = async () => {
     if (!licenseNo || syncing) return;
@@ -168,98 +179,111 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-text-muted">데이터를 불러오는데 실패했습니다.</TableCell>
                   </TableRow>
-                ) : historyData.length === 0 ? (
+                ) : groupedHistory.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-text-muted">표시할 이력이 없습니다.</TableCell>
                   </TableRow>
                 ) : (
-                  historyData.map((item, index) => (
-                    <TableRow key={`${item.license_no}-${item.last_event_date}-${index}`}>
-                      <TableCell className="font-medium text-brand">
-                        {item.last_event_date && item.last_event_date.length === 8 ? formatApprovalDate(item.last_event_date) : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="text-text-primary font-medium">{item.business_name}</span>
-                          <span className="text-[11px] text-text-muted mt-0.5 font-mono">{item.license_no}</span>
-                          {item.prev_business_name && (
-                            <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
-                              (이전: {item.prev_business_name})
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="text-text-primary">{item.representative_name}</span>
-                          {item.phone_number && (
-                            <span className="text-[11px] text-text-muted mt-0.5 font-mono">
-                              {formatPhoneNumber(item.phone_number)}
-                            </span>
-                          )}
-                          {item.prev_representative_name && (
-                            <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
-                              (이전: {item.prev_representative_name})
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col items-start gap-1">
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border"
-                            style={{
-                              color: CATEGORY_COLORS[item.infer_update_type || ''] || '#9ca3af',
-                              borderColor: CATEGORY_COLORS[item.infer_update_type || ''] || '#9ca3af',
-                              backgroundColor: 'transparent'
-                            }}
-                          >
-                            {CATEGORY_ICONS[item.infer_update_type || ''] && (
-                              <span className="flex items-center">
+                  groupedHistory.map((group, index) => {
+                    const primary = group[0];
+                    const seen = new Set<string>();
+                    const typeEntries = group
+                      .map(g => ({ type: g.infer_update_type || '', detail: g.infer_update_detail || '' }))
+                      .filter(t => { if (seen.has(t.type)) return false; seen.add(t.type); return true; });
+
+                    return (
+                      <TableRow key={`${primary.license_no}-${primary.last_event_date}-${index}`}>
+                        <TableCell className="font-medium text-brand">
+                          {primary.last_event_date && primary.last_event_date.length === 8 ? formatApprovalDate(primary.last_event_date) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-text-primary font-medium">{primary.business_name}</span>
+                            <span className="text-[11px] text-text-muted mt-0.5 font-mono">{primary.license_no}</span>
+                            {primary.prev_business_name && (
+                              <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
+                                (이전: {primary.prev_business_name})
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-text-primary">{primary.representative_name}</span>
+                            {primary.phone_number && (
+                              <span className="text-[11px] text-text-muted mt-0.5 font-mono">
+                                {formatPhoneNumber(primary.phone_number)}
+                              </span>
+                            )}
+                            {primary.prev_representative_name && (
+                              <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
+                                (이전: {primary.prev_representative_name})
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {/* 같은 날 여러 변경 유형 — 태그 복수 표시 */}
+                          <div className="flex flex-col items-start gap-1">
+                            {typeEntries.map((entry, ti) => (
+                              <div key={ti} className="flex flex-col items-start gap-0.5">
+                                <span
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border"
+                                  style={{
+                                    color: CATEGORY_COLORS[entry.type] || '#9ca3af',
+                                    borderColor: CATEGORY_COLORS[entry.type] || '#9ca3af',
+                                    backgroundColor: 'transparent'
+                                  }}
+                                >
+                                  {CATEGORY_ICONS[entry.type] && (
+                                    <span className="flex items-center">
+                                      {(() => {
+                                        const Icon = CATEGORY_ICONS[entry.type];
+                                        return <Icon weight="bold" size={10} />;
+                                      })()}
+                                    </span>
+                                  )}
+                                  {entry.type || '-'}
+                                </span>
+                                {entry.detail && (
+                                  <span className="text-[11px] text-text-secondary leading-tight break-keep ml-1">
+                                    {entry.detail}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                            {primary.business_status && (
+                              <span className="text-[11px] text-text-muted leading-tight mt-0.5">
+                                {primary.business_status}
+                                {primary.prev_business_status && ` (이전: ${primary.prev_business_status})`}
+                              </span>
+                            )}
+                            {primary.collected_by && (
+                              <span className="text-[10px] text-text-muted/50 mt-1 font-mono">
+                                via {({'rolling_scan': 'Rolling Scan', 'chng_dt_poller': 'CHNG_DT Poller', 'tail_ping': 'Tail Ping', 'range_scan': 'Range Scan', 'manual_sync': '세부조회'} as Record<string, string>)[primary.collected_by] || primary.collected_by}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-text-muted">
+                          <div className="flex items-center gap-1.5">
+                            {INDUSTRY_ICONS[primary.industry_type || ''] && (
+                              <span className="flex items-center text-text-secondary">
                                 {(() => {
-                                  const Icon = CATEGORY_ICONS[item.infer_update_type || ''];
-                                  return <Icon weight="bold" size={10} />;
+                                  const Icon = INDUSTRY_ICONS[primary.industry_type || ''];
+                                  return <Icon weight="regular" size={14} />;
                                 })()}
                               </span>
                             )}
-                            {item.infer_update_type || '-'}
-                          </span>
-                          {(item.infer_update_detail || item.update_type) && (
-                            <span className="text-[11px] text-text-secondary leading-tight break-keep">
-                              {item.infer_update_detail || item.update_type}
-                            </span>
-                          )}
-                          {item.business_status && (
-                            <span className="text-[11px] text-text-muted leading-tight mt-0.5">
-                              {item.business_status}
-                              {item.prev_business_status && ` (이전: ${item.prev_business_status})`}
-                            </span>
-                          )}
-                          {item.collected_by && (
-                            <span className="text-[10px] text-text-muted/50 mt-1 font-mono">
-                              via {({'rolling_scan': 'Rolling Scan', 'chng_dt_poller': 'CHNG_DT Poller', 'tail_ping': 'Tail Ping', 'range_scan': 'Range Scan', 'manual_sync': '세부조회'} as Record<string, string>)[item.collected_by] || item.collected_by}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-text-muted">
-                        <div className="flex items-center gap-1.5">
-                          {INDUSTRY_ICONS[item.industry_type || ''] && (
-                            <span className="flex items-center text-text-secondary">
-                              {(() => {
-                                const Icon = INDUSTRY_ICONS[item.industry_type || ''];
-                                return <Icon weight="regular" size={14} />;
-                              })()}
-                            </span>
-                          )}
-                          <span>{item.industry_type || '-'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-text-muted max-w-[200px] truncate" title={item.address}>
-                        {item.address}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                            <span>{primary.industry_type || '-'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-text-muted max-w-[200px] truncate" title={primary.address}>
+                          {primary.address}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

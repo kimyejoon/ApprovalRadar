@@ -13,7 +13,16 @@ def build_business_where_clause(
     
     if infer_update_type:
         placeholders = ', '.join(['?'] * len(infer_update_type))
-        query_conditions.append(f"infer_update_type IN ({placeholders})")
+        # 같은 날 같은 업소에 여러 변경 유형이 있을 경우,
+        # 하나라도 매칭되면 해당 날짜 레코드 전체를 가져옴 (프론트 그룹핑용)
+        query_conditions.append(
+            f"EXISTS ("
+            f"SELECT 1 FROM businesses b2 "
+            f"WHERE b2.license_no = businesses.license_no "
+            f"AND b2.last_event_date = businesses.last_event_date "
+            f"AND b2.infer_update_type IN ({placeholders})"
+            f")"
+        )
         params.extend(infer_update_type)
         
     if industry_type:

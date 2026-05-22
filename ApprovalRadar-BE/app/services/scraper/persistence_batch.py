@@ -5,7 +5,7 @@ from app.repositories.business_repository import BusinessRepository
 from app.repositories.raw_data_repository import RawDataRepository
 from app.services.change_detector import ChangeDetector, infer_change_type_from_bf_af
 from app.core.logger import logger
-from app.services.scraper.persistence_notifier import trigger_sse_broadcast, trigger_backfill_thread
+from app.services.scraper.persistence_notifier import trigger_sse_broadcast
 
 business_repo = BusinessRepository()
 raw_repo = RawDataRepository()
@@ -40,7 +40,6 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
     yesterday_count = 0
     today_in_page = 0       # 신규+중복 포함 오늘 날짜 레코드 수
     yesterday_in_page = 0   # 신규+중복 포함 어제 날짜 레코드 수
-    inserted_lcns_list = []
 
     with get_db() as conn:
         existing_records = {}
@@ -227,9 +226,6 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
             ))
             to_insert_raw.append((lcns_no, json.dumps(m["raw_row"], ensure_ascii=False), now))
             new_indexed += 1
-            # 대표자명이 이미 채워진 경우 I2500 백필 불필요 → 백필 목록에서 제외
-            if not _rep_name:
-                inserted_lcns_list.append(lcns_no)
             if event_date == today_str:
                 today_count += 1
             elif event_date == yesterday_str:
@@ -260,9 +256,6 @@ def persist_batch_crawl(service_id: str, mapped_rows: list, collected_by: str) -
     if today_count > 0:
         trigger_sse_broadcast(today_count, service_id)
 
-    if inserted_lcns_list:
-        unique_inserted = list(dict.fromkeys(inserted_lcns_list))
-        trigger_backfill_thread(unique_inserted, service_id, f"flush-{service_id}")
 
     return {
         "total_fetched": len(mapped_rows),
