@@ -370,52 +370,92 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 _save_poll_history(result)
                 return result
 
-            # ── Step 4: I2500 후보군 검증 및 I2861 형식 변환 ──
-            logger.info(f"[CHNG_DT Poller] 🔍 신규 후보군 {len(new_items):,}건에 대해 I2861 변경이력 교차 검증 시작 (동시성 10)...")
+            # ── Step 4: I2500 후보군 검증 및 즉시/배치 삽입 ─────────────────────────
+            # 오늘 날짜 진짜 변경건 → 검증 완료 즉시 DB 삽입 + SSE 1건 발행
+            # 과거 날짜 / 단순동기화 건 → pending_past_rows 배치 큐 → 전건 완료 후 일괄 삽입
+            logger.info(
+                f"[CHNG_DT Poller] 🔍 신규 후보군 {len(new_items):,}건에 대해 "
+                f"I2861 변경이력 교차 검증 시작 (동시성 10, 오늘 변경건 즉시 삽입)..."
+            )
             semaphore = asyncio.Semaphore(10)
-            
-            async def verify_task(item):
+            from scraper import run_scraper_for_service_with_rows
+
+            today_str_poll = datetime.datetime.now().strftime("%Y%m%d")
+            pending_past_rows: list[dict] = []   # 과거 날짜 데이터 배치 큐
+            sync_lcns_this_round: list[str] = []
+            real_today_count: int = 0            # 즉시 삽입된 오늘 변경건 수
+
+            async def verify_and_insert_task(item):
+                nonlocal real_today_count
                 async with semaphore:
                     lcns = item.get("LCNS_NO", "")
-                    return await _verify_actual_change(api_client, lcns, target_date, item)
-            
-            tasks = [verify_task(item) for item in new_items]
-            task_results = await asyncio.gather(*tasks)
-            
-            mapped_rows = []
-            sync_lcns_this_round: list[str] = []
-            for item, r_list in zip(new_items, task_results):
-                mapped_rows.extend(r_list)
-                # 단순 동기화 판명된 업소 → 캐시에 저장 (이후 폴링 스킵)
-                if r_list and r_list[0].get("CHNG_PRVNS") in ("\uc2dc\uc2a4\ud15c\ub3d9\uae30\ud654(\uacfc\uac70\uc774\ub825)", "\ucd08\uae30\uc790\ub8cc\ub4f1\ub85d"):
-                    lcns_key = item.get("LCNS_NO", "")
-                    if lcns_key:
-                        sync_lcns_this_round.append(lcns_key)
+                    r_list = await _verify_actual_change(api_client, lcns, target_date, item)
 
+                    if not r_list:
+                        return
+
+                    # 단순동기화 여부 판별
+                    is_sync = r_list[0].get("CHNG_PRVNS") in (
+                        "시스템동기화(과거이력)", "초기자료등록"
+                    )
+
+                    # 오늘/과거 날짜 분리
+                    today_rows = [r for r in r_list if r.get("CHNG_DT") == today_str_poll]
+                    past_rows  = [r for r in r_list if r.get("CHNG_DT") != today_str_poll]
+
+                    # ── 오늘 날짜 진짜 변경건: 즉시 삽입 + 즉시 SSE ─────────────────
+                    if today_rows:
+                        await run_scraper_for_service_with_rows(
+                            "I2861", today_rows, collected_by="chng_dt_poller"
+                        )
+                        real_today_count += len(today_rows)
+                        prvns = today_rows[0].get("CHNG_PRVNS") or "인허가변동"
+                        bf_cn = today_rows[0].get("CHNG_BF_CN") or ""
+                        af_cn = today_rows[0].get("CHNG_AF_CN") or ""
+                        detail = f" ({bf_cn} → {af_cn})" if (bf_cn or af_cn) else ""
+                        logger.info(
+                            f"[CHNG_DT Poller] 🟢 즉시 삽입+SSE: {lcns} "
+                            f"({item.get('BSSH_NM', '')}) [{prvns}]{detail}"
+                        )
+                        # 즉시 삽입 후 today_lcns_in_db 갱신 → I2861 스캔과의 중복 방지
+                        today_lcns_in_db.add(lcns)
+
+                    # ── 과거 날짜 데이터: 배치 큐에 적립 ───────────────────────────
+                    if past_rows:
+                        pending_past_rows.extend(past_rows)
+
+                    # 단순동기화 캐시에 추가
+                    if is_sync:
+                        sync_lcns_this_round.append(lcns)
+
+            await asyncio.gather(*[verify_and_insert_task(item) for item in new_items])
+
+            # ── 단순동기화 캐시 업데이트 ────────────────────────────────────────
             if sync_lcns_this_round:
                 _sync_cache_lcns.update(sync_lcns_this_round)
-                # DB에도 영속저장 (재기동 후에도 스킵 보장)
                 _save_sync_cache_to_db(target_date, sync_lcns_this_round)
                 logger.info(
-                    f"[CHNG_DT Poller] 폴링 캐시: 단순동기화 {len(sync_lcns_this_round):,}건 추가 → 누적 {len(_sync_cache_lcns):,}건 "
-                    f"(다음 사이클에서 자동 스킵, DB 영속화 완료)"
+                    f"[CHNG_DT Poller] 폴링 캐시: 단순동기화 {len(sync_lcns_this_round):,}건 추가 → "
+                    f"누적 {len(_sync_cache_lcns):,}건 (다음 사이클에서 자동 스킵, DB 영속화 완료)"
                 )
 
-            logger.info(
-                f"[CHNG_DT Poller] 🆕 {target_date}: "
-                f"신규 {len(new_items):,}/{len(all_items):,}건 → scraper 파이프라인"
-            )
+            # ── 과거 날짜 데이터 배치 삽입 ────────────────────────────────────
+            if pending_past_rows:
+                logger.info(
+                    f"[CHNG_DT Poller] 📦 과거 날짜 데이터 {len(pending_past_rows):,}건 배치 삽입"
+                )
+                await run_scraper_for_service_with_rows(
+                    "I2861", pending_past_rows, collected_by="chng_dt_poller"
+                )
 
-            from scraper import run_scraper_for_service_with_rows
-            await run_scraper_for_service_with_rows("I2861", mapped_rows, collected_by="chng_dt_poller")
             result["new"] = len(new_items)
-
             elapsed = round(time.time() - start_time, 1)
             result["elapsed"] = elapsed
 
             logger.info(
                 f"🔔 [CHNG_DT Poller] 완료: CHNG_DT={target_date} "
-                f"API {len(all_items):,}건 → 신규 {len(new_items):,}건 INSERT, "
+                f"API {len(all_items):,}건 → 신규 {len(new_items):,}건 처리 "
+                f"(오늘 즉시삽입 {real_today_count}건 / 과거배치 {len(pending_past_rows):,}건), "
                 f"기존 {result['skipped']:,}건 ({elapsed}초, {page}p)"
             )
 

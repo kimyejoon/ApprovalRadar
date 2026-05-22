@@ -272,7 +272,7 @@ class BusinessRepository(AbstractBusinessRepository):
 
     def insert_businesses_batch(self, insert_list: list, conn=None):
         query = '''
-            INSERT INTO businesses 
+            INSERT OR IGNORE INTO businesses 
             (license_no, business_name, address, representative_name, business_status, license_date, phone_number, industry_type, last_event_date, is_new, update_type, prev_business_status, prev_representative_name, prev_business_name, infer_update_type, infer_update_detail, last_event_time, license_time, change_reason, change_before, change_after, collected_by)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
