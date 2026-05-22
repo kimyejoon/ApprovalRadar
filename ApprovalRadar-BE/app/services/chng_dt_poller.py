@@ -139,31 +139,42 @@ async def _verify_actual_change(api_client: ApiClient, lcns: str, target_date: s
             })
         return mapped
     else:
-        # 허수 (단순 DB 싱크만 오늘 됨)
-        actual_date = None
-        if rows:
-            dates = [r.get("CHNG_DT") for r in rows if r.get("CHNG_DT")]
-            if dates:
-                actual_date = max(dates)
-                
-        if not actual_date:
-            # 변경 이력이 아예 없는 신규 업소인 경우 인허가일자 사용
-            actual_date = item_i2500.get("PRMS_DT")
-            
-        if not actual_date:
-            actual_date = "19700101"
-            
         _mk = api_client.key_manager._mask_key(
             api_client.key_manager.api_keys[api_client.key_manager.current_key_idx]
         )
-        logger.info(f"[CHNG_DT Poller | {_mk}] ⚪ {lcns} ({item_i2500.get('BSSH_NM', '')}) 단순 동기화 건 감지 (실제최종일자: {actual_date}) — DB 저장 제외")
-        # CHNG_PRVNS 마커를 보존해 호출부에서 is_sync 판별 + 캐시 등록 가능하게 함
-        # (빈 리스트 반환 시 verify_and_insert_task가 즉시 return → sync 캐시 미등록 → 무한 재검증)
-        return [{
-            "LCNS_NO": lcns,
-            "CHNG_DT": actual_date,
-            "CHNG_PRVNS": "초기자료등록" if not rows else "시스템동기화(과거이력)",
-        }]
+        if rows:
+            # ⚪ I2861 이력 있으나 최근 5일 밖 → 실제 검증된 변경이므로 DB 저장
+            # (INSERT OR IGNORE로 중복 방지, SSE는 발행 안 함)
+            actual_date = max((r.get("CHNG_DT") or "") for r in rows)
+            logger.info(
+                f"[CHNG_DT Poller | {_mk}] ⚪ {lcns} ({item_i2500.get('BSSH_NM', '')}) "
+                f"과거 변경 이력 감지 (최신: {actual_date}) — 과거 날짜로 DB 저장"
+            )
+            mapped = []
+            for r in rows:
+                mapped.append({
+                    "LCNS_NO": lcns,
+                    "BSSH_NM": r.get("BSSH_NM") or item_i2500.get("BSSH_NM"),
+                    "SITE_ADDR": r.get("SITE_ADDR") or item_i2500.get("ADDR"),
+                    "PRSDNT_NM": r.get("PRSDNT_NM") or item_i2500.get("PRSDNT_NM"),
+                    "BSN_STATE_NM": None,
+                    "PRMS_DT": item_i2500.get("PRMS_DT"),
+                    "TELNO": r.get("TELNO") or item_i2500.get("TELNO"),
+                    "INDUTY_CD_NM": r.get("INDUTY_CD_NM") or item_i2500.get("INDUTY_CD_NM"),
+                    "CHNG_DT": r.get("CHNG_DT"),  # I2861 실제 날짜 그대로
+                    "SITE_ADDR_RDN": r.get("SITE_ADDR") or item_i2500.get("ADDR"),
+                    "CHNG_PRVNS": r.get("CHNG_PRVNS") or "시스템동기화(과거이력)",
+                    "CHNG_BF_CN": r.get("CHNG_BF_CN"),
+                    "CHNG_AF_CN": r.get("CHNG_AF_CN"),
+                })
+            return mapped
+        else:
+            # ⚫ 진짜 허수: I2861 이력이 아예 없음 → DB 저장 불가, 캐시만 등록
+            logger.info(
+                f"[CHNG_DT Poller | {_mk}] ⚫ {lcns} ({item_i2500.get('BSSH_NM', '')}) "
+                f"I2861 이력 없음 (신규등록 전 DB 동기화) — DB 저장 제외"
+            )
+            return [{"LCNS_NO": lcns, "CHNG_DT": None, "CHNG_PRVNS": "초기자료등록"}]
 
 
 
@@ -416,14 +427,13 @@ async def poll_changes_for_date(target_date: str) -> dict:
                     if not r_list:
                         return
 
-                    # 단순동기화 여부 판별
-                    is_sync = r_list[0].get("CHNG_PRVNS") in (
-                        "시스템동기화(과거이력)", "초기자료등록"
-                    )
+                    # 진짜 허수 판별: I2861 이력이 아예 없는 경우만 (초기자료등록)
+                    # ⚪ 과거 이력(시스템동기화) 은 DB 저장 대상이므로 is_sync=False
+                    is_sync = r_list[0].get("CHNG_PRVNS") == "초기자료등록"
 
-                    # 오늘/과거 날짜 분리
+                    # 오늘/과거 날짜 분리 (CHNG_DT=None인 허수 마커 제외)
                     today_rows = [r for r in r_list if r.get("CHNG_DT") == today_str_poll]
-                    past_rows  = [r for r in r_list if r.get("CHNG_DT") != today_str_poll]
+                    past_rows  = [r for r in r_list if r.get("CHNG_DT") and r.get("CHNG_DT") != today_str_poll]
 
                     # ── 오늘 날짜 진짜 변경건: 즉시 삽입 + 즉시 SSE ─────────────────
                     if today_rows:
@@ -442,13 +452,13 @@ async def poll_changes_for_date(target_date: str) -> dict:
                         # 즉시 삽입 후 today_lcns_in_db 갱신 → I2861 스캔과의 중복 방지
                         today_lcns_in_db.add(lcns)
 
-                    # ── 과거 날짜 데이터: 배치 큐에 적립 (단순동기화 제외) ─────────
-                    # ⚪ 단순동기화 건: I2500 CHNG_DT가 찍혔어도 실제 변경이 아니므로
-                    # DB 저장 자체를 차단 → 캐시 등록만 수행
-                    if past_rows and not is_sync:
+                    # ── 과거 날짜 데이터: 배치 큐에 적립 ─────────────────────────────
+                    # I2861 검증된 실제 이력은 CHNG_DT가 있으므로 항상 저장
+                    # CHNG_DT=None 허수 마커는 위에서 이미 제외됨
+                    if past_rows:
                         pending_past_rows.extend(past_rows)
 
-                    # 단순동기화 캐시에 추가
+                    # 진짜 허수(초기자료등록) 캐시에 추가
                     if is_sync:
                         sync_lcns_this_round.append(lcns)
 
