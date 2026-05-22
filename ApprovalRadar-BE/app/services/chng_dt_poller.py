@@ -406,11 +406,30 @@ async def poll_changes_for_date(target_date: str) -> dict:
             # ── Step 4: I2500 후보군 검증 및 즉시/배치 삽입 ─────────────────────────
             # 오늘 날짜 진짜 변경건 → 검증 완료 즉시 DB 삽입 + SSE 1건 발행
             # 과거 날짜 / 단순동기화 건 → pending_past_rows 배치 큐 → 전건 완료 후 일괄 삽입
+            N_VERIFY_WORKERS = 10
+            from app.clients.key_manager import KeyManager
+            from app.core.config import settings as _cfg
+
+            # 살아있는 키 인덱스 추출 후 N_VERIFY_WORKERS개 클라이언트에 균등 배분
+            alive_indices = [
+                i for i, k in enumerate(_cfg.API_KEYS)
+                if k not in KeyManager._exhausted_keys
+            ]
+            base_indices = alive_indices if alive_indices else list(range(len(_cfg.API_KEYS)))
+            eff_workers = min(N_VERIFY_WORKERS, len(base_indices))
+            key_step = max(1, len(base_indices) // eff_workers)
+
+            verify_clients = [ApiClient() for _ in range(eff_workers)]
+            for wi, vc in enumerate(verify_clients):
+                assigned_idx = base_indices[(wi * key_step) % len(base_indices)]
+                vc.key_manager.current_key_idx = assigned_idx
+
             logger.info(
                 f"[CHNG_DT Poller] 🔍 신규 후보군 {len(new_items):,}건에 대해 "
-                f"I2861 변경이력 교차 검증 시작 (동시성 10, 오늘 변경건 즉시 삽입)..."
+                f"I2861 변경이력 교차 검증 시작 "
+                f"(검증 워커: {eff_workers}개, 살아있는 키: {len(base_indices)}개)..."
             )
-            semaphore = asyncio.Semaphore(10)
+            semaphore = asyncio.Semaphore(eff_workers)
             from scraper import run_scraper_for_service_with_rows
 
             today_str_poll = datetime.datetime.now().strftime("%Y%m%d")
@@ -418,11 +437,12 @@ async def poll_changes_for_date(target_date: str) -> dict:
             sync_lcns_this_round: list[str] = []
             real_today_count: int = 0            # 즉시 삽입된 오늘 변경건 수
 
-            async def verify_and_insert_task(item):
+            async def verify_and_insert_task(item, worker_idx: int):
                 nonlocal real_today_count
                 async with semaphore:
                     lcns = item.get("LCNS_NO", "")
-                    r_list = await _verify_actual_change(api_client, lcns, target_date, item)
+                    verify_client = verify_clients[worker_idx % eff_workers]
+                    r_list = await _verify_actual_change(verify_client, lcns, target_date, item)
 
                     if not r_list:
                         return
@@ -462,7 +482,7 @@ async def poll_changes_for_date(target_date: str) -> dict:
                     if is_sync:
                         sync_lcns_this_round.append(lcns)
 
-            await asyncio.gather(*[verify_and_insert_task(item) for item in new_items])
+            await asyncio.gather(*[verify_and_insert_task(item, i % eff_workers) for i, item in enumerate(new_items)])
 
             # ── 단순동기화 캐시 업데이트 ────────────────────────────────────────
             if sync_lcns_this_round:
