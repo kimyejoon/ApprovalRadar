@@ -467,7 +467,7 @@ class DiffCrawlerEngine:
             await asyncio.gather(*tasks, return_exceptions=True)
         finally:
             # 워커 클라이언트 세션 정리
-            for wc in worker_clients:
+            for wc in pool._clients:
                 await wc.aclose()
 
         # ── 2차: 실패 페이지 순차 재처리 (WAF 안정화 후, 포기 없음) ────────────
