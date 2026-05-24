@@ -470,9 +470,8 @@ async def poll_changes_for_date(target_date: str) -> dict:
                     if past_rows:
                         pending_past_rows.extend(past_rows)
 
-                    # 진짜 허수(초기자료등록) 캐시에 추가
-                    if is_sync:
-                        sync_lcns_this_round.append(lcns)
+                    # 검증 완료 캐시에 추가하여 다음 폴링 시 중복 조회 방지 (변동건, 과거건, 허수 전체 포함)
+                    sync_lcns_this_round.append(lcns)
 
             await asyncio.gather(*[verify_and_insert_task(item, i % eff_workers) for i, item in enumerate(new_items)])
 
