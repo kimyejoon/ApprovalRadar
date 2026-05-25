@@ -42,21 +42,19 @@ router = APIRouter()
 )
 async def stream_updates(request: Request):
     async def event_generator():
+        import time
         q = asyncio.Queue()
         broadcaster.add_queue(q)
+        last_health_sent = 0.0
         try:
             while True:
                 # ✅ [개선] 클라이언트 연결 끊김 감지 - 좀비 커넥션/메모리 누수 방지
                 if await request.is_disconnected():
                     logger.info("[SSE] 클라이언트 연결 끊김 감지 → 스트림 종료")
                     break
-                try:
-                    # 최대 5초 대기
-                    msg = await asyncio.wait_for(q.get(), timeout=5.0)
-                    yield f"data: {msg}\n\n"
-                except asyncio.TimeoutError:
-                    # 5초 동안 들어온 메시지가 없으면 Ping(Heartbeat) 발송
-                    # api_health 상태도 함께 실어 보내 프론트가 별도 폴링 없이 수신
+                
+                now = time.time()
+                if now - last_health_sent >= 5.0:
                     try:
                         from app.services.api_health_tracker import health_tracker
                         health_payload = health_tracker.get_status()
@@ -71,6 +69,17 @@ async def stream_updates(request: Request):
                         ensure_ascii=False,
                     )
                     yield f"data: {ping_data}\n\n"
+                    last_health_sent = time.time()
+
+                try:
+                    # 다음 Ping 발송 예정 시각까지 남은 대기 시간 계산 (최소 0.1초)
+                    now = time.time()
+                    timeout = max(0.1, 5.0 - (now - last_health_sent))
+                    msg = await asyncio.wait_for(q.get(), timeout=timeout)
+                    yield f"data: {msg}\n\n"
+                except asyncio.TimeoutError:
+                    # timeout으로 인한 루프 재진입 → 상단의 시간 체크에 의해 Ping/Health가 자동 발송됨
+                    pass
         except asyncio.CancelledError:
             # 클라이언트 연결 종료 시
             pass
