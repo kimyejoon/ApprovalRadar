@@ -33,28 +33,26 @@ SERVICE_ID = "I2500"
 PAGE_SIZE = 1000
 POLL_INTERVAL_MINUTES = 5
 
-# 당일 단순 동기화로 확인된 업소 캐시 (재기동 시 초기화, 날짜 바뀌면 자동 리셋)
-# DB 영속화로 부팅 시에도 유지됨
-_sync_cache_date: str = ""
-_sync_cache_lcns: set[str] = set()
+# 단순 동기화로 확인된 업소 캐시 (재기동 시 초기화, DB 영속화로 부팅 시에도 유지됨)
+_sync_cache_loaded: bool = False
+_sync_cache_lcns: dict[str, str] = {}  # license_no -> max_verified_target_date
 
 
-def _load_sync_cache_from_db(target_date: str) -> set:
-    """초기 폴링 시 DB에서 이미 검증된 단순동기화 업소를 로드."""
+def _load_sync_cache_from_db() -> dict[str, str]:
+    """초기 폴링 시 DB에서 이미 검증된 단순동기화 업소와 그 시점의 target_date를 로드."""
     try:
         with get_db() as conn:
             rows = conn.execute(
-                "SELECT license_no FROM chng_dt_sync_verified WHERE target_date = ?",
-                (target_date,)
+                "SELECT license_no, MAX(target_date) as max_date FROM chng_dt_sync_verified GROUP BY license_no"
             ).fetchall()
-        return {r["license_no"] for r in rows}
+        return {r["license_no"]: r["max_date"] for r in rows}
     except Exception:
-        return set()
+        return {}
 
 
-def _save_sync_cache_to_db(target_date: str, lcns_list: list) -> None:
+def _save_sync_cache_to_db(lcns_to_chng_dt: list[tuple[str, str]]) -> None:
     """단순동기화 판명된 업소를 DB에 백업. 이미 있는 건 IGNORE."""
-    if not lcns_list:
+    if not lcns_to_chng_dt:
         return
     now = datetime.datetime.now().isoformat()
     try:
@@ -62,7 +60,7 @@ def _save_sync_cache_to_db(target_date: str, lcns_list: list) -> None:
             conn.executemany(
                 "INSERT OR IGNORE INTO chng_dt_sync_verified "
                 "(target_date, license_no, verified_at) VALUES (?, ?, ?)",
-                [(target_date, lcns, now) for lcns in lcns_list]
+                [(chng_dt, lcns, now) for lcns, chng_dt in lcns_to_chng_dt]
             )
             conn.commit()
     except Exception as e:
@@ -301,14 +299,12 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 return result
 
             # 주: 단순 동기화 캐시 날짜 확인 / 다른 날짜면 리셋
-            global _sync_cache_date, _sync_cache_lcns
-            if _sync_cache_date != target_date:
-                _sync_cache_date = target_date
-                # DB에서 이미 검증된 단순동기화 로드 (재기동 후에도 유지)
-                _sync_cache_lcns = _load_sync_cache_from_db(target_date)
+            global _sync_cache_loaded, _sync_cache_lcns
+            if not _sync_cache_loaded:
+                _sync_cache_lcns = _load_sync_cache_from_db()
+                _sync_cache_loaded = True
                 logger.debug(
-                    f"[CHNG_DT Poller] 단순동기화 캐시 로드: {target_date} "
-                    f"DB {len(_sync_cache_lcns):,}건"
+                    f"[CHNG_DT Poller] 단순동기화 캐시 로드: DB {len(_sync_cache_lcns):,}건"
                 )
 
             # ── Step 2: 이미 오늘 변경건이 DB에 있는 LCNS 조회 (Batch SELECT) ──
@@ -375,7 +371,9 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 # (D) 단순 동기화 이미 확인됨 (in-memory 캐시) → 스킵
                 #     첫 폴링에서 I2861 검증 후 단순동기화로 판명된 업소는
                 #     이후 폴링에서 자동 스킵 (구소 폴링가속화)
-                if lcns in _sync_cache_lcns:
+                chng_dt = item.get("CHNG_DT") or ""
+                cached_max_date = _sync_cache_lcns.get(lcns)
+                if cached_max_date and cached_max_date >= chng_dt:
                     skip_sync_cache += 1
                     continue
 
@@ -423,7 +421,7 @@ async def poll_changes_for_date(target_date: str) -> dict:
             total_items   = len(new_items)
             today_str_poll = datetime.datetime.now().strftime("%Y%m%d")
             pending_past_rows: list[dict] = []   # 과거 날짜 데이터 배치 큐
-            sync_lcns_this_round: list[str] = []
+            sync_lcns_this_round: list[tuple[str, str]] = []
             real_today_count: int = 0            # 즉시 삽입된 오늘 변경건 수
             done_count: int = 0                  # 검증 완료 건수 (진행률용)
 
@@ -471,14 +469,16 @@ async def poll_changes_for_date(target_date: str) -> dict:
                         pending_past_rows.extend(past_rows)
 
                     # 검증 완료 캐시에 추가하여 다음 폴링 시 중복 조회 방지 (변동건, 과거건, 허수 전체 포함)
-                    sync_lcns_this_round.append(lcns)
+                    chng_dt = item.get("CHNG_DT") or target_date
+                    sync_lcns_this_round.append((lcns, chng_dt))
 
             await asyncio.gather(*[verify_and_insert_task(item, i % eff_workers) for i, item in enumerate(new_items)])
 
             # ── 단순동기화 캐시 업데이트 ────────────────────────────────────────
             if sync_lcns_this_round:
-                _sync_cache_lcns.update(sync_lcns_this_round)
-                _save_sync_cache_to_db(target_date, sync_lcns_this_round)
+                for lcns, chng_dt in sync_lcns_this_round:
+                    _sync_cache_lcns[lcns] = max(_sync_cache_lcns.get(lcns, ""), chng_dt)
+                _save_sync_cache_to_db(sync_lcns_this_round)
                 logger.info(
                     f"[CHNG_DT Poller] 폴링 캐시: 단순동기화 {len(sync_lcns_this_round):,}건 추가 → "
                     f"누적 {len(_sync_cache_lcns):,}건 (다음 사이클에서 자동 스킵, DB 영속화 완료)"
