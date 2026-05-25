@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Broadcast, Sun, Moon, SquaresFour, Terminal, GearSix, Flask } from '@phosphor-icons/react';
 import { Button } from '../ui/button';
 import { ServerStatusBadge } from '../ui/ServerStatusBadge';
+import { useApiHealthStore } from '@/store/useApiHealthStore';
 
 export type ActiveTab = 'dashboard' | 'logs' | 'settings' | 'playground';
 
@@ -20,6 +21,29 @@ const NAV_ITEMS: { id: ActiveTab; label: string; icon: React.ElementType }[] = [
 
 export function DashboardLayout({ children, activeTab, onTabChange }: DashboardLayoutProps) {
   const [isDark, setIsDark] = useState(false);
+  const { status } = useApiHealthStore();
+
+  const STATUS_CONFIG: Record<
+    string,
+    { label: string; dot: string; text: string }
+  > = {
+    NORMAL:   { label: '정상',   dot: 'bg-emerald-500', text: 'text-emerald-500' },
+    SLOW:     { label: '느림',   dot: 'bg-yellow-400',  text: 'text-yellow-400'  },
+    DEGRADED: { label: '저하',   dot: 'bg-orange-500',  text: 'text-orange-500'  },
+    UNSTABLE: { label: '불안정', dot: 'bg-red-500',     text: 'text-red-500'     },
+    UNKNOWN:  { label: '확인중', dot: 'bg-gray-400',    text: 'text-gray-400'    },
+  };
+
+  const STATUS_DESC: Record<string, string> = {
+    NORMAL:   '식품안전나라 API 서버가 정상적으로 응답하고 있습니다.',
+    SLOW:     '응답이 다소 느립니다. 데이터 수집 속도가 저하될 수 있습니다.',
+    DEGRADED: '다수의 타임아웃이 감지됐습니다. 수집 지연이 발생 중입니다.',
+    UNSTABLE: 'API 서버가 불안정합니다. WAF 차단 또는 최대 재시도 초과 발생.',
+    UNKNOWN:  'SSE 연결 후 첫 PING을 기다리는 중입니다. (최대 5초)',
+  };
+
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.UNKNOWN;
+  const desc = STATUS_DESC[status] ?? STATUS_DESC.UNKNOWN;
 
   useEffect(() => {
     if (isDark) {
@@ -47,7 +71,7 @@ export function DashboardLayout({ children, activeTab, onTabChange }: DashboardL
         </div>
 
         {/* 내비게이션 */}
-        <nav className="flex-1 px-4 py-6 space-y-1">
+        <nav className="px-4 py-6 space-y-1">
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
             const isActive = activeTab === id;
             return (
@@ -70,6 +94,27 @@ export function DashboardLayout({ children, activeTab, onTabChange }: DashboardL
             );
           })}
         </nav>
+
+        {/* 외부 API 상태 위젯 */}
+        <div className="flex-1 px-4 flex flex-col justify-end pb-6">
+          <div className="p-4 rounded-xl border border-border-standard bg-surface shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="relative flex h-2 w-2">
+                {status === 'NORMAL' && (
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${cfg.dot} opacity-60`} />
+                )}
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${cfg.dot}`} />
+              </span>
+              <span className="text-[10px] font-semibold text-text-muted tracking-wider uppercase">외부 API 상태</span>
+            </div>
+            <div className={`text-sm font-bold mb-1.5 ${cfg.text}`}>
+              외부 API: {cfg.label}
+            </div>
+            <p className="text-xs text-text-secondary leading-relaxed font-normal">
+              {desc}
+            </p>
+          </div>
+        </div>
 
         {/* 하단 정보 */}
         <div className="p-4 border-t border-border-standard">
