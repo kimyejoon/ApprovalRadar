@@ -61,6 +61,7 @@ export interface FetchApprovalsParams {
   regions?: string;
   infer_update_type?: string;
   industry_type?: string;
+  exclude_keywords?: string;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
 }
@@ -109,6 +110,11 @@ export interface IndicatorResponse {
 export interface ExportApprovalsParams {
   start_date?: string;
   end_date?: string;
+  search?: string;
+  regions?: string;
+  infer_update_type?: string;
+  industry_type?: string;
+  exclude_keywords?: string;
 }
 
 export interface KeyStatusItem {

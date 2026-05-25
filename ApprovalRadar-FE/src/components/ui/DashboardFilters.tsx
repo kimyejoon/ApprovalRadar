@@ -1,4 +1,4 @@
-import { MagnifyingGlass, X } from '@phosphor-icons/react';
+import { MagnifyingGlass, X, Prohibit } from '@phosphor-icons/react';
 import { DatePickerWithPresets } from '@/components/ui/DatePickerWithPresets';
 import { CATEGORY_NAMES, CATEGORY_ICONS } from '@/lib/constants';
 
@@ -28,6 +28,8 @@ interface DashboardFiltersProps {
   onLocationFiltersChange: (locations: string[]) => void;
   industryFilters: string[];
   onIndustryFiltersChange: (industries: string[]) => void;
+  excludeKeywords: string[];
+  onExcludeKeywordsChange: (keywords: string[]) => void;
 }
 
 export function DashboardFilters({
@@ -41,6 +43,8 @@ export function DashboardFilters({
   onLocationFiltersChange,
   industryFilters,
   onIndustryFiltersChange,
+  excludeKeywords,
+  onExcludeKeywordsChange,
 }: DashboardFiltersProps) {
   let groupedTags: { label: string, onRemove: () => void }[] = [];
 
@@ -89,13 +93,32 @@ export function DashboardFilters({
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
+
+        {/* Exclude Keywords Input */}
+        <div className="flex items-center bg-surface border border-border-standard rounded-lg px-3 py-2 w-full max-w-xs focus-within:ring-1 focus-within:ring-red-500 focus-within:border-red-500 transition-all shadow-sm">
+          <Prohibit className="w-5 h-5 text-red-500 mr-2" />
+          <input 
+            type="text" 
+            placeholder="제외할 상호명 입력 (Enter)..." 
+            className="bg-transparent border-none outline-none text-text-primary text-sm w-full placeholder:text-text-muted"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const val = e.currentTarget.value.trim();
+                if (val && !excludeKeywords.includes(val)) {
+                  onExcludeKeywordsChange([...excludeKeywords, val]);
+                  e.currentTarget.value = '';
+                }
+              }
+            }}
+          />
+        </div>
         
         {/* Date Filter */}
         <DatePickerWithPresets date={dateRange} setDate={onDateRangeChange} />
       </div>
 
       {/* Active Filters Row */}
-      {(statusFilters.length > 0 || groupedTags.length > 0 || industryFilters.length > 0) && (
+      {(statusFilters.length > 0 || groupedTags.length > 0 || industryFilters.length > 0 || excludeKeywords.length > 0) && (
         <div className="mb-6 flex flex-wrap items-center gap-2">
           {statusFilters.map(status => (
             <span key={status} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
@@ -135,6 +158,21 @@ export function DashboardFilters({
               <button 
                 onClick={tag.onRemove}
                 className="hover:bg-brand/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
+              >
+                <X weight="bold" className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          ))}
+
+          {excludeKeywords.map(kw => (
+            <span key={kw} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 text-red-500 text-xs font-medium border border-red-500/20 shadow-sm">
+              <span className="flex items-center">
+                <Prohibit weight="bold" size={14} />
+              </span>
+              제외 상호: {kw}
+              <button 
+                onClick={() => onExcludeKeywordsChange(excludeKeywords.filter(k => k !== kw))}
+                className="hover:bg-red-500/20 rounded-full p-0.5 transition-colors focus:outline-none flex items-center justify-center"
               >
                 <X weight="bold" className="w-3.5 h-3.5" />
               </button>

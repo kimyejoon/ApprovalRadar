@@ -6,11 +6,18 @@ import { useExcelExport } from '@/hooks/useExcelExport';
 interface DashboardHeaderProps {
   totalCount: number;
   dateRange?: { from?: Date; to?: Date };
+  filters?: {
+    search?: string;
+    regions?: string[];
+    infer_update_type?: string[];
+    industry_type?: string[];
+    exclude_keywords?: string[];
+  };
 }
 
-export function DashboardHeader({ dateRange }: DashboardHeaderProps) {
+export function DashboardHeader({ dateRange, filters }: DashboardHeaderProps) {
   const todayNewCount = useIndicatorStore(s => s.todayNewCount);
-  const { isExporting, handleExportExcel } = useExcelExport(dateRange);
+  const { isExporting, handleExportExcel } = useExcelExport(dateRange, filters);
 
   return (
     <div className="flex justify-between items-center mb-6">

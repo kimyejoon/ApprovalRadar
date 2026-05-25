@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfToday } from 'date-fns';
 import { fetchApprovals, markApprovalAsRead, type ApprovalData, type ApprovalMappedItem, type ApprovalsResponse } from '@/lib/api';
-import { CATEGORY_NAMES, DEFAULT_STATUS_FILTERS, DEFAULT_INDUSTRY_FILTERS } from '@/lib/constants';
+import { CATEGORY_NAMES, DEFAULT_STATUS_FILTERS, DEFAULT_INDUSTRY_FILTERS, DEFAULT_EXCLUDE_KEYWORDS } from '@/lib/constants';
 import { formatPhoneNumber } from '@/lib/utils';
 
 export type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id' | 'type';
@@ -16,13 +16,14 @@ export function useApprovalRadar() {
   const [statusFilters, setStatusFilters] = useState<string[]>(DEFAULT_STATUS_FILTERS);
   const [locationFilters, setLocationFilters] = useState<string[]>([]); // 기본값: 전체 (지역 필터 해제)
   const [industryFilters, setIndustryFilters] = useState<string[]>(DEFAULT_INDUSTRY_FILTERS);
+  const [excludeKeywords, setExcludeKeywords] = useState<string[]>(DEFAULT_EXCLUDE_KEYWORDS);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>({
     from: startOfToday(),
     to: startOfToday()
   });
 
   const { data: apiResponse, isLoading, isError } = useQuery({
-    queryKey: ['approvals', currentPage, itemsPerPage, searchQuery, statusFilters, locationFilters, industryFilters, dateRange, sortConfig],
+    queryKey: ['approvals', currentPage, itemsPerPage, searchQuery, statusFilters, locationFilters, industryFilters, excludeKeywords, dateRange, sortConfig],
     queryFn: () => fetchApprovals({
       page: currentPage,
       size: itemsPerPage,
@@ -32,6 +33,7 @@ export function useApprovalRadar() {
       regions: locationFilters.length > 0 ? locationFilters.join(',') : undefined,
       infer_update_type: statusFilters.length > 0 ? statusFilters.join(',') : undefined,
       industry_type: industryFilters.length > 0 ? industryFilters.join(',') : undefined,
+      exclude_keywords: excludeKeywords.length > 0 ? excludeKeywords.join(',') : undefined,
       sort_by: sortConfig ? (
         sortConfig.key === 'id' ? 'license_no' :
         sortConfig.key === 'name' ? 'business_name' :
@@ -151,6 +153,7 @@ export function useApprovalRadar() {
       statusFilters,
       locationFilters,
       industryFilters,
+      excludeKeywords,
       dateRange,
     },
     actions: {
@@ -166,6 +169,10 @@ export function useApprovalRadar() {
       handleLocationFiltersChange,
       handleIndustryFiltersChange: (industries: string[]) => {
         setIndustryFilters(industries);
+        setCurrentPage(1);
+      },
+      handleExcludeKeywordsChange: (keywords: string[]) => {
+        setExcludeKeywords(keywords);
         setCurrentPage(1);
       },
       handleDateRangeChange,

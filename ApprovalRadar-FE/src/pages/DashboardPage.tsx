@@ -21,7 +21,17 @@ export function DashboardPage() {
 
   return (
     <>
-      <DashboardHeader totalCount={totalCount} dateRange={state.dateRange} />
+      <DashboardHeader 
+        totalCount={totalCount} 
+        dateRange={state.dateRange} 
+        filters={{
+          search: state.searchQuery,
+          regions: state.locationFilters,
+          infer_update_type: state.statusFilters,
+          industry_type: state.industryFilters,
+          exclude_keywords: state.excludeKeywords
+        }}
+      />
 
       <DashboardIndicators />
 
@@ -36,6 +46,8 @@ export function DashboardPage() {
         onLocationFiltersChange={actions.handleLocationFiltersChange}
         industryFilters={state.industryFilters}
         onIndustryFiltersChange={actions.handleIndustryFiltersChange}
+        excludeKeywords={state.excludeKeywords}
+        onExcludeKeywordsChange={actions.handleExcludeKeywordsChange}
       />
 
       <ApprovalTable 

@@ -63,3 +63,6 @@ export const DEFAULT_STATUS_FILTERS: string[] = ['대표자변경'];
 /** 업종 기본 필터 */
 export const DEFAULT_INDUSTRY_FILTERS: string[] = ['일반음식점', '제과점영업', '휴게음식점'];
 
+/** 상호명 제외 기본 키워드 */
+export const DEFAULT_EXCLUDE_KEYWORDS: string[] = ['세븐일레븐', '코리아세븐'];
+
