@@ -10,7 +10,7 @@ export type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id' | 'type
 export function useApprovalRadar() {
   const [selectedItem, setSelectedItem] = useState<ApprovalMappedItem | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilters, setStatusFilters] = useState<string[]>(DEFAULT_STATUS_FILTERS);
