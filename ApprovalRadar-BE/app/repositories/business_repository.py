@@ -10,11 +10,11 @@ from app.repositories.query_builder import build_business_where_clause
 from app.repositories.indicator_repository import IndicatorRepository
 
 class BusinessRepository(AbstractBusinessRepository):
-    def get_approvals(self, page: int, size: int, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]], sort_by: str, sort_order: str, infer_update_type: Optional[List[str]] = None, industry_type: Optional[List[str]] = None) -> Tuple[List[Dict[str, Any]], int]:
+    def get_approvals(self, page: int, size: int, search: Optional[str], start_date: Optional[str], end_date: Optional[str], regions: Optional[List[str]], sort_by: str, sort_order: str, infer_update_type: Optional[List[str]] = None, industry_type: Optional[List[str]] = None, exclude_keywords: Optional[List[str]] = None) -> Tuple[List[Dict[str, Any]], int]:
         with get_db() as conn:
             cursor = conn.cursor()
             
-            where_clause, params = build_business_where_clause(search, start_date, end_date, regions, infer_update_type, industry_type)
+            where_clause, params = build_business_where_clause(search, start_date, end_date, regions, infer_update_type, industry_type, exclude_keywords)
             
             # 전체 개수
             cursor.execute(f"SELECT COUNT(*) FROM businesses{where_clause}", params)

@@ -6,7 +6,8 @@ def build_business_where_clause(
     end_date: Optional[str],
     regions: Optional[List[str]],
     infer_update_type: Optional[List[str]] = None,
-    industry_type: Optional[List[str]] = None
+    industry_type: Optional[List[str]] = None,
+    exclude_keywords: Optional[List[str]] = None
 ) -> Tuple[str, List[Any]]:
     query_conditions = []
     params = []
@@ -29,6 +30,11 @@ def build_business_where_clause(
         placeholders = ', '.join(['?'] * len(industry_type))
         query_conditions.append(f"industry_type IN ({placeholders})")
         params.extend(industry_type)
+        
+    if exclude_keywords:
+        for kw in exclude_keywords:
+            query_conditions.append("business_name NOT LIKE ?")
+            params.append(f"%{kw}%")
         
     if search:
         query_conditions.append("(business_name LIKE ? OR license_no LIKE ?)")

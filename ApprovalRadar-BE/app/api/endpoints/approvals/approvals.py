@@ -50,6 +50,11 @@ def parse_infer_update_type_list(infer_update_type: Optional[str] = Query(None, 
         return None
     return [r.strip() for r in infer_update_type.split(',') if r.strip()]
 
+def parse_exclude_keywords_list(exclude_keywords: Optional[str] = Query(None, description="콤마(,)로 구분된 상호명 제외 키워드 목록")) -> Optional[List[str]]:
+    if not exclude_keywords:
+        return None
+    return [k.strip() for k in exclude_keywords.split(',') if k.strip()]
+
 def get_business_repo() -> BusinessRepository:
     return BusinessRepository()
 
@@ -65,10 +70,11 @@ def get_approvals(
     sort_order: SortOrderEnum = Query(SortOrderEnum.desc, description="정렬 방향 (asc | desc)"),
     infer_update_type: Optional[List[str]] = Depends(parse_infer_update_type_list),
     industry_type: Optional[List[str]] = Depends(parse_industry_type_list),
+    exclude_keywords: Optional[List[str]] = Depends(parse_exclude_keywords_list),
     repo: BusinessRepository = Depends(get_business_repo)
 ):
     try:
-        result, total_count = repo.get_approvals(page, size, search, start_date, end_date, regions, sort_by.value, sort_order.value, infer_update_type, industry_type)
+        result, total_count = repo.get_approvals(page, size, search, start_date, end_date, regions, sort_by.value, sort_order.value, infer_update_type, industry_type, exclude_keywords)
         total_pages = math.ceil(total_count / size) if total_count > 0 else 1
         
         meta = PaginationMeta(
@@ -102,7 +108,8 @@ def export_approvals_excel(
     end_date: Optional[str] = Query(None, description="조회 종료일 (YYYYMMDD)"),
     regions: Optional[List[str]] = Depends(parse_comma_separated_list),
     infer_update_type: Optional[List[str]] = Depends(parse_infer_update_type_list),
-    industry_type: Optional[List[str]] = Depends(parse_industry_type_list)
+    industry_type: Optional[List[str]] = Depends(parse_industry_type_list),
+    exclude_keywords: Optional[List[str]] = Depends(parse_exclude_keywords_list)
 ):
     try:
         if not start_date and not end_date:
@@ -113,7 +120,7 @@ def export_approvals_excel(
             start_date_db = start_date.replace('-', '') if start_date else None
             end_date_db = end_date.replace('-', '') if end_date else None
 
-        excel_buffer = generate_excel_export(start_date_db, end_date_db, search, regions, infer_update_type, industry_type)
+        excel_buffer = generate_excel_export(start_date_db, end_date_db, search, regions, infer_update_type, industry_type, exclude_keywords)
         
         date_str = ""
         if start_date_db and end_date_db:

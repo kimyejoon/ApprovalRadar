@@ -5,7 +5,7 @@ from database import get_db
 from typing import Optional
 from app.repositories.query_builder import build_business_where_clause
 
-def generate_excel_export(start_date: Optional[str], end_date: Optional[str], search: Optional[str] = None, regions: Optional[list] = None, infer_update_type: Optional[list] = None, industry_type: Optional[list] = None) -> io.BytesIO:
+def generate_excel_export(start_date: Optional[str], end_date: Optional[str], search: Optional[str] = None, regions: Optional[list] = None, infer_update_type: Optional[list] = None, industry_type: Optional[list] = None, exclude_keywords: Optional[list] = None) -> io.BytesIO:
     """
     주어진 조건에 맞춰 데이터를 조회한 후,
     엑셀 파일 데이터(io.BytesIO)로 반환합니다.
@@ -14,7 +14,7 @@ def generate_excel_export(start_date: Optional[str], end_date: Optional[str], se
         cursor = conn.cursor()
         
         # repositories.query_builder 함수를 사용하여 WHERE 절 생성
-        where_clause, params = build_business_where_clause(search, start_date, end_date, regions, infer_update_type, industry_type)
+        where_clause, params = build_business_where_clause(search, start_date, end_date, regions, infer_update_type, industry_type, exclude_keywords)
             
         # 데이터 조회 (last_event_date 또는 created_at 기준 내림차순)
         query = f"SELECT * FROM businesses{where_clause} ORDER BY last_event_date DESC, created_at DESC"
