@@ -192,7 +192,7 @@ export function ApprovalTable({
                     <CopyButton text={primaryItem.id} />
                   </div>
                 </TableCodeCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
                   <div className="flex items-center gap-1.5 justify-between">
                     <span>{primaryItem.location}</span>
                     <CopyButton text={primaryItem.location} />

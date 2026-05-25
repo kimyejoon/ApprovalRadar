@@ -278,7 +278,7 @@ export function ApprovalDetailModal({ isOpen, onClose, selectedItem }: ApprovalD
                             <span>{primary.industry_type || '-'}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs text-text-muted max-w-[200px] truncate" title={primary.address}>
+                        <TableCell className="text-xs text-text-muted whitespace-nowrap" title={primary.address}>
                           {primary.address}
                         </TableCell>
                       </TableRow>
