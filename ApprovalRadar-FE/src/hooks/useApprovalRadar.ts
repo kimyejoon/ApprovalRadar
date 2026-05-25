@@ -78,8 +78,7 @@ export function useApprovalRadar() {
   const markAsReadMutation = useMutation({
     mutationFn: (license_no: string) => markApprovalAsRead(license_no),
     onMutate: async (license_no) => {
-      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-      const queryKey = ['approvals', currentPage, itemsPerPage, searchQuery, statusFilters, locationFilters, industryFilters, dateRange, sortConfig];
+      const queryKey = ['approvals', currentPage, itemsPerPage, searchQuery, statusFilters, locationFilters, industryFilters, excludeKeywords, dateRange, sortConfig];
       await queryClient.cancelQueries({ queryKey });
 
       // Snapshot the previous value
