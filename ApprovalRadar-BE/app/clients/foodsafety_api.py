@@ -99,11 +99,13 @@ class ApiClient:
             api_key = self.get_current_key()
             
             # I2861 호출 시 가짜 파라미터를 무조건 강제 적용하여 실시간 Live View 활성화
+            # (프록시 서버의 캐시 적중을 막고 실시간 DB 데이터를 가져오기 위해 동적 타임스탬프 사용)
             if service_id == "I2861":
+                cache_buster = f"LIVE_{int(time.time())}"
                 if not kwargs:
-                    kwargs = {"SYS_SYNC": "LIVE"}
-                elif "SYS_SYNC" not in kwargs:
-                    kwargs["SYS_SYNC"] = "LIVE"
+                    kwargs = {"SYS_SYNC": cache_buster}
+                elif "SYS_SYNC" not in kwargs or kwargs["SYS_SYNC"] == "LIVE":
+                    kwargs["SYS_SYNC"] = cache_buster
 
             url = f"{settings.BASE_URL}/{api_key}/{service_id}/{settings.DATA_TYPE}/{start_idx}/{end_idx}"
             if kwargs:
