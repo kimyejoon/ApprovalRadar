@@ -127,24 +127,30 @@ def prune_db(days: int = 7, force: bool = False):
         )
 
         conn.commit()
+        conn.close()  # 커넥션을 명시적으로 닫아 락 해제
         logger.info(f"DB Pruning data deletion completed. Deleted {raw_deleted:,} rows from api_raw_data, {logs_deleted:,} rows from system_logs.")
 
         # 5. incremental_vacuum 실행 (5000 페이지씩 락 부담 없이 점진적 회수)
         logger.info("Starting incremental_vacuum space reclamation...")
         vacuumed_total_pages = 0
-        while True:
-            cursor.execute("PRAGMA freelist_count;")
-            freelist_count = cursor.fetchone()[0]
-            if freelist_count == 0:
-                break
+        
+        # autocommit 모드 (isolation_level=None) 및 타임아웃 60초 설정하여 잠금 경합 완화
+        vac_conn = sqlite3.connect(DB_FILE, isolation_level=None, timeout=60.0)
+        vac_cursor = vac_conn.cursor()
+        try:
+            while True:
+                vac_cursor.execute("PRAGMA freelist_count;")
+                freelist_count = vac_cursor.fetchone()[0]
+                if freelist_count == 0:
+                    break
 
-            # 한 번에 5000 페이지씩 비우기
-            pages_to_vacuum = min(5000, freelist_count)
-            cursor.execute(f"PRAGMA incremental_vacuum({pages_to_vacuum});")
-            vacuumed_total_pages += pages_to_vacuum
-            time.sleep(0.01)
-
-        conn.close()
+                # 한 번에 5000 페이지씩 비우기
+                pages_to_vacuum = min(5000, freelist_count)
+                vac_cursor.execute(f"PRAGMA incremental_vacuum({pages_to_vacuum});")
+                vacuumed_total_pages += pages_to_vacuum
+                time.sleep(0.05)  # 다른 스레드가 쓰기 작업을 할 수 있도록 양보 시간을 확보
+        finally:
+            vac_conn.close()
 
         # 6. 작업 후 파일 크기 및 절약된 공간
         size_after = os.path.getsize(DB_FILE)
