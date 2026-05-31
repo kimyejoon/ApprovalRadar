@@ -262,10 +262,11 @@ def full_mirror(services: list | None = None, from_index: int = 1, force: bool =
 def run_prune(days: int = 7):
     """
     7일 이전의 api_raw_data 및 system_logs 데이터를 삭제하고,
-    incremental_vacuum을 통해 디스크 공간을 회수합니다. (수동 강제 실행)
+    30일 이전 로그 파일을 정리한 뒤 incremental_vacuum을 수행합니다. (수동 강제 실행)
     """
-    from database import prune_db
-    print(f"[DB Pruning] DB 오래된 데이터 수동 정리 시작... (보존 기간: {days}일)")
+    from database import prune_db, prune_log_files
+    print(f"[DB Pruning] DB 및 로그 파일 수동 정리 시작... (보존 기간: DB {days}일 / 로그 30일)")
+    prune_log_files(keep_days=30)
     prune_db(days=days, force=True)
-    print("[DB Pruning] DB Pruning 작업 완료!")
+    print("[DB Pruning] DB 및 로그 파일 정리 작업 완료!")
 
