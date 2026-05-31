@@ -61,7 +61,7 @@ def get_db():
 
 # 외부 모듈 호환성을 위해 DDL 스키마 및 유지보수 기능을 이관한 모듈로부터 노출
 from app.database.schema import init_db
-from app.database.maintenance import backup_db, vacuum_db, prune_db
+from app.database.maintenance import backup_db, vacuum_db, prune_db, prune_log_files
 
 if __name__ == "__main__":
     init_db()
