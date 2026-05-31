@@ -91,6 +91,15 @@ async def lifespan(app: FastAPI):
         daemon=True,
         name="IndustryBackfillThread"
     ).start()
+
+    # DB 오래된 데이터 자동 정리 (Pruning) 백그라운드 시작
+    # (최초 1회 INCREMENTAL vacuum 전환 시 기동 지연을 방지하기 위해 스레드 분리)
+    from database import prune_db
+    threading.Thread(
+        target=lambda: prune_db(days=7),
+        daemon=True,
+        name="DbPruneThread"
+    ).start()
     
     # 즉시 종료 시그널 핸들러 등록 (Ctrl+C가 SSE 연결로 인해 block되는 현상 방지)
     # PyInstaller 환경에서 uvicorn이 서브스레드로 실행될 때는 signal 설정 불가
