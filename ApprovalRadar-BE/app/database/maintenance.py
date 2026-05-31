@@ -223,3 +223,38 @@ def prune_db(days: int = 7, force: bool = False):
         # 8. 임시 제거한 SQLiteHandler 복구
         for h in removed_handlers:
             root_logger.addHandler(h)
+
+
+def prune_log_files(keep_days: int = 30):
+    from app.core.logger import logger, _get_app_base_dir
+    import time
+    import os
+
+    base_dir = _get_app_base_dir()
+    log_dir = os.path.join(base_dir, "logs")
+    if not os.path.exists(log_dir):
+        return
+
+    logger.info(f"Checking old log files in {log_dir} to prune (keeping last {keep_days} days)...")
+    now = time.time()
+    deleted_count = 0
+
+    try:
+        for filename in os.listdir(log_dir):
+            file_path = os.path.join(log_dir, filename)
+            if os.path.isfile(file_path) and filename.startswith("app_") and filename.endswith(".log"):
+                # 수정 시각이 keep_days 일보다 전인지 체크
+                if os.stat(file_path).st_mtime < now - keep_days * 86400:
+                    try:
+                        os.remove(file_path)
+                        logger.info(f"Deleted old log file: {filename}")
+                        deleted_count += 1
+                    except Exception as ex:
+                        logger.warning(f"Failed to remove log file {filename}: {ex}")
+        if deleted_count > 0:
+            logger.info(f"Successfully pruned {deleted_count} old log files.")
+        else:
+            logger.info("No old log files found to prune.")
+    except Exception as e:
+        logger.error(f"Failed to prune log files: {e}", exc_info=True)
+
