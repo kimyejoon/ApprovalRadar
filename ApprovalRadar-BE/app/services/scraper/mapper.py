@@ -53,6 +53,21 @@ def map_row_fields(service_id: str, row: dict) -> Optional[Dict[str, Any]]:
             "change_before":       row.get("CHNG_BF_CN", ""),
             "change_after":        chng_af,
         }
+    elif service_id == "I2500":
+        return {
+            "lcns_no":             row.get("LCNS_NO", ""),
+            "business_name":       row.get("BSSH_NM", ""),
+            "address":             row.get("ADDR", "") or row.get("SITE_ADDR", ""),
+            "representative_name": row.get("PRSDNT_NM", ""),
+            "business_status":     row.get("BSN_STATE_NM") or "영업/정상",
+            "license_date":        row.get("PRMS_DT", ""),
+            "phone_number":        row.get("TELNO", ""),
+            "industry_type":       row.get("INDUTY_CD_NM", ""),
+            "event_date_raw":      row.get("CHNG_DT", "") or row.get("PRMS_DT", ""),
+            "change_reason":       None,  # None으로 처리하여 신규등록 판정 유도
+            "change_before":       "",
+            "change_after":        "",
+        }
     else:
         logger.warning(f"Unknown service_id: {service_id}. Skipping row mapping.")
         return None

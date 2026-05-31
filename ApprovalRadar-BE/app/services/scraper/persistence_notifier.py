@@ -12,7 +12,7 @@ def trigger_sse_broadcast(count: int, service_id: str):
             {"type": "UPDATE", "count": count}, ensure_ascii=False
         )
         broadcaster.broadcast_sync(update_data)
-        svc_name = {"I2859": "식품업소", "I2861": "음식점업소"}.get(service_id, service_id)
+        svc_name = {"I2859": "식품업소", "I2861": "음식점업소", "I2500": "신규등록"}.get(service_id, service_id)
         logger.info(
             f"🔔 [{svc_name}] 오늘 변동분 {count}건 감지 → SSE 발행!"
         )

@@ -334,11 +334,12 @@ async def poll_changes_for_date(target_date: str) -> dict:
 
             # ── Step 3: 후보군 필터링 ──
             #   제외 조건:
-            #     (A) PRMS_DT == target_date → 신규등록 건 (변경이 아님)
+            #     (A) 식품위생법 적용 업종이 아님 → 비식품 업종 완전 차단
             #     (B) 이미 DB에 last_event_date=target_date 레코드 존재 → 이미 수집됨
             #     (C) 동일 LCNS_NO 중복 (I2500 같은 페이지 내 중복)
             #     (D) 단순 동기화 캐시에 있는 업소 → 이미 당일 검증 완료, 변경없음 확인됨
             new_items = []
+            new_regs = []
             seen_lcns_in_cycle: set[str] = set()
             skip_new_reg = 0
             skip_already_today = 0
@@ -350,20 +351,14 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 if not lcns:
                     continue
 
-                # (A) 신규등록 건 제외 (PRMS_DT == target_date)
-                prms_dt = item.get("PRMS_DT") or ""
-                if prms_dt == target_date:
-                    skip_new_reg += 1
-                    continue
-
-                # (A-2) 식품위생법 적용 업종만 수집 (비식품 업종 완전 차단)
+                # (A) 식품위생법 적용 업종만 수집 (비식품 업종 완전 차단)
                 # FOOD_SERVICE_INDUSTRIES = 일반음식점·휴게음식점·제과점영업·위탁급식영업·집단급식소·유흥주점영업·단란주점
                 induty = (item.get("INDUTY_CD_NM") or "").strip()
                 if induty and induty not in FOOD_SERVICE_INDUSTRIES:
                     skip_new_reg += 1   # 스킵 카운터 공유 (업종 외)
                     continue
 
-                # (B) 이미 금일 변경건이 DB에 있는 경우 제외
+                # (B) 이미 금일 변경/등록건이 DB에 있는 경우 제외
                 if lcns in today_lcns_in_db:
                     skip_already_today += 1
                     continue
@@ -382,20 +377,25 @@ async def poll_changes_for_date(target_date: str) -> dict:
                     continue
                 seen_lcns_in_cycle.add(lcns)
 
-                new_items.append(item)
+                prms_dt = item.get("PRMS_DT") or ""
+                if prms_dt == target_date:
+                    new_regs.append(item)
+                else:
+                    new_items.append(item)
 
-            result["skipped"] = len(all_items) - len(new_items)
+            result["skipped"] = len(all_items) - (len(new_items) + len(new_regs))
 
             logger.info(
                 f"[CHNG_DT Poller] 필터 결과: "
-                f"신규등록 스킵 {skip_new_reg:,}건 | "
+                f"업종외 스킵 {skip_new_reg:,}건 | "
                 f"금일 이미수집 스킵 {skip_already_today:,}건 | "
                 f"동기화캐시 스킵 {skip_sync_cache:,}건 | "
                 f"중복 스킵 {skip_dedup:,}건 | "
+                f"신규등록 대상 {len(new_regs):,}건 | "
                 f"I2861 검증 대상 {len(new_items):,}건"
             )
 
-            if not new_items:
+            if not new_items and not new_regs:
                 logger.info(
                     f"[CHNG_DT Poller] {target_date}: {len(all_items):,}건 전부 기존 수집됨 "
                     f"→ Rolling Scan 정상 커버 중 ✅"
@@ -407,71 +407,83 @@ async def poll_changes_for_date(target_date: str) -> dict:
             # ── Step 4: I2500 후보군 검증 및 즉시/배치 삽입 ─────────────────────────
             # 오늘 날짜 진짜 변경건 → 검증 완료 즉시 DB 삽입 + SSE 1건 발행
             # 과거 날짜 / 단순동기화 건 → pending_past_rows 배치 큐 → 전건 완료 후 일괄 삽입
-            pool        = ApiWorkerPool(10, label="CHNG_DT Poller")
-            eff_workers = pool.n_workers
-            logger.info(
-                f"[CHNG_DT Poller] 🔍 신규 후보군 {len(new_items):,}건에 대해 "
-                f"I2861 변경이력 교차 검증 시작 "
-                f"(검증 워커: {eff_workers}개, 살아있는 키: {pool.n_alive}개)..."
-            )
-            semaphore = pool.semaphore
             from scraper import run_scraper_for_service_with_rows
 
-            total_items   = len(new_items)
             today_str_poll = datetime.datetime.now().strftime("%Y%m%d")
-            pending_past_rows: list[dict] = []   # 과거 날짜 데이터 배치 큐
             sync_lcns_this_round: list[tuple[str, str]] = []
             real_today_count: int = 0            # 즉시 삽입된 오늘 변경건 수
-            done_count: int = 0                  # 검증 완료 건수 (진행률용)
+            pending_past_rows: list[dict] = []   # 과거 날짜 데이터 배치 큐
+            total_items = len(new_items)
 
-            async def verify_and_insert_task(item, worker_idx: int):
-                nonlocal real_today_count, done_count
-                async with semaphore:
+            # ── Step 4-1: 신규 등록건 일괄 즉시 삽입 (I2861 검증 불필요) ──────────────────
+            if new_regs:
+                logger.info(
+                    f"[CHNG_DT Poller] 🆕 신규 등록건 {len(new_regs):,}건 DB 즉시 삽입 진행..."
+                )
+                await run_scraper_for_service_with_rows(
+                    "I2500", new_regs, collected_by="chng_dt_poller"
+                )
+                for item in new_regs:
                     lcns = item.get("LCNS_NO", "")
-                    verify_client = pool.get_client(worker_idx)
-                    done_count += 1
-                    prog = f"[{done_count}/{total_items}]"
-                    r_list = await _verify_actual_change(verify_client, lcns, target_date, item, prog=prog)
-
-                    if not r_list:
-                        return
-
-                    # 진짜 허수 판별: I2861 이력이 아예 없는 경우만 (초기자료등록)
-                    # ⚪ 과거 이력(시스템동기화) 은 DB 저장 대상이므로 is_sync=False
-                    is_sync = r_list[0].get("CHNG_PRVNS") == "초기자료등록"
-
-                    # 오늘/과거 날짜 분리 (CHNG_DT=None인 허수 마커 제외)
-                    today_rows = [r for r in r_list if r.get("CHNG_DT") == today_str_poll]
-                    past_rows  = [r for r in r_list if r.get("CHNG_DT") and r.get("CHNG_DT") != today_str_poll]
-
-                    # ── 오늘 날짜 진짜 변경건: 즉시 삽입 + 즉시 SSE ─────────────────
-                    if today_rows:
-                        await run_scraper_for_service_with_rows(
-                            "I2861", today_rows, collected_by="chng_dt_poller"
-                        )
-                        real_today_count += len(today_rows)
-                        prvns = today_rows[0].get("CHNG_PRVNS") or "인허가변동"
-                        bf_cn = today_rows[0].get("CHNG_BF_CN") or ""
-                        af_cn = today_rows[0].get("CHNG_AF_CN") or ""
-                        detail = f" ({bf_cn} → {af_cn})" if (bf_cn or af_cn) else ""
-                        logger.info(
-                            f"[CHNG_DT Poller] {prog} 🟢 즉시 삽입+SSE: {lcns} "
-                            f"({item.get('BSSH_NM', '')}) [{prvns}]{detail}"
-                        )
-                        # 즉시 삽입 후 today_lcns_in_db 갱신 → I2861 스캔과의 중복 방지
-                        today_lcns_in_db.add(lcns)
-
-                    # ── 과거 날짜 데이터: 배치 큐에 적립 ─────────────────────────────
-                    # I2861 검증된 실제 이력은 CHNG_DT가 있으므로 항상 저장
-                    # CHNG_DT=None 허수 마커는 위에서 이미 제외됨
-                    if past_rows:
-                        pending_past_rows.extend(past_rows)
-
-                    # 검증 완료 캐시에 추가하여 다음 폴링 시 중복 조회 방지 (변동건, 과거건, 허수 전체 포함)
                     chng_dt = item.get("CHNG_DT") or target_date
                     sync_lcns_this_round.append((lcns, chng_dt))
 
-            await asyncio.gather(*[verify_and_insert_task(item, i % eff_workers) for i, item in enumerate(new_items)])
+            # ── Step 4-2: 변경 후보군에 대한 I2861 교차 검증 ──────────────────────────────
+            if new_items:
+                pool        = ApiWorkerPool(10, label="CHNG_DT Poller")
+                eff_workers = pool.n_workers
+                logger.info(
+                    f"[CHNG_DT Poller] 🔍 신규 변경 후보군 {len(new_items):,}건에 대해 "
+                    f"I2861 변경이력 교차 검증 시작 "
+                    f"(검증 워커: {eff_workers}개, 살아있는 키: {pool.n_alive}개)..."
+                )
+                semaphore = pool.semaphore
+                done_count = 0                  # 검증 완료 건수 (진행률용)
+
+                async def verify_and_insert_task(item, worker_idx: int):
+                    nonlocal real_today_count, done_count
+                    async with semaphore:
+                        lcns = item.get("LCNS_NO", "")
+                        verify_client = pool.get_client(worker_idx)
+                        done_count += 1
+                        prog = f"[{done_count}/{total_items}]"
+                        r_list = await _verify_actual_change(verify_client, lcns, target_date, item, prog=prog)
+
+                        if not r_list:
+                            return
+
+                        is_sync = r_list[0].get("CHNG_PRVNS") == "초기자료등록"
+
+                        # 오늘/과거 날짜 분리 (CHNG_DT=None인 허수 마커 제외)
+                        today_rows = [r for r in r_list if r.get("CHNG_DT") == today_str_poll]
+                        past_rows  = [r for r in r_list if r.get("CHNG_DT") and r.get("CHNG_DT") != today_str_poll]
+
+                        # ── 오늘 날짜 진짜 변경건: 즉시 삽입 + 즉시 SSE ─────────────────
+                        if today_rows:
+                            await run_scraper_for_service_with_rows(
+                                "I2861", today_rows, collected_by="chng_dt_poller"
+                            )
+                            real_today_count += len(today_rows)
+                            prvns = today_rows[0].get("CHNG_PRVNS") or "인허가변동"
+                            bf_cn = today_rows[0].get("CHNG_BF_CN") or ""
+                            af_cn = today_rows[0].get("CHNG_AF_CN") or ""
+                            detail = f" ({bf_cn} → {af_cn})" if (bf_cn or af_cn) else ""
+                            logger.info(
+                                f"[CHNG_DT Poller] {prog} 🟢 즉시 삽입+SSE: {lcns} "
+                                f"({item.get('BSSH_NM', '')}) [{prvns}]{detail}"
+                            )
+                            # 즉시 삽입 후 today_lcns_in_db 갱신 → I2861 스캔과의 중복 방지
+                            today_lcns_in_db.add(lcns)
+
+                        # ── 과거 날짜 데이터: 배치 큐에 적립 ─────────────────────────────
+                        if past_rows:
+                            pending_past_rows.extend(past_rows)
+
+                        # 검증 완료 캐시에 추가하여 다음 폴링 시 중복 조회 방지 (변동건, 과거건, 허수 전체 포함)
+                        chng_dt = item.get("CHNG_DT") or target_date
+                        sync_lcns_this_round.append((lcns, chng_dt))
+
+                await asyncio.gather(*[verify_and_insert_task(item, i % eff_workers) for i, item in enumerate(new_items)])
 
             # ── 단순동기화 캐시 업데이트 ────────────────────────────────────────
             if sync_lcns_this_round:
@@ -492,14 +504,14 @@ async def poll_changes_for_date(target_date: str) -> dict:
                     "I2861", pending_past_rows, collected_by="chng_dt_poller"
                 )
 
-            result["new"] = len(new_items)
+            result["new"] = len(new_items) + len(new_regs)
             elapsed = round(time.time() - start_time, 1)
             result["elapsed"] = elapsed
 
             logger.info(
                 f"🔔 [CHNG_DT Poller] 완료: CHNG_DT={target_date} "
-                f"API {len(all_items):,}건 → 신규 {len(new_items):,}건 처리 "
-                f"(오늘 즉시삽입 {real_today_count}건 / 과거배치 {len(pending_past_rows):,}건), "
+                f"API {len(all_items):,}건 → 신규 {result['new']:,}건 처리 "
+                f"(신규등록 {len(new_regs)}건 / 변경감지 {real_today_count}건 / 과거배치 {len(pending_past_rows):,}건), "
                 f"기존 {result['skipped']:,}건 ({elapsed}초, {page}p)"
             )
 
@@ -511,6 +523,7 @@ async def poll_changes_for_date(target_date: str) -> dict:
     result["elapsed"] = round(time.time() - start_time, 1)
     _save_poll_history(result)
     return result
+
 
 
 def _save_poll_history(result: dict):
