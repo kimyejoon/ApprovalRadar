@@ -178,12 +178,14 @@ export function ApprovalTable({
             return (
               <TableRow
                 key={`${primaryItem.raw.license_no}-${primaryItem.raw.last_event_date}-${index}`}
-                onClick={() => onRowClick(primaryItem)}
-                className={`cursor-pointer group ${isUnread ? 'bg-emerald-400/20 hover:bg-emerald-400/30' : ''}`}
+                className={isUnread ? 'bg-emerald-400/20 hover:bg-emerald-400/30' : ''}
               >
-                <TableCell className="font-medium text-text-primary group-hover:text-brand transition-colors">
+                <TableCell className="font-medium text-text-primary">
                   <div className="flex items-center gap-1.5 justify-between">
-                    <div className="flex flex-col">
+                    <div
+                      onClick={() => onRowClick(primaryItem)}
+                      className="flex flex-col cursor-pointer hover:underline hover:text-brand transition-colors"
+                    >
                       <span>{primaryItem.name}</span>
                       {primaryItem.prevName && (
                         <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
