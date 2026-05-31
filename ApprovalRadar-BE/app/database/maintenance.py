@@ -101,7 +101,9 @@ def prune_db(days: int = 7, force: bool = False):
         size_before = os.path.getsize(DB_FILE)
         size_before_mb = size_before / 1024 / 1024
 
-        conn = sqlite3.connect(DB_FILE)
+        # timeout 60초 설정 및 BEGIN IMMEDIATE 트랜잭션으로 락 충돌 방지
+        conn = sqlite3.connect(DB_FILE, timeout=60.0)
+        conn.execute("BEGIN IMMEDIATE;")
         cursor = conn.cursor()
 
         # 4. auto_vacuum = INCREMENTAL 설정 및 최초 1회 마이그레이션
@@ -114,18 +116,38 @@ def prune_db(days: int = 7, force: bool = False):
             logger.info("Successfully migrated auto_vacuum mode to INCREMENTAL.")
 
         # 5. 데이터 삭제
-        cursor.execute(
-            "DELETE FROM api_raw_data WHERE datetime(fetched_at) < datetime('now', ?)",
-            (f"-{days} days",)
-        )
-        raw_deleted = cursor.rowcount
+        raw_deleted = 0
+        logs_deleted = 0
+        
+        # api_raw_data 삭제 재시도 루프
+        for retry in range(5):
+            try:
+                cursor.execute(
+                    "DELETE FROM api_raw_data WHERE datetime(fetched_at) < datetime('now', ?)",
+                    (f"-{days} days",)
+                )
+                raw_deleted = cursor.rowcount
+                break
+            except sqlite3.OperationalError as oe:
+                if "locked" in str(oe).lower() and retry < 4:
+                    time.sleep(0.5)
+                else:
+                    raise
 
-        # system_logs 삭제
-        cursor.execute(
-            "DELETE FROM system_logs WHERE datetime(created_at) < datetime('now', ?)",
-            (f"-{days} days",)
-        )
-        logs_deleted = cursor.rowcount
+        # system_logs 삭제 재시도 루프
+        for retry in range(5):
+            try:
+                cursor.execute(
+                    "DELETE FROM system_logs WHERE datetime(created_at) < datetime('now', ?)",
+                    (f"-{days} days",)
+                )
+                logs_deleted = cursor.rowcount
+                break
+            except sqlite3.OperationalError as oe:
+                if "locked" in str(oe).lower() and retry < 4:
+                    time.sleep(0.5)
+                else:
+                    raise
 
         # 'db_maintenance' 상태 갱신
         now_str = datetime.datetime.now().isoformat()
