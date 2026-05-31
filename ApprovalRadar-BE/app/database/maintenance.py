@@ -60,3 +60,104 @@ def vacuum_db():
         logger.info("SQLite DB VACUUM completed successfully.")
     except Exception as e:
         logger.error(f"Failed to VACUUM DB: {e}")
+
+
+def prune_db(days: int = 7, force: bool = False):
+    from app.core.logger import logger
+    from database import DB_FILE
+
+    logger.info(f"Starting SQLite DB Pruning (keeping last {days} days, force={force})...")
+    try:
+        # 1. 24시간 중복 방지 체크 (force=False 일 때만)
+        if not force:
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            try:
+                cursor.execute("SELECT updated_at FROM crawler_state WHERE service_id = 'db_maintenance'")
+                row = cursor.fetchone()
+                if row:
+                    last_pruned = datetime.datetime.fromisoformat(row[0])
+                    if datetime.datetime.now() - last_pruned < datetime.timedelta(hours=24):
+                        logger.info(f"DB Pruning skipped: last pruned at {row[0]} (less than 24 hours ago).")
+                        conn.close()
+                        return
+            except Exception as ex:
+                logger.warning(f"Failed to parse last pruned time: {ex}, proceeding with pruning.")
+            finally:
+                if conn:
+                    conn.close()
+
+        # 2. 작업 전 파일 크기
+        size_before = os.path.getsize(DB_FILE)
+        size_before_mb = size_before / 1024 / 1024
+
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+
+        # 3. auto_vacuum = INCREMENTAL 설정 및 최초 1회 마이그레이션
+        cursor.execute("PRAGMA auto_vacuum;")
+        auto_vacuum_mode = cursor.fetchone()[0]
+        if auto_vacuum_mode != 2:  # 2: INCREMENTAL
+            logger.info("Migrating SQLite auto_vacuum mode to INCREMENTAL...")
+            cursor.execute("PRAGMA auto_vacuum = INCREMENTAL;")
+            # 설정을 디스크 포맷에 적용하기 위해 VACUUM 실행
+            cursor.execute("VACUUM;")
+            logger.info("Successfully migrated auto_vacuum mode to INCREMENTAL.")
+
+        # 4. 데이터 삭제
+        # api_raw_data 삭제 (UTC datetime과 맞추기 위해 datetime 함수 활용)
+        cursor.execute(
+            "DELETE FROM api_raw_data WHERE datetime(fetched_at) < datetime('now', ?)",
+            (f"-{days} days",)
+        )
+        raw_deleted = cursor.rowcount
+
+        # system_logs 삭제
+        cursor.execute(
+            "DELETE FROM system_logs WHERE datetime(created_at) < datetime('now', ?)",
+            (f"-{days} days",)
+        )
+        logs_deleted = cursor.rowcount
+
+        # 'db_maintenance' 상태 갱신
+        now_str = datetime.datetime.now().isoformat()
+        cursor.execute(
+            "INSERT OR REPLACE INTO crawler_state (service_id, last_total_count, pivots, updated_at) VALUES (?, 0, '{}', ?)",
+            ('db_maintenance', now_str)
+        )
+
+        conn.commit()
+        logger.info(f"DB Pruning data deletion completed. Deleted {raw_deleted:,} rows from api_raw_data, {logs_deleted:,} rows from system_logs.")
+
+        # 5. incremental_vacuum 실행 (5000 페이지씩 락 부담 없이 점진적 회수)
+        logger.info("Starting incremental_vacuum space reclamation...")
+        vacuumed_total_pages = 0
+        while True:
+            cursor.execute("PRAGMA freelist_count;")
+            freelist_count = cursor.fetchone()[0]
+            if freelist_count == 0:
+                break
+
+            # 한 번에 5000 페이지씩 비우기
+            pages_to_vacuum = min(5000, freelist_count)
+            cursor.execute(f"PRAGMA incremental_vacuum({pages_to_vacuum});")
+            vacuumed_total_pages += pages_to_vacuum
+            time.sleep(0.01)
+
+        conn.close()
+
+        # 6. 작업 후 파일 크기 및 절약된 공간
+        size_after = os.path.getsize(DB_FILE)
+        size_after_mb = size_after / 1024 / 1024
+        saved_mb = size_before_mb - size_after_mb
+
+        logger.info(
+            f"SQLite DB Pruning completed successfully.\n"
+            f"  - Size Before: {size_before_mb:.2f} MB\n"
+            f"  - Size After: {size_after_mb:.2f} MB\n"
+            f"  - Saved Space: {saved_mb:.2f} MB\n"
+            f"  - Vacuumed Pages: {vacuumed_total_pages:,} pages"
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to prune DB: {e}", exc_info=True)
