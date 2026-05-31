@@ -369,11 +369,10 @@ async def poll_changes_for_date(target_date: str) -> dict:
                     continue
 
                 # (D) 단순 동기화 이미 확인됨 (in-memory 캐시) → 스킵
-                #     첫 폴링에서 I2861 검증 후 단순동기화로 판명된 업소는
-                #     이후 폴링에서 자동 스킵 (구소 폴링가속화)
-                chng_dt = item.get("CHNG_DT") or ""
+                #     당일 검증 완료되었거나 그 이후 날짜까지 검증된 경우 스킵 (구소 폴링가속화)
+                #     주의: I2500 응답에는 CHNG_DT 필드가 없으므로, 현재 쿼리 중인 target_date 기준으로 캐시 비교 수행
                 cached_max_date = _sync_cache_lcns.get(lcns)
-                if cached_max_date and cached_max_date >= chng_dt:
+                if cached_max_date and cached_max_date >= target_date:
                     skip_sync_cache += 1
                     continue
 
