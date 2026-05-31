@@ -4,6 +4,7 @@ import os
 
 # app 모듈 경로 인식
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from app.core.logger import logger
 
 from app.cli.commands.keys import check_keys
 from app.cli.commands.tail import test_tail
