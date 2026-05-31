@@ -92,11 +92,17 @@ async def lifespan(app: FastAPI):
         name="IndustryBackfillThread"
     ).start()
 
-    # DB 오래된 데이터 자동 정리 (Pruning) 백그라운드 시작
+    # DB 오래된 데이터 자동 정리 (Pruning) 및 로그 파일 정리 백그라운드 시작
     # (최초 1회 INCREMENTAL vacuum 전환 시 기동 지연을 방지하기 위해 스레드 분리)
-    from database import prune_db
+    # - prune_log_files는 기동 시마다 매번 즉시 수행
+    # - prune_db는 내부에서 24시간 주기 필터링 수행
+    from database import prune_db, prune_log_files
+    def _background_maintenance():
+        prune_log_files(keep_days=30)
+        prune_db(days=7)
+
     threading.Thread(
-        target=lambda: prune_db(days=7),
+        target=_background_maintenance,
         daemon=True,
         name="DbPruneThread"
     ).start()
