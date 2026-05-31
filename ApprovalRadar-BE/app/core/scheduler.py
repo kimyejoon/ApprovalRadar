@@ -110,11 +110,14 @@ def start_scheduler():
     scheduler.add_job(_backfill_job, 'interval', hours=6, id="backfill_job")
 
     # DB 최적화 (일요일 새벽 3시)
-    from database import vacuum_db, backup_db
+    from database import vacuum_db, backup_db, prune_db
     scheduler.add_job(vacuum_db, 'cron', day_of_week='sun', hour=3, minute=0, id="vacuum_job")
 
     # DB 백업 (매일 새벽 4시)
     scheduler.add_job(backup_db, 'cron', hour=4, minute=0, id="backup_job")
+
+    # DB 오래된 데이터 자동 정리 (매일 새벽 3시 30분)
+    scheduler.add_job(lambda: prune_db(days=7), 'cron', hour=3, minute=30, id="db_prune_job")
 
     # 앱 시작 시 즉시 1회 실행 (blocking 방지를 위해 스케줄러에 위임)
     logger.info("Adding initial catch-up scraper job to background...")
