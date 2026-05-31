@@ -73,6 +73,7 @@ interface ApprovalTableProps {
   onLocationClick: () => void;
   onStatusClick: () => void;
   onIndustryClick: () => void;
+  mode?: 'changes' | 'new';
 }
 
 export function ApprovalTable({
@@ -85,6 +86,7 @@ export function ApprovalTable({
   onLocationClick,
   onStatusClick,
   onIndustryClick,
+  mode = 'changes',
 }: ApprovalTableProps) {
   // 같은 (license_no, last_event_date) 를 하나의 그룹으로 묶음
   // 여러 변경 유형이 동날짜에 발생하면 1개 행으로 표시하되 태그를 복수 표시
@@ -124,15 +126,21 @@ export function ApprovalTable({
             </button>
           </TableHead>
           <TableHead>
-            <button
-              className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
-              onClick={onStatusClick}
-            >
-              변경 타입
-              <CaretDown weight="bold" className="w-4 h-4" />
-            </button>
+            {mode === 'new' ? (
+              <span className="flex items-center gap-1 text-text-muted font-medium text-xs">
+                구분
+              </span>
+            ) : (
+              <button
+                className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
+                onClick={onStatusClick}
+              >
+                변경 타입
+                <CaretDown weight="bold" className="w-4 h-4" />
+              </button>
+            )}
           </TableHead>
-          <SortableHead label="인허가 변동시각" sortKey="approvalDate" sortConfig={sortConfig} onSort={onSort} />
+          <SortableHead label={mode === 'new' ? '인허가 일자' : '인허가 변동시각'} sortKey="approvalDate" sortConfig={sortConfig} onSort={onSort} />
           <SortableHead label="전화번호" sortKey="phone" sortConfig={sortConfig} onSort={onSort} />
         </TableRow>
       </TableHeader>

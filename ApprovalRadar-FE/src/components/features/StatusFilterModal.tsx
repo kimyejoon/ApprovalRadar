@@ -4,11 +4,13 @@ import { Modal } from '../ui/Modal';
 import { CATEGORY_NAMES, CATEGORY_ICONS } from '@/lib/constants';
 import { SquaresFour } from '@phosphor-icons/react';
 
-const STATUS_OPTIONS = Object.keys(CATEGORY_NAMES).map(key => ({
-  value: key,
-  label: CATEGORY_NAMES[key],
-  icon: CATEGORY_ICONS[key] || SquaresFour
-}));
+const STATUS_OPTIONS = Object.keys(CATEGORY_NAMES)
+  .filter(key => key !== '신규등록')
+  .map(key => ({
+    value: key,
+    label: CATEGORY_NAMES[key],
+    icon: CATEGORY_ICONS[key] || SquaresFour
+  }));
 
 interface StatusFilterModalProps {
   isOpen: boolean;

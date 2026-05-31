@@ -9,6 +9,9 @@ export const CATEGORY_NAMES: Record<string, string> = {
   '초기수집(과거변경있음)': '기타',
 };
 
+export const CHANGE_CATEGORIES = ['대표자변경', '상태변경', '변경민원-상호명', '변경민원-주소', '초기수집(과거변경있음)'];
+export const NEW_CATEGORIES = ['신규등록'];
+
 export const CATEGORY_COLORS: Record<string, string> = {
   '신규등록': '#434FF4',
   '상태변경': '#ef4444',

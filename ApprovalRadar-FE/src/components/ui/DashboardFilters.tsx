@@ -30,6 +30,7 @@ interface DashboardFiltersProps {
   onIndustryFiltersChange: (industries: string[]) => void;
   excludeKeywords: string[];
   onExcludeKeywordsChange: (keywords: string[]) => void;
+  mode?: 'changes' | 'new';
 }
 
 export function DashboardFilters({
@@ -45,6 +46,7 @@ export function DashboardFilters({
   onIndustryFiltersChange,
   excludeKeywords,
   onExcludeKeywordsChange,
+  mode = 'changes',
 }: DashboardFiltersProps) {
   let groupedTags: { label: string, onRemove: () => void }[] = [];
 
@@ -118,9 +120,9 @@ export function DashboardFilters({
       </div>
 
       {/* Active Filters Row */}
-      {(statusFilters.length > 0 || groupedTags.length > 0 || industryFilters.length > 0 || excludeKeywords.length > 0) && (
+      {((mode !== 'new' && statusFilters.length > 0) || groupedTags.length > 0 || industryFilters.length > 0 || excludeKeywords.length > 0) && (
         <div className="mb-6 flex flex-wrap items-center gap-2">
-          {statusFilters.map(status => (
+          {mode !== 'new' && statusFilters.map(status => (
             <span key={status} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 text-brand text-xs font-medium border border-brand/20 shadow-sm">
               {CATEGORY_ICONS[status] && (
                 <span className="flex items-center">

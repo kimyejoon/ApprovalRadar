@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Broadcast, Sun, Moon, SquaresFour, Terminal, GearSix, Flask } from '@phosphor-icons/react';
+import { Broadcast, Sun, Moon, SquaresFour, PlusSquare, Terminal, GearSix, Flask } from '@phosphor-icons/react';
 import { Button } from '../ui/button';
 import { ServerStatusBadge } from '../ui/ServerStatusBadge';
 import { useApiHealthStore } from '@/store/useApiHealthStore';
 
-export type ActiveTab = 'dashboard' | 'logs' | 'settings' | 'playground';
+export type ActiveTab = 'change-monitor' | 'new-monitor' | 'logs' | 'settings' | 'playground';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -13,10 +13,11 @@ interface DashboardLayoutProps {
 }
 
 const NAV_ITEMS: { id: ActiveTab; label: string; icon: React.ElementType }[] = [
-  { id: 'dashboard', label: '대시보드', icon: SquaresFour },
-  { id: 'logs',      label: '로그',    icon: Terminal },
-  { id: 'settings',  label: '설정',    icon: GearSix },
-  { id: 'playground', label: '플레이그라운드', icon: Flask },
+  { id: 'change-monitor', label: '변경건 모니터링', icon: SquaresFour },
+  { id: 'new-monitor',    label: '신규건 모니터링', icon: PlusSquare },
+  { id: 'logs',           label: '로그',          icon: Terminal },
+  { id: 'settings',       label: '설정',          icon: GearSix },
+  { id: 'playground',     label: '플레이그라운드',   icon: Flask },
 ];
 
 export function DashboardLayout({ children, activeTab, onTabChange }: DashboardLayoutProps) {
@@ -54,10 +55,11 @@ export function DashboardLayout({ children, activeTab, onTabChange }: DashboardL
   }, [isDark]);
 
   const PAGE_TITLES: Record<ActiveTab, string> = {
-    dashboard: '실시간 인허가 변동 모니터링',
-    logs:      '시스템 로그 모니터링',
-    settings:  '설정',
-    playground: '크롤러 플레이그라운드',
+    'change-monitor': '실시간 인허가 변동 모니터링',
+    'new-monitor':    '실시간 인허가 신규 등록 모니터링',
+    logs:             '시스템 로그 모니터링',
+    settings:         '설정',
+    playground:       '크롤러 플레이그라운드',
   };
 
   return (

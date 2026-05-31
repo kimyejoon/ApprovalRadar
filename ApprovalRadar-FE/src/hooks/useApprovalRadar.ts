@@ -1,29 +1,132 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, startOfToday } from 'date-fns';
+import { format, startOfToday, parse } from 'date-fns';
 import { fetchApprovals, markApprovalAsRead, type ApprovalData, type ApprovalMappedItem, type ApprovalsResponse } from '@/lib/api';
 import { CATEGORY_NAMES, DEFAULT_STATUS_FILTERS, DEFAULT_INDUSTRY_FILTERS, DEFAULT_EXCLUDE_KEYWORDS } from '@/lib/constants';
 import { formatPhoneNumber } from '@/lib/utils';
 
 export type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id' | 'type';
 
-export function useApprovalRadar() {
+function getUrlParams() {
+  const hash = window.location.hash || '';
+  const questionMarkIndex = hash.indexOf('?');
+  if (questionMarkIndex === -1) return new URLSearchParams();
+  return new URLSearchParams(hash.substring(questionMarkIndex));
+}
+
+function syncStateToUrl(hashPath: string, state: {
+  page: number;
+  size: number;
+  search: string;
+  status: string[];
+  regions: string[];
+  industries: string[];
+  exclude: string[];
+  from?: Date;
+  to?: Date;
+  sortKey?: SortKey | null;
+  sortDir?: 'asc' | 'desc' | null;
+}) {
+  const params = new URLSearchParams();
+  if (state.page !== 1) params.set('page', state.page.toString());
+  if (state.size !== 50) params.set('size', state.size.toString());
+  if (state.search) params.set('search', state.search);
+  if (state.status.length > 0) params.set('status', state.status.join(','));
+  if (state.regions.length > 0) params.set('regions', state.regions.join(','));
+  if (state.industries.length > 0) params.set('industries', state.industries.join(','));
+  if (state.exclude.length > 0) params.set('exclude', state.exclude.join(','));
+  if (state.from) params.set('from', format(state.from, 'yyyyMMdd'));
+  if (state.to) params.set('to', format(state.to, 'yyyyMMdd'));
+  if (state.sortKey) {
+    params.set('sort', state.sortKey);
+    params.set('dir', state.sortDir || 'desc');
+  }
+
+  const queryStr = params.toString();
+  const newHash = `#${hashPath}${queryStr ? '?' + queryStr : ''}`;
+  window.history.replaceState(null, '', newHash);
+}
+
+export function useApprovalRadar(mode: 'changes' | 'new') {
+  const hashPath = mode === 'changes' ? '/change-monitor' : '/new-monitor';
+
+  // ── 1. URL로부터 초기 상태 파싱 ──
+  const getInitialState = () => {
+    const params = getUrlParams();
+    const page = parseInt(params.get('page') || '1', 10);
+    const size = parseInt(params.get('size') || '50', 10);
+    const search = params.get('search') || '';
+
+    // 모드별 상태(status) 기본값 분기
+    let status = DEFAULT_STATUS_FILTERS;
+    if (mode === 'new') {
+      status = ['신규등록'];
+    } else {
+      const urlStatus = params.get('status');
+      if (urlStatus) {
+        status = urlStatus.split(',').filter(Boolean);
+      }
+    }
+
+    const regions = params.get('regions') ? (params.get('regions') || '').split(',').filter(Boolean) : [];
+    const industries = params.get('industries') ? (params.get('industries') || '').split(',').filter(Boolean) : DEFAULT_INDUSTRY_FILTERS;
+    const exclude = params.get('exclude') ? (params.get('exclude') || '').split(',').filter(Boolean) : DEFAULT_EXCLUDE_KEYWORDS;
+
+    let from = startOfToday();
+    let to = startOfToday();
+    if (params.get('from')) {
+      try {
+        from = parse(params.get('from') || '', 'yyyyMMdd', new Date());
+      } catch (e) {}
+    }
+    if (params.get('to')) {
+      try {
+        to = parse(params.get('to') || '', 'yyyyMMdd', new Date());
+      } catch (e) {}
+    }
+
+    const sortKey = params.get('sort') as SortKey || null;
+    const sortDir = params.get('dir') as 'asc' | 'desc' || 'desc';
+    const sortConfig = sortKey ? { key: sortKey, direction: sortDir } : null;
+
+    return { page, size, search, status, regions, industries, exclude, from, to, sortConfig };
+  };
+
+  const initial = getInitialState();
+
   const [selectedItem, setSelectedItem] = useState<ApprovalMappedItem | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(50);
-  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilters, setStatusFilters] = useState<string[]>(DEFAULT_STATUS_FILTERS);
-  const [locationFilters, setLocationFilters] = useState<string[]>([]); // 기본값: 전체 (지역 필터 해제)
-  const [industryFilters, setIndustryFilters] = useState<string[]>(DEFAULT_INDUSTRY_FILTERS);
-  const [excludeKeywords, setExcludeKeywords] = useState<string[]>(DEFAULT_EXCLUDE_KEYWORDS);
+  const [currentPage, setCurrentPage] = useState(initial.page);
+  const [itemsPerPage, setItemsPerPage] = useState(initial.size);
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(initial.sortConfig);
+  const [searchQuery, setSearchQuery] = useState(initial.search);
+  const [statusFilters, setStatusFilters] = useState<string[]>(initial.status);
+  const [locationFilters, setLocationFilters] = useState<string[]>(initial.regions);
+  const [industryFilters, setIndustryFilters] = useState<string[]>(initial.industries);
+  const [excludeKeywords, setExcludeKeywords] = useState<string[]>(initial.exclude);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>({
-    from: startOfToday(),
-    to: startOfToday()
+    from: initial.from,
+    to: initial.to
   });
 
+  // ── 2. 상태가 변경될 때마다 URL Hash 파라미터 갱신 ──
+  useEffect(() => {
+    syncStateToUrl(hashPath, {
+      page: currentPage,
+      size: itemsPerPage,
+      search: searchQuery,
+      status: statusFilters,
+      regions: locationFilters,
+      industries: industryFilters,
+      exclude: excludeKeywords,
+      from: dateRange?.from,
+      to: dateRange?.to,
+      sortKey: sortConfig?.key,
+      sortDir: sortConfig?.direction
+    });
+  }, [currentPage, itemsPerPage, searchQuery, statusFilters, locationFilters, industryFilters, excludeKeywords, dateRange, sortConfig, hashPath]);
+
   const { data: apiResponse, isLoading, isError } = useQuery({
-    queryKey: ['approvals', currentPage, itemsPerPage, searchQuery, statusFilters, locationFilters, industryFilters, excludeKeywords, dateRange, sortConfig],
+    queryKey: ['approvals', currentPage, itemsPerPage, searchQuery, statusFilters, locationFilters, industryFilters, excludeKeywords, dateRange, sortConfig, mode],
     queryFn: () => fetchApprovals({
       page: currentPage,
       size: itemsPerPage,
@@ -31,7 +134,10 @@ export function useApprovalRadar() {
       start_date: dateRange?.from ? format(dateRange.from, 'yyyyMMdd') : undefined,
       end_date: dateRange?.to ? format(dateRange.to, 'yyyyMMdd') : undefined,
       regions: locationFilters.length > 0 ? locationFilters.join(',') : undefined,
-      infer_update_type: statusFilters.length > 0 ? statusFilters.join(',') : undefined,
+      // mode가 'new'면 무조건 '신규등록'만, 'changes'면 '신규등록'을 필터 목록에서 제외하거나 사용자 선택 필터 적용
+      infer_update_type: mode === 'new' 
+        ? '신규등록' 
+        : (statusFilters.length > 0 ? statusFilters.join(',') : undefined),
       industry_type: industryFilters.length > 0 ? industryFilters.join(',') : undefined,
       exclude_keywords: excludeKeywords.length > 0 ? excludeKeywords.join(',') : undefined,
       sort_by: sortConfig ? (
@@ -77,14 +183,12 @@ export function useApprovalRadar() {
 
   const markAsReadMutation = useMutation({
     mutationFn: (license_no: string) => markApprovalAsRead(license_no),
-    onMutate: async (license_no) => {
-      const queryKey = ['approvals', currentPage, itemsPerPage, searchQuery, statusFilters, locationFilters, industryFilters, excludeKeywords, dateRange, sortConfig];
+    onMutate: async (license_no: string) => {
+      const queryKey = ['approvals', currentPage, itemsPerPage, searchQuery, statusFilters, locationFilters, industryFilters, excludeKeywords, dateRange, sortConfig, mode];
       await queryClient.cancelQueries({ queryKey });
 
-      // Snapshot the previous value
       const previousData = queryClient.getQueryData<ApprovalsResponse>(queryKey);
 
-      // Optimistically update to the new value
       if (previousData) {
         queryClient.setQueryData<ApprovalsResponse>(queryKey, {
           ...previousData,
@@ -94,7 +198,6 @@ export function useApprovalRadar() {
         });
       }
 
-      // Return a context object with the snapshotted value
       return { previousData, queryKey };
     },
     onError: (_err, _newTodo, context) => {
@@ -103,7 +206,6 @@ export function useApprovalRadar() {
       }
     },
     onSettled: (_data, _error, _variables, context) => {
-      // Always refetch after error or success to ensure data is correct
       if (context?.queryKey) {
         queryClient.invalidateQueries({ queryKey: context.queryKey });
       }
@@ -162,8 +264,10 @@ export function useApprovalRadar() {
       handleItemsPerPageChange,
       handleSearch,
       handleStatusFiltersChange: (statuses: string[]) => {
-        setStatusFilters(statuses);
-        setCurrentPage(1);
+        if (mode === 'changes') {
+          setStatusFilters(statuses);
+          setCurrentPage(1);
+        }
       },
       handleLocationFiltersChange,
       handleIndustryFiltersChange: (industries: string[]) => {

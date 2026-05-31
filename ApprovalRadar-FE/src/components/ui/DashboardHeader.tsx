@@ -13,18 +13,27 @@ interface DashboardHeaderProps {
     industry_type?: string[];
     exclude_keywords?: string[];
   };
+  mode?: 'changes' | 'new';
 }
 
-export function DashboardHeader({ dateRange, filters }: DashboardHeaderProps) {
+export function DashboardHeader({ dateRange, filters, mode = 'changes' }: DashboardHeaderProps) {
   const todayNewCount = useIndicatorStore(s => s.todayNewCount);
   const { isExporting, handleExportExcel } = useExcelExport(dateRange, filters);
 
   return (
     <div className="flex justify-between items-center mb-6">
       <div>
-        <h2 className="text-2xl font-sans font-medium text-text-primary tracking-tight">금일 변동 내역</h2>
+        <h2 className="text-2xl font-sans font-medium text-text-primary tracking-tight">
+          {mode === 'new' ? '금일 신규 등록 내역' : '금일 변동 내역'}
+        </h2>
         <p className="text-text-muted mt-1 text-sm">
-          오늘 발생한 새로운 변동: <span className="text-brand font-medium">{todayNewCount.toLocaleString()}</span>건
+          {mode === 'new' ? (
+            '오늘 새롭게 인허가 등록된 업소 내역입니다.'
+          ) : (
+            <>
+              오늘 발생한 새로운 변동: <span className="text-brand font-medium">{todayNewCount.toLocaleString()}</span>건
+            </>
+          )}
         </p>
       </div>
       <div className="flex gap-2">
