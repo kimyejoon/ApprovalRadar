@@ -27,20 +27,23 @@ export function useExcelExport(dateRange?: DateRange, filters?: ExcelExportFilte
       const startStr = dateRange?.from ? format(dateRange.from, 'yyyyMMdd') : undefined;
       const endStr = dateRange?.to ? format(dateRange.to, 'yyyyMMdd') : undefined;
       
-      let filename = '대표자변경분.xlsx';
+      const isNewReg = filters?.infer_update_type?.includes('신규등록') && filters.infer_update_type.length === 1;
+      const prefix = isNewReg ? '신규등록건' : '대표자변경분';
+
+      let filename = `${prefix}.xlsx`;
       if (startStr && endStr) {
         if (startStr === endStr) {
-          filename = `대표자변경분_${startStr}.xlsx`;
+          filename = `${prefix}_${startStr}.xlsx`;
         } else {
-          filename = `대표자변경분_${startStr}_${endStr}.xlsx`;
+          filename = `${prefix}_${startStr}_${endStr}.xlsx`;
         }
       } else if (startStr) {
-        filename = `대표자변경분_${startStr}.xlsx`;
+        filename = `${prefix}_${startStr}.xlsx`;
       } else if (endStr) {
-        filename = `대표자변경분_${endStr}.xlsx`;
+        filename = `${prefix}_${endStr}.xlsx`;
       } else {
         const today = format(new Date(), 'yyyyMMdd');
-        filename = `대표자변경분_${today}.xlsx`;
+        filename = `${prefix}_${today}.xlsx`;
       }
 
       const search = filters?.search?.trim() || undefined;
