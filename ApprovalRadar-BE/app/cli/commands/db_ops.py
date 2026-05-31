@@ -257,3 +257,15 @@ def full_mirror(services: list | None = None, from_index: int = 1, force: bool =
     print(f"  신규 저장: {grand_total_saved:,}건")
     print(f"  사용 API 호출: {grand_total_calls}회")
     print(f"  소요 시간: {elapsed:.1f}초")
+
+
+def run_prune(days: int = 7):
+    """
+    7일 이전의 api_raw_data 및 system_logs 데이터를 삭제하고,
+    incremental_vacuum을 통해 디스크 공간을 회수합니다. (수동 강제 실행)
+    """
+    from database import prune_db
+    print(f"🚀 DB 오래된 데이터 수동 정리 (Pruning) 시작... (보존 기간: {days}일)")
+    prune_db(days=days, force=True)
+    print("✅ DB Pruning 작업 완료!")
+

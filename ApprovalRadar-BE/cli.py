@@ -10,7 +10,7 @@ from app.cli.commands.tail import test_tail
 from app.cli.commands.sync import run_sync
 from app.cli.commands.backfill import run_backfill
 from app.cli.commands.stream import test_stream_update
-from app.cli.commands.db_ops import reset_state, full_scan_init, full_mirror
+from app.cli.commands.db_ops import reset_state, full_scan_init, full_mirror, run_prune
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ApprovalRadar Backend CLI Tools")
@@ -25,6 +25,7 @@ if __name__ == "__main__":
         "--full-scan-init": ("⚠️ DB를 완전 초기화하고 전체 스캔을 재준비합니다. (확인 프롬프트 포함)", lambda a, s: full_scan_init(no_backup=a.no_backup, services=s)),
         "--reset-state": ("businesses 데이터는 보존하고 crawler_state(피벗/Tail)만 리셋합니다.", lambda a, s: reset_state(services=s)),
         "--mirror": ("전체 API 데이터를 businesses 테이블에 미러링합니다. (일회성, API 호출)", lambda a, s: full_mirror(services=s, from_index=a.from_index, force=a.force)),
+        "--prune-db": ("최근 7일 이전의 api_raw_data 및 system_logs 데이터를 삭제하고 용량을 정리합니다.", lambda a, s: run_prune(days=7)),
     }
 
     for flag, (help_text, _) in actions.items():
