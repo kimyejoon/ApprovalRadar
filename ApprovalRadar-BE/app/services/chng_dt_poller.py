@@ -87,7 +87,7 @@ async def _verify_actual_change(
     """
     service_i2861 = "I2861"
     try:
-        res = await api_client.fetch_data(service_i2861, 1, 10, LCNS_NO=lcns)
+        res = await api_client.fetch_data(service_i2861, 1, 100, LCNS_NO=lcns)
     except Exception as e:
         logger.warning(f"[CHNG_DT Poller] I2861 검증 API 호출 실패 (LCNS_NO={lcns}): {e}")
         # API 호출 실패 시에는 안전을 위해 I2500 정보 그대로 오늘 자 변동으로 처리
