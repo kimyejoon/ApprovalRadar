@@ -101,12 +101,11 @@ def prune_db(days: int = 7, force: bool = False):
         size_before = os.path.getsize(DB_FILE)
         size_before_mb = size_before / 1024 / 1024
 
-        # timeout 60초 설정 및 BEGIN IMMEDIATE 트랜잭션으로 락 충돌 방지
+        # timeout 60초 설정하여 커넥션 생성 (autocommit 상태에서 auto_vacuum 마이그레이션을 우선 처리)
         conn = sqlite3.connect(DB_FILE, timeout=60.0)
-        conn.execute("BEGIN IMMEDIATE;")
         cursor = conn.cursor()
 
-        # 4. auto_vacuum = INCREMENTAL 설정 및 최초 1회 마이그레이션
+        # 4. auto_vacuum = INCREMENTAL 설정 및 최초 1회 마이그레이션 (트랜잭션 밖에서 실행 필수)
         cursor.execute("PRAGMA auto_vacuum;")
         auto_vacuum_mode = cursor.fetchone()[0]
         if auto_vacuum_mode != 2:  # 2: INCREMENTAL
@@ -114,6 +113,9 @@ def prune_db(days: int = 7, force: bool = False):
             cursor.execute("PRAGMA auto_vacuum = INCREMENTAL;")
             cursor.execute("VACUUM;")
             logger.info("Successfully migrated auto_vacuum mode to INCREMENTAL.")
+
+        # 이제 쓰기 작업을 위해 BEGIN IMMEDIATE 트랜잭션 시작
+        conn.execute("BEGIN IMMEDIATE;")
 
         # 5. 데이터 삭제
         raw_deleted = 0
