@@ -63,12 +63,22 @@ def vacuum_db():
 
 
 def prune_db(days: int = 7, force: bool = False):
-    from app.core.logger import logger
+    import logging
+    from app.core.logger import logger, SQLiteHandler
     from database import DB_FILE
+
+    # 1. 중복 방지 및 락 방지를 위해 SQLiteHandler 임시 분리
+    # Pruning 진행 도중 로그가 DB에 다시 적재되며 발생하는 Self-Locking 방지
+    root_logger = logging.getLogger("ApprovalRadar")
+    removed_handlers = []
+    for h in list(root_logger.handlers):
+        if isinstance(h, SQLiteHandler):
+            root_logger.removeHandler(h)
+            removed_handlers.append(h)
 
     logger.info(f"Starting SQLite DB Pruning (keeping last {days} days, force={force})...")
     try:
-        # 1. 24시간 중복 방지 체크 (force=False 일 때만)
+        # 2. 24시간 중복 방지 체크 (force=False 일 때만)
         if not force:
             conn = sqlite3.connect(DB_FILE)
             cursor = conn.cursor()
@@ -87,25 +97,23 @@ def prune_db(days: int = 7, force: bool = False):
                 if conn:
                     conn.close()
 
-        # 2. 작업 전 파일 크기
+        # 3. 작업 전 파일 크기
         size_before = os.path.getsize(DB_FILE)
         size_before_mb = size_before / 1024 / 1024
 
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
 
-        # 3. auto_vacuum = INCREMENTAL 설정 및 최초 1회 마이그레이션
+        # 4. auto_vacuum = INCREMENTAL 설정 및 최초 1회 마이그레이션
         cursor.execute("PRAGMA auto_vacuum;")
         auto_vacuum_mode = cursor.fetchone()[0]
         if auto_vacuum_mode != 2:  # 2: INCREMENTAL
             logger.info("Migrating SQLite auto_vacuum mode to INCREMENTAL...")
             cursor.execute("PRAGMA auto_vacuum = INCREMENTAL;")
-            # 설정을 디스크 포맷에 적용하기 위해 VACUUM 실행
             cursor.execute("VACUUM;")
             logger.info("Successfully migrated auto_vacuum mode to INCREMENTAL.")
 
-        # 4. 데이터 삭제
-        # api_raw_data 삭제 (UTC datetime과 맞추기 위해 datetime 함수 활용)
+        # 5. 데이터 삭제
         cursor.execute(
             "DELETE FROM api_raw_data WHERE datetime(fetched_at) < datetime('now', ?)",
             (f"-{days} days",)
@@ -130,29 +138,51 @@ def prune_db(days: int = 7, force: bool = False):
         conn.close()  # 커넥션을 명시적으로 닫아 락 해제
         logger.info(f"DB Pruning data deletion completed. Deleted {raw_deleted:,} rows from api_raw_data, {logs_deleted:,} rows from system_logs.")
 
-        # 5. incremental_vacuum 실행 (5000 페이지씩 락 부담 없이 점진적 회수)
+        # 6. incremental_vacuum 실행 (5000 페이지씩 락 부담 없이 점진적 회수)
         logger.info("Starting incremental_vacuum space reclamation...")
         vacuumed_total_pages = 0
         
-        # autocommit 모드 (isolation_level=None) 및 타임아웃 60초 설정하여 잠금 경합 완화
+        # autocommit 모드 (isolation_level=None) 및 타임아웃 60초 설정
         vac_conn = sqlite3.connect(DB_FILE, isolation_level=None, timeout=60.0)
         vac_cursor = vac_conn.cursor()
         try:
             while True:
-                vac_cursor.execute("PRAGMA freelist_count;")
-                freelist_count = vac_cursor.fetchone()[0]
+                # freelist 조회 시 락 방어 재시도 루프
+                freelist_count = 0
+                for retry in range(5):
+                    try:
+                        vac_cursor.execute("PRAGMA freelist_count;")
+                        freelist_count = vac_cursor.fetchone()[0]
+                        break
+                    except sqlite3.OperationalError as oe:
+                        if "locked" in str(oe).lower() and retry < 4:
+                            time.sleep(0.5)
+                        else:
+                            raise
+
                 if freelist_count == 0:
                     break
 
                 # 한 번에 5000 페이지씩 비우기
                 pages_to_vacuum = min(5000, freelist_count)
-                vac_cursor.execute(f"PRAGMA incremental_vacuum({pages_to_vacuum});")
+                
+                # vacuum 실행 시 락 방어 재시도 루프
+                for retry in range(5):
+                    try:
+                        vac_cursor.execute(f"PRAGMA incremental_vacuum({pages_to_vacuum});")
+                        break
+                    except sqlite3.OperationalError as oe:
+                        if "locked" in str(oe).lower() and retry < 4:
+                            time.sleep(0.5)
+                        else:
+                            raise
+
                 vacuumed_total_pages += pages_to_vacuum
-                time.sleep(0.05)  # 다른 스레드가 쓰기 작업을 할 수 있도록 양보 시간을 확보
+                time.sleep(0.05)  # 다른 스레드가 쓰기 작업을 할 수 있도록 양보
         finally:
             vac_conn.close()
 
-        # 6. 작업 후 파일 크기 및 절약된 공간
+        # 7. 작업 후 파일 크기 및 절약된 공간
         size_after = os.path.getsize(DB_FILE)
         size_after_mb = size_after / 1024 / 1024
         saved_mb = size_before_mb - size_after_mb
@@ -167,3 +197,7 @@ def prune_db(days: int = 7, force: bool = False):
 
     except Exception as e:
         logger.error(f"Failed to prune DB: {e}", exc_info=True)
+    finally:
+        # 8. 임시 제거한 SQLiteHandler 복구
+        for h in removed_handlers:
+            root_logger.addHandler(h)
