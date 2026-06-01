@@ -208,6 +208,7 @@ class BusinessRepository(AbstractBusinessRepository):
         - 이미 값이 있는 필드는 덮어쓰지 않음 (COALESCE)
         - 빈 문자열은 NULL로 처리하여 기존값 보호
         - license_date: None/미색인/빈값만 채움
+        - 백필 후 license_date == last_event_date인 경우 신규등록으로 재분류
         """
         query = """
             UPDATE businesses
@@ -227,10 +228,20 @@ class BusinessRepository(AbstractBusinessRepository):
                     CASE WHEN license_date IS NULL OR license_date = '' OR license_date = '미색인'
                          THEN NULLIF(?, '') ELSE license_date END,
                     license_date
-                )
+                ),
+                infer_update_type  = CASE 
+                    WHEN (license_date IS NULL OR license_date = '' OR license_date = '미색인') AND NULLIF(?, '') = last_event_date 
+                    THEN '신규등록' 
+                    ELSE infer_update_type 
+                END,
+                infer_update_detail = CASE 
+                    WHEN (license_date IS NULL OR license_date = '' OR license_date = '미색인') AND NULLIF(?, '') = last_event_date 
+                    THEN NULL 
+                    ELSE infer_update_detail 
+                END
             WHERE license_no = ?
         """
-        params = (industry_type, representative_name, phone_number, license_date, license_no)
+        params = (industry_type, representative_name, phone_number, license_date, license_date, license_date, license_no)
         if conn:
             conn.execute(query, params)
         else:
