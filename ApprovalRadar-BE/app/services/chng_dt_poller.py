@@ -378,7 +378,7 @@ async def poll_changes_for_date(target_date: str) -> dict:
                 seen_lcns_in_cycle.add(lcns)
 
                 prms_dt = item.get("PRMS_DT") or ""
-                if prms_dt == target_date:
+                if prms_dt and prms_dt >= target_date:
                     new_regs.append(item)
                 else:
                     new_items.append(item)
