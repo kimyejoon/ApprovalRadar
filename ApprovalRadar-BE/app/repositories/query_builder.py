@@ -35,16 +35,18 @@ def build_business_where_clause(
         conds.append(f"({' AND '.join(cond_a)})")
         
         # 조건 B: license_date가 유효하고, license_date가 범위 내인 경우 (신규등록 태그가 없어도 표시 가능)
-        cond_b = [
-            "(license_date IS NOT NULL AND license_date != '' AND license_date != '미색인')"
-        ]
-        if start_date:
-            cond_b.append("license_date >= ?")
-            params.append(start_date)
-        if end_date:
-            cond_b.append("license_date <= ?")
-            params.append(end_date)
-        conds.append(f"({' AND '.join(cond_b)})")
+        # 단, start_date 또는 end_date가 존재할 때만 적용하여 날짜 필터 해제 시 전체 데이터 매칭을 방지합니다.
+        if start_date or end_date:
+            cond_b = [
+                "(license_date IS NOT NULL AND license_date != '' AND license_date != '미색인')"
+            ]
+            if start_date:
+                cond_b.append("license_date >= ?")
+                params.append(start_date)
+            if end_date:
+                cond_b.append("license_date <= ?")
+                params.append(end_date)
+            conds.append(f"({' AND '.join(cond_b)})")
         
         query_conditions.append(f"({' OR '.join(conds)})")
     else:
