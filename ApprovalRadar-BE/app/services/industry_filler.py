@@ -80,12 +80,7 @@ async def fill_missing_industry_types():
 
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT license_no FROM businesses 
-            WHERE industry_type IS NULL OR industry_type = '' 
-               OR representative_name IS NULL OR representative_name = '' 
-               OR license_date IS NULL OR license_date = '' OR license_date = '미색인'
-        """)
+        cursor.execute("SELECT license_no FROM businesses WHERE industry_type IS NULL OR industry_type = ''")
         missing_records = cursor.fetchall()
 
     missing_licenses = [row["license_no"] for row in missing_records]
