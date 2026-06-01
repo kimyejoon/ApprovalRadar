@@ -69,8 +69,12 @@ export function useApprovalRadar(mode: 'changes' | 'new') {
     }
 
     const regions = params.get('regions') ? (params.get('regions') || '').split(',').filter(Boolean) : [];
-    const industries = params.get('industries') ? (params.get('industries') || '').split(',').filter(Boolean) : DEFAULT_INDUSTRY_FILTERS;
-    const exclude = params.get('exclude') ? (params.get('exclude') || '').split(',').filter(Boolean) : DEFAULT_EXCLUDE_KEYWORDS;
+    const industries = params.get('industries') 
+      ? (params.get('industries') || '').split(',').filter(Boolean) 
+      : (mode === 'new' ? [] : DEFAULT_INDUSTRY_FILTERS);
+    const exclude = params.get('exclude') 
+      ? (params.get('exclude') || '').split(',').filter(Boolean) 
+      : (mode === 'new' ? [] : DEFAULT_EXCLUDE_KEYWORDS);
 
     let from = startOfToday();
     let to = startOfToday();

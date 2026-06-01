@@ -125,12 +125,8 @@ export function ApprovalTable({
               <CaretDown weight="bold" className="w-4 h-4" />
             </button>
           </TableHead>
-          <TableHead>
-            {mode === 'new' ? (
-              <span className="flex items-center gap-1 text-text-muted font-medium text-xs">
-                구분
-              </span>
-            ) : (
+          {mode !== 'new' && (
+            <TableHead>
               <button
                 className="flex items-center gap-1 hover:text-text-primary transition-colors focus:outline-none"
                 onClick={onStatusClick}
@@ -138,8 +134,8 @@ export function ApprovalTable({
                 변경 타입
                 <CaretDown weight="bold" className="w-4 h-4" />
               </button>
-            )}
-          </TableHead>
+            </TableHead>
+          )}
           <SortableHead label={mode === 'new' ? '인허가 일자' : '인허가 변동시각'} sortKey="approvalDate" sortConfig={sortConfig} onSort={onSort} />
           <SortableHead label="전화번호" sortKey="phone" sortConfig={sortConfig} onSort={onSort} />
         </TableRow>
@@ -147,15 +143,15 @@ export function ApprovalTable({
       <TableBody>
         {isLoading ? (
           <TableRow>
-            <TableCell colSpan={8} className="text-center py-8 text-text-muted">데이터를 불러오는 중입니다...</TableCell>
+            <TableCell colSpan={mode === 'new' ? 7 : 8} className="text-center py-8 text-text-muted">데이터를 불러오는 중입니다...</TableCell>
           </TableRow>
         ) : isError ? (
           <TableRow>
-            <TableCell colSpan={8} className="text-center py-8 text-text-muted">데이터를 불러오는데 실패했습니다.</TableCell>
+            <TableCell colSpan={mode === 'new' ? 7 : 8} className="text-center py-8 text-text-muted">데이터를 불러오는데 실패했습니다.</TableCell>
           </TableRow>
         ) : groupedRows.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={8} className="text-center py-8 text-text-muted">검색 결과가 없습니다.</TableCell>
+            <TableCell colSpan={mode === 'new' ? 7 : 8} className="text-center py-8 text-text-muted">검색 결과가 없습니다.</TableCell>
           </TableRow>
         ) : (
           groupedRows.map((group, index) => {
@@ -231,37 +227,39 @@ export function ApprovalTable({
                     <span>{primaryItem.type}</span>
                   </div>
                 </TableCell>
-                <TableCell>
-                  {/* 변경 타입: 같은 날 여러 타입이면 태그 복수 표시 */}
-                  <div className="flex flex-col items-start gap-1">
-                    {typeEntries.map((entry, ti) => (
-                      <div key={ti} className="flex flex-col items-start gap-0.5">
-                        <span
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-[15px] font-extrabold text-white border"
-                          style={{
-                            backgroundColor: CATEGORY_COLORS[entry.type] || '#9ca3af',
-                            borderColor: CATEGORY_COLORS[entry.type] || '#9ca3af',
-                          }}
-                        >
-                          {CATEGORY_ICONS[entry.type] && (
-                            <span className="flex items-center text-white">
-                              {(() => {
-                                const Icon = CATEGORY_ICONS[entry.type];
-                                return <Icon weight="bold" size={14} />;
-                              })()}
+                {mode !== 'new' && (
+                  <TableCell>
+                    {/* 변경 타입: 같은 날 여러 타입이면 태그 복수 표시 */}
+                    <div className="flex flex-col items-start gap-1">
+                      {typeEntries.map((entry, ti) => (
+                        <div key={ti} className="flex flex-col items-start gap-0.5">
+                          <span
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-[15px] font-extrabold text-white border"
+                            style={{
+                              backgroundColor: CATEGORY_COLORS[entry.type] || '#9ca3af',
+                              borderColor: CATEGORY_COLORS[entry.type] || '#9ca3af',
+                            }}
+                          >
+                            {CATEGORY_ICONS[entry.type] && (
+                              <span className="flex items-center text-white">
+                                {(() => {
+                                  const Icon = CATEGORY_ICONS[entry.type];
+                                  return <Icon weight="bold" size={14} />;
+                                })()}
+                              </span>
+                            )}
+                            {entry.type || '-'}
+                          </span>
+                          {entry.detail && (
+                            <span className="text-[15px] font-bold text-text-primary mt-1.5 ml-0.5 leading-snug break-words block">
+                              {entry.detail}
                             </span>
                           )}
-                          {entry.type || '-'}
-                        </span>
-                        {entry.detail && (
-                          <span className="text-[15px] font-bold text-text-primary mt-1.5 ml-0.5 leading-snug break-words block">
-                            {entry.detail}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </TableCell>
+                        </div>
+                      ))}
+                    </div>
+                  </TableCell>
+                )}
                 <TableCell className="text-xs text-text-muted">
                   <div className="flex flex-col gap-0.5">
                     <span>{formatApprovalDate(primaryItem.approvalDate)}</span>
