@@ -186,9 +186,9 @@ export function ApprovalTable({
                       onClick={() => onRowClick(primaryItem)}
                       className="flex flex-col cursor-pointer hover:underline hover:text-brand transition-colors"
                     >
-                      <span>{primaryItem.name}</span>
+                      <span className="text-[15px] font-bold text-text-primary leading-tight">{primaryItem.name}</span>
                       {primaryItem.prevName && (
-                        <span className="text-[11px] text-brand mt-0.5 leading-tight break-keep">
+                        <span className="text-xs text-brand/80 mt-0.5 leading-tight break-keep">
                           (이전: {primaryItem.prevName})
                         </span>
                       )}
@@ -198,13 +198,13 @@ export function ApprovalTable({
                 </TableCell>
                 <TableCodeCell>
                   <div className="flex items-center gap-1.5 justify-between">
-                    <span>{primaryItem.id}</span>
+                    <span className="text-[15px] font-semibold text-text-primary font-mono">{primaryItem.id}</span>
                     <CopyButton text={primaryItem.id} />
                   </div>
                 </TableCodeCell>
                 <TableCell className="whitespace-nowrap">
                   <div className="flex items-center gap-1.5 justify-between">
-                    <span>{primaryItem.location}</span>
+                    <span className="text-[15px] font-medium text-text-primary">{primaryItem.location}</span>
                     <CopyButton text={primaryItem.location} />
                   </div>
                 </TableCell>
@@ -237,7 +237,7 @@ export function ApprovalTable({
                     {typeEntries.map((entry, ti) => (
                       <div key={ti} className="flex flex-col items-start gap-0.5">
                         <span
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-sm font-bold border"
                           style={{
                             color: CATEGORY_COLORS[entry.type] || '#9ca3af',
                             borderColor: CATEGORY_COLORS[entry.type] || '#9ca3af',
@@ -248,14 +248,14 @@ export function ApprovalTable({
                             <span className="flex items-center">
                               {(() => {
                                 const Icon = CATEGORY_ICONS[entry.type];
-                                return <Icon weight="bold" size={12} />;
+                                return <Icon weight="bold" size={13} />;
                               })()}
                             </span>
                           )}
                           {entry.type || '-'}
                         </span>
                         {entry.detail && (
-                          <span className="text-[11px] text-text-muted ml-1 leading-tight break-keep">
+                          <span className="text-xs text-text-muted ml-1 leading-tight break-keep">
                             {entry.detail}
                           </span>
                         )}
