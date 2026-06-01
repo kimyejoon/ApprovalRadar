@@ -186,9 +186,9 @@ export function ApprovalTable({
                       onClick={() => onRowClick(primaryItem)}
                       className="flex flex-col cursor-pointer hover:underline hover:text-brand transition-colors"
                     >
-                      <span className="text-[15px] font-bold text-text-primary leading-tight">{primaryItem.name}</span>
+                      <span className="text-[17px] font-extrabold text-text-primary leading-tight">{primaryItem.name}</span>
                       {primaryItem.prevName && (
-                        <span className="text-xs text-brand/80 mt-0.5 leading-tight break-keep">
+                        <span className="text-[13px] text-brand/80 mt-0.5 leading-tight break-keep font-semibold">
                           (이전: {primaryItem.prevName})
                         </span>
                       )}
@@ -198,13 +198,13 @@ export function ApprovalTable({
                 </TableCell>
                 <TableCodeCell>
                   <div className="flex items-center gap-1.5 justify-between">
-                    <span className="text-[15px] font-semibold text-text-primary font-mono">{primaryItem.id}</span>
+                    <span className="text-[16px] font-bold text-text-primary font-mono">{primaryItem.id}</span>
                     <CopyButton text={primaryItem.id} />
                   </div>
                 </TableCodeCell>
                 <TableCell className="whitespace-nowrap">
                   <div className="flex items-center gap-1.5 justify-between">
-                    <span className="text-[15px] font-medium text-text-primary">{primaryItem.location}</span>
+                    <span className="text-[16px] font-semibold text-text-primary">{primaryItem.location}</span>
                     <CopyButton text={primaryItem.location} />
                   </div>
                 </TableCell>
@@ -237,7 +237,7 @@ export function ApprovalTable({
                     {typeEntries.map((entry, ti) => (
                       <div key={ti} className="flex flex-col items-start gap-0.5">
                         <span
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-sm font-bold text-white border"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-[15px] font-extrabold text-white border"
                           style={{
                             backgroundColor: CATEGORY_COLORS[entry.type] || '#9ca3af',
                             borderColor: CATEGORY_COLORS[entry.type] || '#9ca3af',
@@ -247,14 +247,14 @@ export function ApprovalTable({
                             <span className="flex items-center text-white">
                               {(() => {
                                 const Icon = CATEGORY_ICONS[entry.type];
-                                return <Icon weight="bold" size={13} />;
+                                return <Icon weight="bold" size={14} />;
                               })()}
                             </span>
                           )}
                           {entry.type || '-'}
                         </span>
                         {entry.detail && (
-                          <span className="text-sm font-bold text-text-primary mt-1.5 ml-0.5 leading-snug break-words block">
+                          <span className="text-[15px] font-bold text-text-primary mt-1.5 ml-0.5 leading-snug break-words block">
                             {entry.detail}
                           </span>
                         )}
