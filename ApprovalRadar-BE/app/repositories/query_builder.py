@@ -12,20 +12,63 @@ def build_business_where_clause(
     query_conditions = []
     params = []
     
-    if infer_update_type:
-        placeholders = ', '.join(['?'] * len(infer_update_type))
-        # 같은 날 같은 업소에 여러 변경 유형이 있을 경우,
-        # 하나라도 매칭되면 해당 날짜 레코드 전체를 가져옴 (프론트 그룹핑용)
-        query_conditions.append(
-            f"EXISTS ("
-            f"SELECT 1 FROM businesses b2 "
-            f"WHERE b2.license_no = businesses.license_no "
-            f"AND b2.last_event_date = businesses.last_event_date "
-            f"AND b2.infer_update_type IN ({placeholders})"
-            f")"
-        )
-        params.extend(infer_update_type)
+    # 신규등록 탭 단독 조회 시 특별 처리
+    is_only_new_reg = (
+        infer_update_type 
+        and len(infer_update_type) == 1 
+        and infer_update_type[0] == '신규등록'
+    )
+    
+    if is_only_new_reg:
+        conds = []
         
+        # 조건 A: 태그가 '신규등록'이고, last_event_date가 범위 내인 경우
+        cond_a = [
+            "EXISTS (SELECT 1 FROM businesses b2 WHERE b2.license_no = businesses.license_no AND b2.last_event_date = businesses.last_event_date AND b2.infer_update_type = '신규등록')"
+        ]
+        if start_date:
+            cond_a.append("last_event_date >= ?")
+            params.append(start_date)
+        if end_date:
+            cond_a.append("last_event_date <= ?")
+            params.append(end_date)
+        conds.append(f"({' AND '.join(cond_a)})")
+        
+        # 조건 B: license_date가 유효하고, license_date가 범위 내인 경우 (신규등록 태그가 없어도 표시 가능)
+        cond_b = [
+            "(license_date IS NOT NULL AND license_date != '' AND license_date != '미색인')"
+        ]
+        if start_date:
+            cond_b.append("license_date >= ?")
+            params.append(start_date)
+        if end_date:
+            cond_b.append("license_date <= ?")
+            params.append(end_date)
+        conds.append(f"({' AND '.join(cond_b)})")
+        
+        query_conditions.append(f"({' OR '.join(conds)})")
+    else:
+        # 일반 처리
+        if infer_update_type:
+            placeholders = ', '.join(['?'] * len(infer_update_type))
+            query_conditions.append(
+                f"EXISTS ("
+                f"SELECT 1 FROM businesses b2 "
+                f"WHERE b2.license_no = businesses.license_no "
+                f"AND b2.last_event_date = businesses.last_event_date "
+                f"AND b2.infer_update_type IN ({placeholders})"
+                f")"
+            )
+            params.extend(infer_update_type)
+            
+        if start_date:
+            query_conditions.append("last_event_date >= ?")
+            params.append(start_date)
+            
+        if end_date:
+            query_conditions.append("last_event_date <= ?")
+            params.append(end_date)
+
     if industry_type:
         placeholders = ', '.join(['?'] * len(industry_type))
         query_conditions.append(f"industry_type IN ({placeholders})")
@@ -40,14 +83,6 @@ def build_business_where_clause(
         query_conditions.append("(business_name LIKE ? OR license_no LIKE ?)")
         search_term = f"%{search}%"
         params.extend([search_term, search_term])
-        
-    if start_date:
-        query_conditions.append("last_event_date >= ?")
-        params.append(start_date)
-        
-    if end_date:
-        query_conditions.append("last_event_date <= ?")
-        params.append(end_date)
         
     if regions:
         region_conditions = []
