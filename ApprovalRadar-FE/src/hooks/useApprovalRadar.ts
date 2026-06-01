@@ -89,9 +89,9 @@ export function useApprovalRadar(mode: 'changes' | 'new') {
       } catch (e) {}
     }
 
-    const sortKey = params.get('sort') as SortKey || null;
-    const sortDir = params.get('dir') as 'asc' | 'desc' || 'desc';
-    const sortConfig = sortKey ? { key: sortKey, direction: sortDir } : null;
+    const sortKey = (params.get('sort') as SortKey) || 'approvalDate';
+    const sortDir = (params.get('dir') as 'asc' | 'desc') || 'desc';
+    const sortConfig = { key: sortKey, direction: sortDir };
 
     return { page, size, search, status, regions, industries, exclude, from, to, sortConfig };
   };
@@ -148,10 +148,10 @@ export function useApprovalRadar(mode: 'changes' | 'new') {
         sortConfig.key === 'id' ? 'license_no' :
         sortConfig.key === 'name' ? 'business_name' :
         sortConfig.key === 'owner' ? 'representative_name' :
-        sortConfig.key === 'approvalDate' ? 'last_event_date' :
+        sortConfig.key === 'approvalDate' ? (mode === 'new' ? 'license_date' : 'last_event_date') :
         sortConfig.key === 'phone' ? 'phone_number' :
         sortConfig.key === 'type' ? 'industry_type' : 'created_at'
-      ) : 'created_at',
+      ) : (mode === 'new' ? 'license_date' : 'last_event_date'),
       sort_order: sortConfig ? sortConfig.direction : 'desc',
     }),
     refetchInterval: 1000 * 60 * 5, // 5 min polling
