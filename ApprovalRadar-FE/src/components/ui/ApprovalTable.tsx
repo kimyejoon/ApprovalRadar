@@ -254,7 +254,7 @@ export function ApprovalTable({
                           {entry.type || '-'}
                         </span>
                         {entry.detail && (
-                          <span className="text-[13px] font-semibold text-text-primary mt-1.5 ml-0.5 leading-snug break-words block">
+                          <span className="text-sm font-bold text-text-primary mt-1.5 ml-0.5 leading-snug break-words block">
                             {entry.detail}
                           </span>
                         )}
