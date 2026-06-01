@@ -237,15 +237,14 @@ export function ApprovalTable({
                     {typeEntries.map((entry, ti) => (
                       <div key={ti} className="flex flex-col items-start gap-0.5">
                         <span
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-sm font-bold border"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-sm font-bold text-white border"
                           style={{
-                            color: CATEGORY_COLORS[entry.type] || '#9ca3af',
+                            backgroundColor: CATEGORY_COLORS[entry.type] || '#9ca3af',
                             borderColor: CATEGORY_COLORS[entry.type] || '#9ca3af',
-                            backgroundColor: 'transparent',
                           }}
                         >
                           {CATEGORY_ICONS[entry.type] && (
-                            <span className="flex items-center">
+                            <span className="flex items-center text-white">
                               {(() => {
                                 const Icon = CATEGORY_ICONS[entry.type];
                                 return <Icon weight="bold" size={13} />;
