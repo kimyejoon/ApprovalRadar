@@ -48,9 +48,10 @@ async def _fetch_and_update_industry(
     industry_type = rows[0].get("INDUTY_CD_NM", "")
     representative_name = rows[0].get("PRSDNT_NM", "")
     phone_number = rows[0].get("TELNO", "")
+    license_date = rows[0].get("PRMS_DT", "")
 
     # 모두 빈값이면 업데이트할 것 없음
-    if not industry_type and not representative_name and not phone_number:
+    if not industry_type and not representative_name and not phone_number and not license_date:
         return False
 
     # SQLite 스레드/태스크 간 동시 쓰기 경합 방지
@@ -60,6 +61,7 @@ async def _fetch_and_update_industry(
             industry_type=industry_type,
             representative_name=representative_name,
             phone_number=phone_number,
+            license_date=license_date,
         )
     return True
 
@@ -78,7 +80,12 @@ async def fill_missing_industry_types():
 
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT license_no FROM businesses WHERE industry_type IS NULL OR industry_type = ''")
+        cursor.execute("""
+            SELECT license_no FROM businesses 
+            WHERE industry_type IS NULL OR industry_type = '' 
+               OR representative_name IS NULL OR representative_name = '' 
+               OR license_date IS NULL OR license_date = '' OR license_date = '미색인'
+        """)
         missing_records = cursor.fetchall()
 
     missing_licenses = [row["license_no"] for row in missing_records]
