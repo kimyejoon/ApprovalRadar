@@ -310,6 +310,7 @@ CREATE_INDEX_BUSINESS_NAME = 'CREATE INDEX IF NOT EXISTS idx_businesses_business
 CREATE_INDEX_INFER_UPDATE_TYPE = 'CREATE INDEX IF NOT EXISTS idx_businesses_infer_update_type ON businesses (infer_update_type);'
 # EXISTS 서브쿼리 최적화용 복합 인덱스: WHERE license_no=? AND last_event_date=? AND infer_update_type IN (?)
 CREATE_INDEX_LICENSE_DATE_TYPE = 'CREATE INDEX IF NOT EXISTS idx_businesses_license_date_type ON businesses (license_no, last_event_date, infer_update_type);'
+CREATE_INDEX_LICENSE_DATE = 'CREATE INDEX IF NOT EXISTS idx_businesses_license_date ON businesses (license_date);'
 CREATE_INDEX_INDUSTRY_TYPE = 'CREATE INDEX IF NOT EXISTS idx_businesses_industry_type ON businesses (industry_type);'
 CREATE_INDEX_LOGS_LEVEL = 'CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs (level);'
 CREATE_INDEX_LOGS_CREATED_AT = 'CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs (created_at);'
