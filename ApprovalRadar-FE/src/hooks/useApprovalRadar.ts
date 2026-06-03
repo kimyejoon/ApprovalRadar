@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfToday, parse } from 'date-fns';
 import { fetchApprovals, markApprovalAsRead, type ApprovalData, type ApprovalMappedItem, type ApprovalsResponse } from '@/lib/api';
-import { CATEGORY_NAMES, DEFAULT_STATUS_FILTERS, DEFAULT_INDUSTRY_FILTERS, DEFAULT_EXCLUDE_KEYWORDS } from '@/lib/constants';
+import { CATEGORY_NAMES, DEFAULT_STATUS_FILTERS, DEFAULT_INDUSTRY_FILTERS, DEFAULT_EXCLUDE_KEYWORDS, CHANGE_CATEGORIES } from '@/lib/constants';
 import { formatPhoneNumber } from '@/lib/utils';
 
 export type SortKey = 'name' | 'owner' | 'approvalDate' | 'phone' | 'id' | 'type';
@@ -141,7 +141,7 @@ export function useApprovalRadar(mode: 'changes' | 'new') {
       // mode가 'new'면 무조건 '신규등록'만, 'changes'면 '신규등록'을 필터 목록에서 제외하거나 사용자 선택 필터 적용
       infer_update_type: mode === 'new' 
         ? '신규등록' 
-        : (statusFilters.length > 0 ? statusFilters.join(',') : undefined),
+        : (statusFilters.length > 0 ? statusFilters.join(',') : CHANGE_CATEGORIES.join(',')),
       industry_type: industryFilters.length > 0 ? industryFilters.join(',') : undefined,
       exclude_keywords: excludeKeywords.length > 0 ? excludeKeywords.join(',') : undefined,
       sort_by: sortConfig ? (

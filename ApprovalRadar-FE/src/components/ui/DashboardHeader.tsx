@@ -18,7 +18,7 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ dateRange, filters, mode = 'changes' }: DashboardHeaderProps) {
   const todayNewCount = useIndicatorStore(s => s.todayNewCount);
-  const { isExporting, handleExportExcel } = useExcelExport(dateRange, filters);
+  const { isExporting, handleExportExcel } = useExcelExport(dateRange, filters, mode);
 
   return (
     <div className="flex justify-between items-center mb-6">

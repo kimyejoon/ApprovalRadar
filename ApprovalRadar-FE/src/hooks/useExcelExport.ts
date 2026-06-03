@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { exportApprovalsExcel } from '@/lib/api';
+import { CHANGE_CATEGORIES } from '@/lib/constants';
 
 interface DateRange {
   from?: Date;
@@ -15,7 +16,7 @@ interface ExcelExportFilters {
   exclude_keywords?: string[];
 }
 
-export function useExcelExport(dateRange?: DateRange, filters?: ExcelExportFilters) {
+export function useExcelExport(dateRange?: DateRange, filters?: ExcelExportFilters, mode: 'changes' | 'new' = 'changes') {
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExportExcel = async () => {
@@ -48,7 +49,14 @@ export function useExcelExport(dateRange?: DateRange, filters?: ExcelExportFilte
 
       const search = filters?.search?.trim() || undefined;
       const regions = filters?.regions && filters.regions.length > 0 ? filters.regions.join(',') : undefined;
-      const infer_update_type = filters?.infer_update_type && filters.infer_update_type.length > 0 ? filters.infer_update_type.join(',') : undefined;
+      
+      const resolvedUpdateTypes = mode === 'new' 
+        ? ['신규등록']
+        : (filters?.infer_update_type && filters.infer_update_type.length > 0 
+           ? filters.infer_update_type 
+           : CHANGE_CATEGORIES);
+      const infer_update_type = resolvedUpdateTypes.join(',');
+      
       const industry_type = filters?.industry_type && filters.industry_type.length > 0 ? filters.industry_type.join(',') : undefined;
       const exclude_keywords = filters?.exclude_keywords && filters.exclude_keywords.length > 0 ? filters.exclude_keywords.join(',') : undefined;
       
