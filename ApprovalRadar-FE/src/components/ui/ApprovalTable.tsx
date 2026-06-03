@@ -260,11 +260,13 @@ export function ApprovalTable({
                     </div>
                   </TableCell>
                 )}
-                <TableCell className="text-xs text-text-muted">
-                  <div className="flex flex-col gap-0.5">
-                    <span>{formatApprovalDate(primaryItem.approvalDate)}</span>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[16px] font-bold text-text-primary whitespace-nowrap">
+                      {formatApprovalDate(primaryItem.approvalDate)}
+                    </span>
                     {primaryItem.raw.created_at && (
-                      <span className="text-[10px] text-text-muted/60 leading-tight">
+                      <span className="text-[12px] text-text-muted leading-tight whitespace-nowrap">
                         색인일: {formatIndexedAt(primaryItem.raw.created_at)}
                       </span>
                     )}

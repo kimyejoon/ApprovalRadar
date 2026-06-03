@@ -54,7 +54,7 @@ export function useApprovalRadar(mode: 'changes' | 'new') {
   const getInitialState = () => {
     const params = getUrlParams();
     const page = parseInt(params.get('page') || '1', 10);
-    const size = parseInt(params.get('size') || '50', 10);
+    const size = parseInt(params.get('size') || '100', 10);
     const search = params.get('search') || '';
 
     // 모드별 상태(status) 기본값 분기
