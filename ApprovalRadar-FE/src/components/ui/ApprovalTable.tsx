@@ -266,7 +266,7 @@ export function ApprovalTable({
                       {formatApprovalDate(primaryItem.approvalDate)}
                     </span>
                     {primaryItem.raw.created_at && (
-                      <span className="text-[15px] font-semibold text-text-muted leading-tight whitespace-nowrap">
+                      <span className="text-[15px] font-semibold text-text-primary leading-tight whitespace-nowrap">
                         색인일: {formatIndexedAt(primaryItem.raw.created_at)}
                       </span>
                     )}
