@@ -148,10 +148,10 @@ export function useApprovalRadar(mode: 'changes' | 'new') {
         sortConfig.key === 'id' ? 'license_no' :
         sortConfig.key === 'name' ? 'business_name' :
         sortConfig.key === 'owner' ? 'representative_name' :
-        sortConfig.key === 'approvalDate' ? (mode === 'new' ? 'license_date' : 'last_event_date') :
+        sortConfig.key === 'approvalDate' ? 'created_at' :
         sortConfig.key === 'phone' ? 'phone_number' :
         sortConfig.key === 'type' ? 'industry_type' : 'created_at'
-      ) : (mode === 'new' ? 'license_date' : 'last_event_date'),
+      ) : 'created_at',
       sort_order: sortConfig ? sortConfig.direction : 'desc',
     }),
     refetchInterval: 1000 * 60 * 5, // 5 min polling
