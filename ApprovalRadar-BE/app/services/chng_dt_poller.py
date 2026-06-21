@@ -589,6 +589,11 @@ async def _run_poller_async():
     근거: D-1 ⊄ D-2 ≒ 15건 누락 (LCNS_NO가 CHNG_DT 업데이트되어 다른 날짜로 이동)
     """
     now = datetime.datetime.now()
+    today_str = now.strftime("%Y%m%d")
+
+    # 임시 캐시 중 오늘 날짜와 다른 오래된 캐시 정리 (메모리 누수 방지)
+    global _temp_polled_cache
+    _temp_polled_cache = {item for item in _temp_polled_cache if item[2] == today_str}
 
     # D-3 → D-2 → D-1 순서 (넓은 범위부터 먼저 수집)
     anchors = [
