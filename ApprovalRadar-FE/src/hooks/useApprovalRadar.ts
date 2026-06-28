@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, startOfToday, parse } from 'date-fns';
+import { format, startOfToday, parse, addDays } from 'date-fns';
 import { fetchApprovals, markApprovalAsRead, type ApprovalData, type ApprovalMappedItem, type ApprovalsResponse } from '@/lib/api';
 import { CATEGORY_NAMES, DEFAULT_STATUS_FILTERS, DEFAULT_INDUSTRY_FILTERS, DEFAULT_EXCLUDE_KEYWORDS, CHANGE_CATEGORIES } from '@/lib/constants';
 import { formatPhoneNumber } from '@/lib/utils';
@@ -77,7 +77,7 @@ export function useApprovalRadar(mode: 'changes' | 'new') {
       : (mode === 'new' ? [] : DEFAULT_EXCLUDE_KEYWORDS);
 
     let from = startOfToday();
-    let to = startOfToday();
+    let to = addDays(startOfToday(), 30);
     if (params.get('from')) {
       try {
         from = parse(params.get('from') || '', 'yyyyMMdd', new Date());
