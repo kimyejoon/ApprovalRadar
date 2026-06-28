@@ -61,7 +61,7 @@ export const INDUSTRY_ICONS: Record<string, Icon> = {
 // 변경이 필요한 경우 이 파일만 수정하면 useApprovalRadar.ts에 자동 반영됩니다.
 
 /** 상태 유형 기본 필터 */
-export const DEFAULT_STATUS_FILTERS: string[] = ['대표자변경'];
+export const DEFAULT_STATUS_FILTERS: string[] = ['대표자변경', '변경민원-상호명'];
 
 /** 업종 기본 필터 */
 export const DEFAULT_INDUSTRY_FILTERS: string[] = ['일반음식점', '제과점영업', '휴게음식점'];
